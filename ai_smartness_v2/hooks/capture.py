@@ -201,8 +201,8 @@ def get_ai_path() -> Path:
         candidate = parent / ".ai"
         if candidate.exists():
             return candidate
-        # Also check for .ai_smartness_v2/.ai (hidden folder)
-        candidate = parent / ".ai_smartness_v2" / ".ai"
+        # Also check for _ai_smartness_v2/.ai (underscore prefix folder)
+        candidate = parent / "_ai_smartness_v2" / ".ai"
         if candidate.exists():
             return candidate
 

@@ -169,7 +169,7 @@ def ensure_daemon_running(ai_path: Path, max_wait: float = 2.0) -> bool:
     # Start the daemon
     try:
         # Find the processor script path
-        # Use direct path since folder may be hidden (.ai_smartness_v2)
+        # Use direct path since folder may be hidden (_ai_smartness_v2)
         package_dir = Path(__file__).parent.parent
         processor_path = package_dir / "daemon" / "processor.py"
 

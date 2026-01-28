@@ -59,7 +59,7 @@ def clear_hook_guard():
 # =============================================================================
 
 def get_package_root() -> Path:
-    """Get the .ai_smartness_v2 package root."""
+    """Get the _ai_smartness_v2 package root."""
     return Path(__file__).parent.parent
 
 

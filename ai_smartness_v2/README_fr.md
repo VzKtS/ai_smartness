@@ -57,7 +57,7 @@ Le système maintient un **réseau de pensées** où les concepts restent connec
 
 ```bash
 # Dans votre projet cible
-/chemin/vers/.ai_smartness_v2/install.sh .
+/chemin/vers/_ai_smartness_v2/install.sh .
 ```
 
 ### Configuration Interactive
@@ -68,7 +68,7 @@ Le système maintient un **réseau de pensées** où les concepts restent connec
 
 ### Ce que le Script Fait
 
-- Copie .ai_smartness_v2 dans votre projet
+- Copie _ai_smartness_v2 dans votre projet
 - Configure les hooks Claude Code avec des **chemins absolus**
 - Détecte le chemin du CLI Claude pour l'extraction LLM
 - Initialise la structure de la base de données
@@ -85,22 +85,22 @@ Le système maintient un **réseau de pensées** où les concepts restent connec
 cd /votre/projet
 
 # Aperçu du statut
-python3 .ai_smartness_v2/cli/main.py status
+python3 _ai_smartness_v2/cli/main.py status
 
 # Lister les threads
-python3 .ai_smartness_v2/cli/main.py threads
-python3 .ai_smartness_v2/cli/main.py threads --status active
-python3 .ai_smartness_v2/cli/main.py threads --limit 20
+python3 _ai_smartness_v2/cli/main.py threads
+python3 _ai_smartness_v2/cli/main.py threads --status active
+python3 _ai_smartness_v2/cli/main.py threads --limit 20
 
 # Voir un thread spécifique
-python3 .ai_smartness_v2/cli/main.py thread <thread_id>
+python3 _ai_smartness_v2/cli/main.py thread <thread_id>
 
 # Lister les bridges
-python3 .ai_smartness_v2/cli/main.py bridges
-python3 .ai_smartness_v2/cli/main.py bridges --thread <thread_id>
+python3 _ai_smartness_v2/cli/main.py bridges
+python3 _ai_smartness_v2/cli/main.py bridges --thread <thread_id>
 
 # Recherche sémantique
-python3 .ai_smartness_v2/cli/main.py search "authentification"
+python3 _ai_smartness_v2/cli/main.py search "authentification"
 ```
 
 ---
@@ -150,7 +150,7 @@ Avant chaque prompt utilisateur, contexte invisible injecté:
 
 ## Configuration
 
-Config stockée dans `.ai_smartness_v2/.ai/config.json`:
+Config stockée dans `_ai_smartness_v2/.ai/config.json`:
 
 ```json
 {
@@ -189,7 +189,7 @@ Config stockée dans `.ai_smartness_v2/.ai/config.json`:
 ## Structure de la Base de Données
 
 ```
-.ai_smartness_v2/.ai/
+_ai_smartness_v2/.ai/
 ├── config.json           # Configuration
 ├── db/
 │   ├── threads/          # Fichiers JSON Thread

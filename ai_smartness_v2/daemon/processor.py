@@ -9,7 +9,7 @@ This daemon:
 4. Runs persistently in background
 
 Usage:
-    python3 .ai_smartness_v2/daemon/processor.py --db-path /path/to/.ai/db
+    python3 _ai_smartness_v2/daemon/processor.py --db-path /path/to/.ai/db
 
 Or via client (internal):
     from daemon.client import ensure_daemon_running
@@ -81,43 +81,10 @@ class ProcessorDaemon:
         logger.info("Loading modules...")
 
         try:
-            # Use importlib for direct path loading since folder may be hidden (.ai_smartness_v2)
-            # which Python doesn't recognize as a valid module name
-            import importlib.util
-
-            package_dir = Path(__file__).parent.parent
-
-            def load_module(name: str, rel_path: str):
-                """Load a module by file path."""
-                module_path = package_dir / rel_path
-                spec = importlib.util.spec_from_file_location(name, module_path)
-                module = importlib.util.module_from_spec(spec)
-                sys.modules[name] = module
-                spec.loader.exec_module(module)
-                return module
-
-            # Load modules in dependency order
-            # 1. Models (no deps)
-            thread_model = load_module("thread_model", "models/thread.py")
-            bridge_model = load_module("bridge_model", "models/bridge.py")
-
-            # 2. Storage (depends on models)
-            storage_threads = load_module("storage_threads", "storage/threads.py")
-            storage_bridges = load_module("storage_bridges", "storage/bridges.py")
-            storage_manager = load_module("storage_manager", "storage/manager.py")
-
-            # 3. Processing (some deps)
-            extractor = load_module("extractor", "processing/extractor.py")
-            embeddings = load_module("embeddings", "processing/embeddings.py")
-
-            # 4. Intelligence (depends on storage, processing)
-            thread_manager = load_module("thread_manager", "intelligence/thread_manager.py")
-            gossip = load_module("gossip", "intelligence/gossip.py")
-
-            # Get classes from loaded modules
-            StorageManager = storage_manager.StorageManager
-            ThreadManager = thread_manager.ThreadManager
-            GossipPropagator = gossip.GossipPropagator
+            # With _ai_smartness_v2 (underscore prefix), regular imports work
+            from ..storage.manager import StorageManager
+            from ..intelligence.thread_manager import ThreadManager
+            from ..intelligence.gossip import GossipPropagator
 
             # StorageManager expects root_path (parent of .ai)
             # db_path = /path/.ai/db → root_path = /path
