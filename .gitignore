@@ -1,0 +1,27 @@
+# AI Smartness v1 - legacy folder (not part of this repo)
+/ai_smartness/
+
+# Runtime data (created when installed in projects)
+**/.ai/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Claude settings (local only)
+.claude/
+.claudeignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
