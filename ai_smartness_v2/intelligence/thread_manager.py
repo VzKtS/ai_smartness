@@ -222,8 +222,8 @@ class ThreadManager:
         """Execute the decided action."""
 
         if decision.action == ThreadAction.NEW_THREAD:
-            # Create new thread
-            title = extraction.intent or extract_title_from_content(content)
+            # Create new thread - use title (subject-based), not intent (action-based)
+            title = extraction.title or extract_title_from_content(content)
             thread = Thread.create(title, OriginType(source_type))
             thread.topics = extraction.subjects + extraction.key_concepts
             thread.add_message(content, "user")
@@ -246,9 +246,9 @@ class ThreadManager:
             )
 
         elif decision.action == ThreadAction.FORK:
-            # Fork from parent thread
+            # Fork from parent thread - use title (subject-based)
             parent = self.storage.threads.get(decision.thread_id)
-            title = extraction.intent or extract_title_from_content(content)
+            title = extraction.title or extract_title_from_content(content)
             thread = Thread.create(title, OriginType.SPLIT, parent_id=decision.thread_id)
             thread.topics = extraction.subjects + extraction.key_concepts
             thread.add_message(content, "user")

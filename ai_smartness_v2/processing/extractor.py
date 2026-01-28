@@ -19,6 +19,7 @@ SourceType = Literal["prompt", "read", "write", "task", "fetch", "response"]
 class Extraction:
     """Result of LLM extraction."""
     source_type: SourceType
+    title: str  # Short subject title (3-5 words, NO action verbs)
     intent: str  # What the user/system intended
     subjects: List[str]  # Main subjects/topics
     questions: List[str]  # Questions asked or implied
@@ -31,6 +32,7 @@ class Extraction:
     def to_dict(self) -> dict:
         return {
             "source_type": self.source_type,
+            "title": self.title,
             "intent": self.intent,
             "subjects": self.subjects,
             "questions": self.questions,
@@ -42,14 +44,21 @@ class Extraction:
 
 
 # Extraction prompts per source type
+# IMPORTANT: "title" must be the SUBJECT (noun), not an action (verb)
+# BAD: "Analyser le protocole P2P" / GOOD: "Protocole P2P handshake"
 EXTRACTION_PROMPTS = {
     "prompt": """Analyse ce message utilisateur et extrait les informations structurées.
 
 MESSAGE:
 {content}
 
+IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+- MAUVAIS: "Analyser le fichier de config"
+- BON: "Configuration système"
+
 Réponds en JSON strict:
 {{
+  "title": "Sujet principal en 3-5 mots (nom, pas verbe)",
   "intent": "L'intention principale de l'utilisateur (1 phrase)",
   "subjects": ["sujet1", "sujet2"],
   "questions": ["question posée ou implicite"],
@@ -66,8 +75,13 @@ FICHIER: {file_path}
 CONTENU (extrait):
 {content}
 
+IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+- MAUVAIS: "Lire le fichier de handshake"
+- BON: "P2P Handshake Protocol"
+
 Réponds en JSON strict:
 {{
+  "title": "Sujet principal du fichier en 3-5 mots",
   "intent": "Pourquoi ce fichier est probablement lu (1 phrase)",
   "subjects": ["sujet principal du fichier"],
   "questions": [],
@@ -84,8 +98,13 @@ FICHIER: {file_path}
 CHANGEMENTS:
 {content}
 
+IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+- MAUVAIS: "Modifier la gestion des erreurs"
+- BON: "Error handling system"
+
 Réponds en JSON strict:
 {{
+  "title": "Sujet de la modification en 3-5 mots",
   "intent": "Ce qui a été modifié et pourquoi (1 phrase)",
   "subjects": ["sujet de la modification"],
   "questions": [],
@@ -101,8 +120,13 @@ Sois concis. Pas de texte hors du JSON.""",
 RÉSULTAT:
 {content}
 
+IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+- MAUVAIS: "Analyser l'architecture du projet"
+- BON: "Architecture projet"
+
 Réponds en JSON strict:
 {{
+  "title": "Sujet traité en 3-5 mots",
   "intent": "Ce que le sous-agent a accompli (1 phrase)",
   "subjects": ["sujet traité"],
   "questions": ["question ouverte si applicable"],
@@ -119,8 +143,13 @@ URL: {url}
 CONTENU:
 {content}
 
+IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+- MAUVAIS: "Rechercher la documentation API"
+- BON: "API Documentation"
+
 Réponds en JSON strict:
 {{
+  "title": "Sujet de la page en 3-5 mots",
   "intent": "Information recherchée (1 phrase)",
   "subjects": ["sujet de la recherche"],
   "questions": [],
@@ -136,8 +165,13 @@ Sois concis. Pas de texte hors du JSON.""",
 RÉPONSE:
 {content}
 
+IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+- MAUVAIS: "Proposer une solution de cache"
+- BON: "Cache system design"
+
 Réponds en JSON strict:
 {{
+  "title": "Sujet traité en 3-5 mots",
   "intent": "Ce que l'assistant a fait/proposé (1 phrase)",
   "subjects": ["sujet traité"],
   "questions": ["question posée à l'utilisateur"],
@@ -222,6 +256,7 @@ class LLMExtractor:
             # Return minimal extraction on error
             return Extraction(
                 source_type=source_type,
+                title="Extraction error",
                 intent=f"Extraction failed: {e}",
                 subjects=[],
                 questions=[],
@@ -297,7 +332,11 @@ class LLMExtractor:
         words = content.split()
         significant_words = [w for w in words if len(w) > 4 and w[0].isupper()][:5]
 
+        # Build title from significant words (noun-based)
+        title = ' '.join(significant_words[:3]) if significant_words else "Unknown topic"
+
         return json.dumps({
+            "title": title,
             "intent": "Extraction heuristique (LLM non disponible)",
             "subjects": significant_words[:2] if significant_words else ["unknown"],
             "questions": [],
@@ -370,8 +409,14 @@ class LLMExtractor:
                 subjects = self._clean_topics(data.get("subjects", []))
                 key_concepts = self._clean_topics(data.get("key_concepts", []))
 
+                # Get title, fallback to first subject if not provided
+                title = data.get("title", "")
+                if not title and subjects:
+                    title = subjects[0].title()
+
                 return Extraction(
                     source_type=source_type,
+                    title=title,
                     intent=data.get("intent", ""),
                     subjects=subjects,
                     questions=data.get("questions", []),
@@ -387,6 +432,7 @@ class LLMExtractor:
         # Parsing failed, return minimal extraction
         return Extraction(
             source_type=source_type,
+            title="Unknown",
             intent="Parsing failed",
             subjects=[],
             questions=[],
