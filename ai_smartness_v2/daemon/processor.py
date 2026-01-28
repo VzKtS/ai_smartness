@@ -9,7 +9,7 @@ This daemon:
 4. Runs persistently in background
 
 Usage:
-    python3 _ai_smartness_v2/daemon/processor.py --db-path /path/to/.ai/db
+    python3 ai_smartness_v2/daemon/processor.py --db-path /path/to/.ai/db
 
 Or via client (internal):
     from daemon.client import ensure_daemon_running
@@ -81,10 +81,26 @@ class ProcessorDaemon:
         logger.info("Loading modules...")
 
         try:
-            # With _ai_smartness_v2 (underscore prefix), regular imports work
-            from ..storage.manager import StorageManager
-            from ..intelligence.thread_manager import ThreadManager
-            from ..intelligence.gossip import GossipPropagator
+            # Add package parent to sys.path so we can import as a package
+            # ai_smartness_v2/ is in /project/ai_smartness_v2/
+            # We need to add /project/ to sys.path
+            package_dir = Path(__file__).parent.parent  # ai_smartness_v2/
+            package_parent = package_dir.parent  # /project/
+            package_name = package_dir.name  # "ai_smartness_v2"
+
+            if str(package_parent) not in sys.path:
+                sys.path.insert(0, str(package_parent))
+
+            # Now we can import using absolute package paths
+            # Import dynamically to avoid issues at module load time
+            import importlib
+            storage_mod = importlib.import_module(f"{package_name}.storage.manager")
+            thread_manager_mod = importlib.import_module(f"{package_name}.intelligence.thread_manager")
+            gossip_mod = importlib.import_module(f"{package_name}.intelligence.gossip")
+
+            StorageManager = storage_mod.StorageManager
+            ThreadManager = thread_manager_mod.ThreadManager
+            GossipPropagator = gossip_mod.GossipPropagator
 
             # StorageManager expects root_path (parent of .ai)
             # db_path = /path/.ai/db → root_path = /path

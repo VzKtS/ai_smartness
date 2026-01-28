@@ -57,7 +57,7 @@ The system maintains a **thought network** where concepts remain connected and a
 
 ```bash
 # In your target project
-/path/to/_ai_smartness_v2/install.sh .
+/path/to/ai_smartness_v2/install.sh .
 ```
 
 ### Interactive Setup
@@ -68,7 +68,7 @@ The system maintains a **thought network** where concepts remain connected and a
 
 ### What the Script Does
 
-- Copies _ai_smartness_v2 into your project
+- Copies ai_smartness_v2 into your project
 - Configures Claude Code hooks with **absolute paths**
 - Detects Claude CLI path for LLM extraction
 - Initializes the database structure
@@ -85,22 +85,22 @@ The system maintains a **thought network** where concepts remain connected and a
 cd /your/project
 
 # Status overview
-python3 _ai_smartness_v2/cli/main.py status
+python3 ai_smartness_v2/cli/main.py status
 
 # List threads
-python3 _ai_smartness_v2/cli/main.py threads
-python3 _ai_smartness_v2/cli/main.py threads --status active
-python3 _ai_smartness_v2/cli/main.py threads --limit 20
+python3 ai_smartness_v2/cli/main.py threads
+python3 ai_smartness_v2/cli/main.py threads --status active
+python3 ai_smartness_v2/cli/main.py threads --limit 20
 
 # View specific thread
-python3 _ai_smartness_v2/cli/main.py thread <thread_id>
+python3 ai_smartness_v2/cli/main.py thread <thread_id>
 
 # List bridges
-python3 _ai_smartness_v2/cli/main.py bridges
-python3 _ai_smartness_v2/cli/main.py bridges --thread <thread_id>
+python3 ai_smartness_v2/cli/main.py bridges
+python3 ai_smartness_v2/cli/main.py bridges --thread <thread_id>
 
 # Semantic search
-python3 _ai_smartness_v2/cli/main.py search "authentication"
+python3 ai_smartness_v2/cli/main.py search "authentication"
 ```
 
 ---
@@ -150,7 +150,7 @@ At 95% context window:
 
 ## Configuration
 
-Config stored in `_ai_smartness_v2/.ai/config.json`:
+Config stored in `ai_smartness_v2/.ai/config.json`:
 
 ```json
 {
@@ -189,7 +189,7 @@ Config stored in `_ai_smartness_v2/.ai/config.json`:
 ## Database Structure
 
 ```
-_ai_smartness_v2/.ai/
+ai_smartness_v2/.ai/
 ├── config.json           # Configuration
 ├── db/
 │   ├── threads/          # Thread JSON files

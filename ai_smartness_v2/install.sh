@@ -192,7 +192,7 @@ echo "📁 Target: $TARGET_DIR"
 # ============================================================================
 
 KEEP_DATA="no"
-AI_SMARTNESS_DIR="$TARGET_DIR/_ai_smartness_v2"
+AI_SMARTNESS_DIR="$TARGET_DIR/ai_smartness_v2"
 
 if [ -d "$AI_SMARTNESS_DIR" ]; then
     echo ""
@@ -224,7 +224,7 @@ if [ -d "$AI_SMARTNESS_DIR" ]; then
 
     # Backup if keeping data
     if [ "$KEEP_DATA" = "yes" ] && [ -d "$DB_DIR" ]; then
-        BACKUP_DIR="/tmp/_ai_smartness_v2_backup_$$"
+        BACKUP_DIR="/tmp/ai_smartness_v2_backup_$$"
         cp -r "$AI_SMARTNESS_DIR/.ai" "$BACKUP_DIR"
     fi
 
@@ -458,12 +458,12 @@ GITIGNORE="$TARGET_DIR/.gitignore"
 
 GITIGNORE_ENTRIES="
 # AI Smartness v2
-_ai_smartness_v2/
+ai_smartness_v2/
 .ai/
 "
 
 if [ -f "$GITIGNORE" ]; then
-    if ! grep -q "^_ai_smartness_v2/$" "$GITIGNORE" 2>/dev/null; then
+    if ! grep -q "^ai_smartness_v2/$" "$GITIGNORE" 2>/dev/null; then
         echo "$GITIGNORE_ENTRIES" >> "$GITIGNORE"
         echo "   ✓ Entries added"
     else
@@ -480,11 +480,11 @@ fi
 
 CLAUDEIGNORE="$TARGET_DIR/.claudeignore"
 CLAUDEIGNORE_ENTRIES="# AI Smartness v2 - invisible to agent
-_ai_smartness_v2/
+ai_smartness_v2/
 .claude/"
 
 if [ -f "$CLAUDEIGNORE" ]; then
-    if ! grep -q "^_ai_smartness_v2/$" "$CLAUDEIGNORE" 2>/dev/null; then
+    if ! grep -q "^ai_smartness_v2/$" "$CLAUDEIGNORE" 2>/dev/null; then
         echo "" >> "$CLAUDEIGNORE"
         echo "$CLAUDEIGNORE_ENTRIES" >> "$CLAUDEIGNORE"
     fi

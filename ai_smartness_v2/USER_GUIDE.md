@@ -95,7 +95,7 @@ When the context window fills to 95%:
 
 ```bash
 # Global overview
-python3 _ai_smartness_v2/cli/main.py status
+python3 ai_smartness_v2/cli/main.py status
 ```
 
 Shows:
@@ -108,42 +108,42 @@ Shows:
 
 ```bash
 # List all threads
-python3 _ai_smartness_v2/cli/main.py threads
+python3 ai_smartness_v2/cli/main.py threads
 
 # Filter by status
-python3 _ai_smartness_v2/cli/main.py threads --status active
-python3 _ai_smartness_v2/cli/main.py threads --status suspended
-python3 _ai_smartness_v2/cli/main.py threads --status archived
+python3 ai_smartness_v2/cli/main.py threads --status active
+python3 ai_smartness_v2/cli/main.py threads --status suspended
+python3 ai_smartness_v2/cli/main.py threads --status archived
 
 # Limit results
-python3 _ai_smartness_v2/cli/main.py threads --limit 10
+python3 ai_smartness_v2/cli/main.py threads --limit 10
 
 # View specific thread
-python3 _ai_smartness_v2/cli/main.py thread thread_20260128_143022_abc123
+python3 ai_smartness_v2/cli/main.py thread thread_20260128_143022_abc123
 ```
 
 ### Bridges
 
 ```bash
 # List all bridges
-python3 _ai_smartness_v2/cli/main.py bridges
+python3 ai_smartness_v2/cli/main.py bridges
 
 # Filter by thread
-python3 _ai_smartness_v2/cli/main.py bridges --thread thread_20260128_143022
+python3 ai_smartness_v2/cli/main.py bridges --thread thread_20260128_143022
 
 # Limit results
-python3 _ai_smartness_v2/cli/main.py bridges --limit 20
+python3 ai_smartness_v2/cli/main.py bridges --limit 20
 ```
 
 ### Search
 
 ```bash
 # Semantic search across threads
-python3 _ai_smartness_v2/cli/main.py search "authentication"
-python3 _ai_smartness_v2/cli/main.py search "database migration"
+python3 ai_smartness_v2/cli/main.py search "authentication"
+python3 ai_smartness_v2/cli/main.py search "database migration"
 
 # Limit results
-python3 _ai_smartness_v2/cli/main.py search "api" --limit 5
+python3 ai_smartness_v2/cli/main.py search "api" --limit 5
 ```
 
 ---
@@ -171,7 +171,7 @@ If rules are violated, reminders are injected into context.
 
 ### Configuration
 
-Edit `_ai_smartness_v2/.ai/config.json`:
+Edit `ai_smartness_v2/.ai/config.json`:
 
 ```json
 {
@@ -198,7 +198,7 @@ Don't try to "help" the system - it captures everything automatically. Just:
 
 When starting a new session:
 1. The system injects context automatically
-2. You can check status: `python3 _ai_smartness_v2/cli/main.py status`
+2. You can check status: `python3 ai_smartness_v2/cli/main.py status`
 3. Your agent will have access to previous context
 
 ### Long Projects
@@ -287,7 +287,7 @@ If the agent seems to "forget" context:
 
 ## Database Files
 
-Location: `_ai_smartness_v2/.ai/`
+Location: `ai_smartness_v2/.ai/`
 
 | File/Folder | Content |
 |-------------|---------|
@@ -300,13 +300,13 @@ Location: `_ai_smartness_v2/.ai/`
 
 ```bash
 # Count threads
-ls _ai_smartness_v2/.ai/db/threads/ | wc -l
+ls ai_smartness_v2/.ai/db/threads/ | wc -l
 
 # Count bridges
-ls _ai_smartness_v2/.ai/db/bridges/ | wc -l
+ls ai_smartness_v2/.ai/db/bridges/ | wc -l
 
 # View a thread
-cat _ai_smartness_v2/.ai/db/threads/thread_20260128_143022_abc123.json | python3 -m json.tool
+cat ai_smartness_v2/.ai/db/threads/thread_20260128_143022_abc123.json | python3 -m json.tool
 ```
 
 ---
@@ -329,4 +329,4 @@ If you encounter issues:
 1. Check `.claude/settings.json` for correct hook paths
 2. Verify Claude CLI is accessible
 3. Review thread/bridge counts with CLI
-4. Check `_ai_smartness_v2/.ai/` for database integrity
+4. Check `ai_smartness_v2/.ai/` for database integrity
