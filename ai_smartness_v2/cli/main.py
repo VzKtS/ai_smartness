@@ -8,6 +8,8 @@ Usage:
     ai thread <id>         Show thread details
     ai bridges             List bridges
     ai search <query>      Search threads
+    ai reindex             Recalculate all embeddings
+    ai health              System health check
 """
 
 import argparse
@@ -84,6 +86,17 @@ def main():
         help="Number of results (default: 5)"
     )
 
+    # reindex command
+    reindex_parser = subparsers.add_parser("reindex", help="Recalculate all embeddings")
+    reindex_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed progress"
+    )
+
+    # health command
+    health_parser = subparsers.add_parser("health", help="System health check")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -99,25 +112,55 @@ def main():
 
     # Import and run commands
     try:
-        if args.command == "status":
-            from .commands.status import run_status
-            return run_status(ai_path)
+        # Try relative imports first (when running as module)
+        try:
+            if args.command == "status":
+                from .commands.status import run_status
+                return run_status(ai_path)
+            elif args.command == "threads":
+                from .commands.threads import run_threads
+                return run_threads(ai_path, args.status, args.limit)
+            elif args.command == "thread":
+                from .commands.threads import run_thread_detail
+                return run_thread_detail(ai_path, args.id)
+            elif args.command == "bridges":
+                from .commands.bridges import run_bridges
+                return run_bridges(ai_path, args.thread, args.limit)
+            elif args.command == "search":
+                from .commands.search import run_search
+                return run_search(ai_path, args.query, args.limit)
+            elif args.command == "reindex":
+                from .commands.reindex import run_reindex
+                return run_reindex(ai_path, args.verbose)
+            elif args.command == "health":
+                from .commands.health import run_health
+                return run_health(ai_path)
+        except ImportError:
+            # Fallback to absolute imports (when running as script)
+            cli_dir = Path(__file__).parent
+            sys.path.insert(0, str(cli_dir))
 
-        elif args.command == "threads":
-            from .commands.threads import run_threads
-            return run_threads(ai_path, args.status, args.limit)
-
-        elif args.command == "thread":
-            from .commands.threads import run_thread_detail
-            return run_thread_detail(ai_path, args.id)
-
-        elif args.command == "bridges":
-            from .commands.bridges import run_bridges
-            return run_bridges(ai_path, args.thread, args.limit)
-
-        elif args.command == "search":
-            from .commands.search import run_search
-            return run_search(ai_path, args.query, args.limit)
+            if args.command == "status":
+                from commands.status import run_status
+                return run_status(ai_path)
+            elif args.command == "threads":
+                from commands.threads import run_threads
+                return run_threads(ai_path, args.status, args.limit)
+            elif args.command == "thread":
+                from commands.threads import run_thread_detail
+                return run_thread_detail(ai_path, args.id)
+            elif args.command == "bridges":
+                from commands.bridges import run_bridges
+                return run_bridges(ai_path, args.thread, args.limit)
+            elif args.command == "search":
+                from commands.search import run_search
+                return run_search(ai_path, args.query, args.limit)
+            elif args.command == "reindex":
+                from commands.reindex import run_reindex
+                return run_reindex(ai_path, args.verbose)
+            elif args.command == "health":
+                from commands.health import run_health
+                return run_health(ai_path)
 
     except ImportError as e:
         print(f"Error loading command module: {e}")

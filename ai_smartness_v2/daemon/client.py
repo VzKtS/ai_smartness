@@ -152,19 +152,33 @@ def ensure_daemon_running(ai_path: Path, max_wait: float = 2.0) -> bool:
         except Exception:
             pass
 
-    # Clean up stale PID file
+    # Clean up old daemon process
     pid_file = ai_path / "processor.pid"
     if pid_file.exists():
         try:
             pid = int(pid_file.read_text().strip())
             # Check if process exists
             os.kill(pid, 0)
+            # Process EXISTS but doesn't respond to socket → kill it
+            try:
+                os.kill(pid, 15)  # SIGTERM
+                time.sleep(0.3)
+                # Force kill if still running
+                try:
+                    os.kill(pid, 0)
+                    os.kill(pid, 9)  # SIGKILL
+                except OSError:
+                    pass  # Already dead
+            except OSError:
+                pass
         except (ValueError, OSError):
             # Process doesn't exist, remove stale PID
-            try:
-                pid_file.unlink()
-            except Exception:
-                pass
+            pass
+        # Always remove PID file before starting new daemon
+        try:
+            pid_file.unlink()
+        except Exception:
+            pass
 
     # Start the daemon
     try:
@@ -177,6 +191,15 @@ def ensure_daemon_running(ai_path: Path, max_wait: float = 2.0) -> bool:
         env = os.environ.copy()
         env["PYTHONPATH"] = str(package_dir.parent) + ":" + env.get("PYTHONPATH", "")
 
+        # Log errors to a file for debugging
+        startup_log = ai_path / "daemon_startup.log"
+        with open(startup_log, "a") as log_file:
+            log_file.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting daemon...\n")
+            log_file.write(f"  processor_path: {processor_path}\n")
+            log_file.write(f"  db_path: {db_path}\n")
+            log_file.write(f"  PYTHONPATH: {env.get('PYTHONPATH', '')}\n")
+
+        stderr_log = open(ai_path / "daemon_stderr.log", "a")
         subprocess.Popen(
             [
                 "python3", str(processor_path),
@@ -185,10 +208,15 @@ def ensure_daemon_running(ai_path: Path, max_wait: float = 2.0) -> bool:
             env=env,
             start_new_session=True,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=stderr_log
         )
 
-    except Exception:
+    except Exception as e:
+        try:
+            with open(ai_path / "daemon_startup.log", "a") as log_file:
+                log_file.write(f"  ERROR: {e}\n")
+        except Exception:
+            pass
         return False
 
     # Wait for daemon to be ready

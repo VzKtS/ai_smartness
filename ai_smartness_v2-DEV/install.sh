@@ -267,6 +267,30 @@ else
 fi
 
 # ============================================================================
+# INSTALL SENTENCE-TRANSFORMERS
+# ============================================================================
+
+echo "🧠 Checking sentence-transformers..."
+
+# Check if sentence-transformers is installed
+if python3 -c "import sentence_transformers" 2>/dev/null; then
+    echo "   ✓ sentence-transformers already installed"
+else
+    echo "   📦 Installing sentence-transformers (required for semantic memory)..."
+    echo "   This may take a few minutes on first install..."
+
+    if pip3 install --user sentence-transformers --quiet 2>/dev/null; then
+        echo "   ✓ sentence-transformers installed successfully"
+    elif pip install --user sentence-transformers --quiet 2>/dev/null; then
+        echo "   ✓ sentence-transformers installed successfully"
+    else
+        echo "   ⚠️  Could not install sentence-transformers automatically"
+        echo "   Please install manually: pip install sentence-transformers"
+        echo "   (AI Smartness will use TF-IDF fallback until installed)"
+    fi
+fi
+
+# ============================================================================
 # DETECT CLAUDE CLI
 # ============================================================================
 
@@ -587,6 +611,9 @@ echo "   ai threads     - List threads"
 echo "   ai thread <id> - Show thread details"
 echo "   ai bridges     - List bridges"
 echo "   ai search <q>  - Search threads"
+echo "   ai reindex     - Recalculate embeddings"
+echo "   ai health      - System health check"
+echo "   ai daemon      - Daemon control (start/stop/status)"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""

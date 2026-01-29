@@ -9,11 +9,15 @@ Handles:
 """
 
 import json
+import logging
 import subprocess
 from pathlib import Path
 from typing import Optional, List, Tuple
 from enum import Enum
 from dataclasses import dataclass
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 from ..models.thread import Thread, ThreadStatus, OriginType
 from ..storage.manager import StorageManager
@@ -71,6 +75,25 @@ class ThreadManager:
 
         self.embeddings = get_embedding_manager()
 
+        # Load thread limits from config
+        self.active_threads_limit = self._load_active_threads_limit()
+
+    def _load_active_threads_limit(self) -> int:
+        """
+        Load active threads limit from config.
+
+        Returns:
+            Limit (default 30 if not configured)
+        """
+        try:
+            config_path = self.storage.ai_path / "config.json"
+            if config_path.exists():
+                config = json.loads(config_path.read_text())
+                return config.get("settings", {}).get("active_threads_limit", 30)
+        except Exception:
+            pass
+        return 30
+
     def _load_llm_config(self) -> dict:
         """
         Load LLM configuration from .ai/config.json.
@@ -125,13 +148,16 @@ class ThreadManager:
         """
         Decide what action to take for this content.
 
-        Uses LLM for complex decisions, heuristics for simple cases.
+        Searches ALL active threads for best match, not just current.
+        Uses lower thresholds (0.35 for active, 0.5 for suspended).
         """
-        current = self.storage.threads.get_current()
         active_threads = self.storage.threads.get_active()
+
+        logger.info(f"DECIDE: {len(active_threads)} active threads, content={content[:50]}...")
 
         # Simple case: no active threads
         if not active_threads:
+            logger.info("DECIDE: No active threads → NEW_THREAD")
             return ThreadDecision(
                 action=ThreadAction.NEW_THREAD,
                 thread_id=None,
@@ -139,66 +165,127 @@ class ThreadManager:
                 confidence=1.0
             )
 
-        # Check for topic match with current thread
-        if current:
-            similarity = self._calculate_topic_similarity(extraction, current)
-            if similarity > 0.6:
-                return ThreadDecision(
-                    action=ThreadAction.CONTINUE,
-                    thread_id=current.id,
-                    reason=f"Topic similarity {similarity:.2f} with current thread",
-                    confidence=similarity
-                )
+        # Search ALL active threads for best match (not just current)
+        best_match = None
+        best_similarity = 0.0
 
-        # Check suspended threads for reactivation
+        for thread in active_threads:
+            similarity = self._calculate_similarity(content, extraction, thread)
+            if similarity > 0.3:  # Log candidates above noise threshold
+                logger.info(f"  SIM: {similarity:.3f} → '{thread.title[:30]}'")
+            if similarity > best_similarity:
+                best_similarity = similarity
+                best_match = thread
+
+        logger.info(f"DECIDE: best_similarity={best_similarity:.3f}, threshold=0.35")
+
+        # Lower threshold: 0.35 for better continuation
+        if best_similarity > 0.35 and best_match:
+            logger.info(f"DECIDE: CONTINUE → '{best_match.title[:30]}'")
+            return ThreadDecision(
+                action=ThreadAction.CONTINUE,
+                thread_id=best_match.id,
+                reason=f"Topic match {best_similarity:.2f} with '{best_match.title[:30]}'",
+                confidence=best_similarity
+            )
+
+        # Check suspended threads for reactivation (threshold 0.5)
         suspended = self.storage.threads.get_suspended()
         for thread in suspended:
-            similarity = self._calculate_topic_similarity(extraction, thread)
-            if similarity > 0.7:
+            similarity = self._calculate_similarity(content, extraction, thread)
+            if similarity > 0.5:
+                logger.info(f"DECIDE: REACTIVATE → '{thread.title[:30]}' (sim={similarity:.3f})")
                 return ThreadDecision(
                     action=ThreadAction.REACTIVATE,
                     thread_id=thread.id,
-                    reason=f"Topic match {similarity:.2f} with suspended thread",
+                    reason=f"Reactivate suspended {similarity:.2f}",
                     confidence=similarity
                 )
 
-        # Check if this is a fork of current thread
-        if current and self._is_potential_fork(extraction, current):
+        # Check for fork potential with best match
+        if best_match and self._is_potential_fork(extraction, best_match):
+            logger.info(f"DECIDE: FORK from '{best_match.title[:30]}'")
             return ThreadDecision(
                 action=ThreadAction.FORK,
-                thread_id=current.id,
+                thread_id=best_match.id,
                 reason="Subtopic or divergent focus detected",
                 confidence=0.7
             )
 
         # Default: new thread
+        logger.info(f"DECIDE: NEW_THREAD (best_sim={best_similarity:.3f} < 0.35)")
         return ThreadDecision(
             action=ThreadAction.NEW_THREAD,
-            thread_id=current.id if current else None,
+            thread_id=None,
             reason="New topic detected",
             confidence=0.8
         )
 
-    def _calculate_topic_similarity(self, extraction: Extraction, thread: Thread) -> float:
+    def _calculate_similarity(
+        self,
+        content: str,
+        extraction: Extraction,
+        thread: Thread
+    ) -> float:
         """
-        Calculate similarity between extraction and thread topics.
+        Calculate comprehensive similarity using multiple signals.
 
-        Uses embedding similarity if available, falls back to keyword overlap.
+        Uses content embedding as primary signal with topic overlap as boost.
+        Never returns 0 if content is provided.
         """
-        # Combine extraction subjects and concepts
-        extraction_text = ' '.join(extraction.subjects + extraction.key_concepts)
+        # Signal 1: Embedding similarity (primary - 70% weight)
+        # Use raw content for embedding, not just extracted topics
+        content_text = content[:500] if content else ''
 
-        # Combine thread topics and summary
-        thread_text = ' '.join(thread.topics) + ' ' + thread.title
+        # Build thread text from title + topics + recent messages
+        thread_parts = [thread.title]
+        thread_parts.extend(thread.topics)
+        for msg in thread.messages[-3:]:
+            thread_parts.append(msg.content[:100])
+        thread_text = ' '.join(thread_parts)
 
-        if not extraction_text or not thread_text:
+        if not content_text:
             return 0.0
 
-        # Use embeddings
-        ext_embedding = self.embeddings.embed(extraction_text)
-        thread_embedding = thread.embedding or self.embeddings.embed(thread_text)
+        # Calculate embeddings
+        content_embedding = self.embeddings.embed(content_text)
 
-        return self.embeddings.similarity(ext_embedding, thread_embedding)
+        # Use cached thread embedding if available, otherwise calculate
+        if thread.embedding is not None:
+            thread_embedding = thread.embedding
+        else:
+            thread_embedding = self.embeddings.embed(thread_text)
+
+        embedding_sim = self.embeddings.similarity(content_embedding, thread_embedding)
+
+        # Signal 2: Topic keyword overlap (secondary - 30% weight)
+        topic_sim = 0.0
+        exact_match_boost = 0.0
+
+        if extraction.subjects and thread.topics:
+            extraction_topics = set(s.lower() for s in extraction.subjects)
+            thread_topics = set(t.lower() for t in thread.topics)
+            common = extraction_topics & thread_topics
+
+            if extraction_topics:
+                topic_sim = len(common) / len(extraction_topics)
+
+            # Boost if exact topic match found
+            if common:
+                exact_match_boost = 0.15
+
+        # Combine: 70% embedding, 30% topic overlap, + boost for exact match
+        combined = 0.7 * embedding_sim + 0.3 * topic_sim + exact_match_boost
+
+        return min(combined, 1.0)  # Cap at 1.0
+
+    def _calculate_topic_similarity(self, extraction: Extraction, thread: Thread) -> float:
+        """
+        Legacy method for backward compatibility.
+        Calls _calculate_similarity with empty content.
+        """
+        extraction_text = ' '.join(extraction.subjects + extraction.key_concepts)
+        return self._calculate_similarity(extraction_text, extraction, thread)
 
     def _is_potential_fork(self, extraction: Extraction, current: Thread) -> bool:
         """Check if content represents a potential fork."""
@@ -291,12 +378,16 @@ class ThreadManager:
         thread.embedding = self.embeddings.embed(combined_text)
         self.storage.threads.save(thread)
 
-    def _enforce_thread_limits(self, max_active: int = 30):
+    def _enforce_thread_limits(self, max_active: int = None):
         """
         Enforce limits on active threads.
 
         Suspends lowest-weight threads when limit exceeded.
+        Uses active_threads_limit from config if max_active not specified.
         """
+        if max_active is None:
+            max_active = self.active_threads_limit
+
         active = self.storage.threads.get_active()
 
         if len(active) <= max_active:

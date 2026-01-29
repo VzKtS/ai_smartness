@@ -15,6 +15,7 @@ AI Smartness v2 is a **neural-inspired working memory**:
 - **Threads** = Neurons (active reasoning streams)
 - **ThinkBridges** = Synapses (semantic connections between threads)
 - **Gossip** = Signal propagation through the network
+- **Memory Injection** = Context restoration at each prompt
 
 The system maintains a **thought network** where concepts remain connected and accessible, avoiding the context loss typical of classic LLM interactions.
 
@@ -27,80 +28,79 @@ The system maintains a **thought network** where concepts remain connected and a
 | **Threads** | Semantic work units with auto-generated titles |
 | **ThinkBridges** | Automatic connections between related threads |
 | **Gossip Propagation** | Bridges spread through the network when concepts evolve |
+| **Memory Injection** | Relevant context injected into every prompt |
+| **User Rules** | Automatic detection and persistence of user preferences |
 | **GuardCode** | Plan mode enforcement, drift protection |
 | **95% Synthesis** | Automatic context preservation before compaction |
+| **Daemon Architecture** | Background processing for fast response |
 | **100% Transparent** | Zero user action required |
-
----
-
-## Architecture v2 (Simplified)
-
-### Only 2 Entities
-
-| Entity | Role |
-|--------|------|
-| **Thread** | Work unit = topic + messages + summary + embedding |
-| **ThinkBridge** | Semantic connection between two threads |
-
-### What Changed from v1
-
-| v1 | v2 | Why |
-|----|----|----|
-| Fragments | Absorbed into Threads | Simpler, each message = implicit fragment |
-| MemBloc | Thread.status=archived | Unified model |
-| Complex graph | Embeddings + Bridges | More powerful, less overhead |
-| Hardcoded thresholds | LLM decisions | Intelligent, not arbitrary |
 
 ---
 
 ## Installation
 
 ```bash
-# In your target project
-/path/to/ai_smartness_v2/install.sh .
+# Clone or copy ai_smartness_v2-DEV to your machine
+# Then run install in your target project:
+/path/to/ai_smartness_v2-DEV/install.sh /path/to/your/project
 ```
 
-### Interactive Setup
+### What the Installer Does
 
-1. **Language**: English, French, or Spanish
-2. **Mode**: Heavy, Normal, or Light (affects thread limits, not extraction cost)
-3. **Database**: Keep existing data or start fresh
+1. **Language selection**: English, French, or Spanish
+2. **Mode selection**: Heavy, Normal, or Light (affects thread limits)
+3. **Installs sentence-transformers** (if not already installed)
+4. **Detects Claude CLI** path for LLM extraction
+5. **Copies files** to `your_project/ai_smartness_v2/`
+6. **Configures hooks** with absolute paths in `.claude/settings.json`
+7. **Initializes database** in `ai_smartness_v2/.ai/db/`
+8. **Installs CLI** to `~/.local/bin/ai`
 
-### What the Script Does
+### Requirements
 
-- Copies ai_smartness_v2 into your project
-- Configures Claude Code hooks with **absolute paths**
-- Detects Claude CLI path for LLM extraction
-- Initializes the database structure
-- Adds exclusions to .gitignore and .claudeignore
+- Python 3.10+
+- Claude Code (CLI or VS Code extension)
+- pip (for automatic sentence-transformers install)
 
-**Note**: Extraction always uses **Haiku** (economical, sufficient for semantic extraction). Your main agent can use any model (Opus, Sonnet, etc.) - they're independent.
+The installer handles dependencies automatically. If sentence-transformers fails to install, the system falls back to TF-IDF (functional but less accurate).
 
 ---
 
 ## CLI Commands
 
-```bash
-# Navigate to your project
-cd /your/project
+After installation, use the `ai` command from your project directory:
 
+```bash
 # Status overview
-python3 ai_smartness_v2/cli/main.py status
+ai status
 
 # List threads
-python3 ai_smartness_v2/cli/main.py threads
-python3 ai_smartness_v2/cli/main.py threads --status active
-python3 ai_smartness_v2/cli/main.py threads --limit 20
+ai threads
+ai threads --status active
+ai threads --status suspended
+ai threads --limit 20
 
 # View specific thread
-python3 ai_smartness_v2/cli/main.py thread <thread_id>
+ai thread <thread_id>
 
 # List bridges
-python3 ai_smartness_v2/cli/main.py bridges
-python3 ai_smartness_v2/cli/main.py bridges --thread <thread_id>
+ai bridges
+ai bridges --thread <thread_id>
 
 # Semantic search
-python3 ai_smartness_v2/cli/main.py search "authentication"
+ai search "authentication"
+
+# System health check
+ai health
+
+# Recalculate embeddings
+ai reindex
+
+# Daemon control
+ai daemon           # Show status
+ai daemon status    # Show status
+ai daemon start     # Start daemon
+ai daemon stop      # Stop daemon
 ```
 
 ---
@@ -109,18 +109,18 @@ python3 ai_smartness_v2/cli/main.py search "authentication"
 
 ### 1. Capture (PostToolUse hook)
 
-Every tool result (Read, Write, Task, etc.) is captured:
+Every tool result (Read, Write, Task, etc.) is sent to the daemon:
 ```
-[Tool Result] → [Noise Filter] → [LLM Extraction] → [Thread Decision]
+[Tool Result] → [Daemon] → [Noise Filter] → [LLM Extraction] → [Thread Decision]
 ```
 
 ### 2. Thread Management
 
-The LLM decides for each input:
+The system decides for each input:
 - **NEW_THREAD**: Different topic → create new thread
-- **CONTINUE**: Same topic → add to active thread
+- **CONTINUE**: Same topic → add to active thread (similarity > 0.35)
 - **FORK**: Sub-topic → create child thread
-- **REACTIVATE**: Old topic returns → wake up archived thread
+- **REACTIVATE**: Old topic returns → wake up suspended thread (similarity > 0.50)
 
 ### 3. Gossip Propagation
 
@@ -131,14 +131,38 @@ Thread A modified → Recalculate embedding
                   → If similarity high → propagate bridges to B's connections
 ```
 
-### 4. Injection (UserPromptSubmit hook)
+### 4. Memory Injection (UserPromptSubmit hook)
 
-Before each user prompt, invisible context is injected:
-```html
-<!-- ai_smartness: {"active_thread": "...", "decisions": [...]} -->
+Before each user prompt, relevant context is injected:
+```xml
+<system-reminder>
+AI Smartness Memory Context:
+
+Current thread: "Authentication System"
+Summary: Implementing JWT-based auth with refresh tokens...
+
+Related threads:
+- "Database Schema" - User table design
+- "API Endpoints" - Auth routes
+
+User rules:
+- always make a plan before implementation
+</system-reminder>
 ```
 
-### 5. Synthesis (PreCompact hook)
+The user sees nothing - this is invisible to you but visible to the agent.
+
+### 5. User Rules Detection
+
+The system automatically detects and stores user preferences:
+- "remember: always use TypeScript"
+- "rule: no console.log in production"
+- "always make a plan before implementation"
+- "never commit directly to main"
+
+Rules are stored in `ai_smartness_v2/.ai/user_rules.json` and injected into every prompt.
+
+### 6. Synthesis (PreCompact hook)
 
 At 95% context window:
 - LLM generates synthesis of current state
@@ -164,6 +188,7 @@ Config stored in `ai_smartness_v2/.ai/config.json`:
   },
   "llm": {
     "extraction_model": "claude-3-5-haiku-20241022",
+    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
     "claude_cli_path": "/usr/local/bin/claude"
   },
   "guardcode": {
@@ -180,9 +205,15 @@ Config stored in `ai_smartness_v2/.ai/config.json`:
 |------|--------------|----------|
 | Light | 15 | Small projects |
 | Normal | 50 | Medium projects |
-| Heavy | 100 | Large/complex projects (blockchain, enterprise) |
+| Heavy | 100 | Large/complex projects |
 
-**Note**: Extraction model is always Haiku (economical). Mode only affects thread limits.
+### Similarity Thresholds
+
+| Context | Threshold | Description |
+|---------|-----------|-------------|
+| Active thread continuation | 0.35 | Minimum to continue a thread |
+| Suspended reactivation | 0.50 | Minimum to wake a thread |
+| Topic boost | +0.15 | Bonus for exact topic match |
 
 ---
 
@@ -191,65 +222,83 @@ Config stored in `ai_smartness_v2/.ai/config.json`:
 ```
 ai_smartness_v2/.ai/
 ├── config.json           # Configuration
-├── db/
-│   ├── threads/          # Thread JSON files
-│   │   └── thread_*.json
-│   ├── bridges/          # ThinkBridge JSON files
-│   │   └── bridge_*.json
-│   └── synthesis/        # Compaction syntheses
-└── processor.sock        # Daemon socket (when running)
+├── user_rules.json       # User-defined rules
+├── processor.pid         # Daemon PID
+├── processor.sock        # Daemon socket
+├── processor.log         # Daemon logs
+├── inject.log            # Injection logs
+└── db/
+    ├── threads/          # Thread JSON files
+    ├── bridges/          # ThinkBridge JSON files
+    └── synthesis/        # Compaction syntheses
 ```
-
----
-
-## Claude Code Hooks
-
-| Hook | Script | Function |
-|------|--------|----------|
-| `UserPromptSubmit` | inject.py | Context injection |
-| `PostToolUse` | capture.py | Automatic capture |
-| `PreCompact` | compact.py | 95% synthesis |
-
----
-
-## GuardCode Rules
-
-| Rule | Description |
-|------|-------------|
-| `enforce_plan_mode` | Block code changes without validated plan |
-| `warn_quick_solutions` | Remind that simple ≠ better |
-| `require_all_choices` | Must present all alternatives |
-
----
-
-## Requirements
-
-- Python 3.10+
-- Claude Code (CLI or VS Code extension)
-- sentence-transformers (for local embeddings)
 
 ---
 
 ## Troubleshooting
 
+### Daemon not running
+
+```bash
+ai daemon status
+# If stopped:
+ai daemon start
+```
+
 ### Captures not working
 
-Check the hook paths in `.claude/settings.json` - they must be **absolute paths**.
+Check hook paths in `.claude/settings.json` - they must be **absolute paths**.
 
-### Extraction showing "heuristic fallback"
+### "Heuristic fallback" in thread titles
 
-Claude CLI not found. Check:
+Claude CLI not found or not responding:
 ```bash
 which claude
-# Should return /usr/local/bin/claude or similar
+# Update path in ai_smartness_v2/.ai/config.json if needed
 ```
 
-### Too many threads
+### Low similarity scores / Poor memory
 
-Increase limit in config:
-```json
-"active_threads_limit": 150
+sentence-transformers not installed:
+```bash
+pip install sentence-transformers
+ai daemon stop
+ai daemon start
+ai reindex
 ```
+
+### Low continuation rate
+
+Check with `ai health`. If below 10%:
+1. Verify sentence-transformers is installed
+2. Run `ai reindex` to recalculate embeddings
+3. Check `ai_smartness_v2/.ai/processor.log` for errors
+
+---
+
+## Architecture
+
+### Components
+
+| Component | File | Role |
+|-----------|------|------|
+| Daemon | `daemon/processor.py` | Background processing |
+| Client | `daemon/client.py` | Fast communication with daemon |
+| Capture Hook | `hooks/capture.py` | PostToolUse capture |
+| Inject Hook | `hooks/inject.py` | UserPromptSubmit injection |
+| Compact Hook | `hooks/compact.py` | PreCompact synthesis |
+| Memory Retriever | `intelligence/memory_retriever.py` | Context retrieval |
+| Thread Manager | `intelligence/thread_manager.py` | Thread lifecycle |
+| Gossip | `intelligence/gossip.py` | Bridge propagation |
+| Embeddings | `processing/embeddings.py` | Vector embeddings |
+
+### Hooks
+
+| Hook | Script | Trigger |
+|------|--------|---------|
+| `UserPromptSubmit` | inject.py | Before each user message |
+| `PostToolUse` | capture.py | After each tool use |
+| `PreCompact` | compact.py | At 95% context |
 
 ---
 
@@ -259,4 +308,4 @@ MIT
 
 ---
 
-**Note**: AI Smartness v2 is a complete rewrite focused on simplicity. The neural network metaphor is operational, not a strict neural implementation.
+**Note**: AI Smartness v2 is designed to be invisible. The best indication it's working is that your agent "remembers" context across sessions without you doing anything special.

@@ -299,6 +299,130 @@ def format_injection(context: dict) -> str:
 
 
 # =============================================================================
+# USER RULES DETECTION
+# =============================================================================
+
+# Patterns that indicate a user rule
+RULE_PATTERNS = [
+    r"rappelle[- ]?toi\s*[:：]\s*(.+)",
+    r"n['']oublie pas\s*[:：]\s*(.+)",
+    r"toujours\s+(.+)",
+    r"jamais\s+(.+)",
+    r"règle\s*[:：]\s*(.+)",
+    r"rule\s*[:：]\s*(.+)",
+    r"remember\s*[:：]\s*(.+)",
+    r"don['']t forget\s*[:：]\s*(.+)",
+    r"always\s+(.+)",
+    r"never\s+(.+)",
+    r"regla\s*[:：]\s*(.+)",
+    r"recuerda\s*[:：]\s*(.+)",
+    r"siempre\s+(.+)",
+    r"nunca\s+(.+)",
+]
+
+
+def detect_and_save_user_rule(message: str, ai_path: Path) -> Optional[str]:
+    """
+    Detect if the message contains a user rule and save it.
+
+    Args:
+        message: User message
+        ai_path: Path to .ai directory
+
+    Returns:
+        The detected rule, or None if no rule found
+    """
+    message_lower = message.lower().strip()
+
+    for pattern in RULE_PATTERNS:
+        match = re.search(pattern, message_lower, re.IGNORECASE)
+        if match:
+            rule = match.group(1).strip()
+
+            # Clean up the rule
+            rule = rule.rstrip('.!?')
+
+            if len(rule) > 10:  # Minimum rule length
+                save_user_rule(rule, ai_path)
+                return rule
+
+    return None
+
+
+def save_user_rule(rule: str, ai_path: Path):
+    """
+    Save a user rule to the rules file.
+
+    Args:
+        rule: The rule to save
+        ai_path: Path to .ai directory
+    """
+    rules_file = ai_path / "user_rules.json"
+
+    try:
+        # Load existing rules
+        if rules_file.exists():
+            data = json.loads(rules_file.read_text(encoding='utf-8'))
+        else:
+            data = {"rules": [], "last_updated": ""}
+
+        # Check if rule already exists (case-insensitive)
+        existing_lower = [r.lower() for r in data.get("rules", [])]
+        if rule.lower() not in existing_lower:
+            data["rules"].append(rule)
+            data["last_updated"] = datetime.now().isoformat()
+
+            # Keep only last 20 rules
+            data["rules"] = data["rules"][-20:]
+
+            # Save
+            rules_file.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2),
+                encoding='utf-8'
+            )
+
+            log(f"Saved user rule: {rule[:50]}...")
+
+    except Exception as e:
+        log(f"Error saving user rule: {e}")
+
+
+# =============================================================================
+# MEMORY RETRIEVAL
+# =============================================================================
+
+def get_memory_context(message: str, db_path: Path) -> str:
+    """
+    Get memory context using MemoryRetriever.
+
+    Args:
+        message: User message
+        db_path: Path to database
+
+    Returns:
+        Memory context string
+    """
+    try:
+        # Import MemoryRetriever
+        package_root = get_package_root()
+        sys.path.insert(0, str(package_root.parent))
+
+        from ai_smartness_v2.intelligence.memory_retriever import MemoryRetriever
+
+        ai_path = db_path.parent
+        retriever = MemoryRetriever(db_path)
+
+        return retriever.get_relevant_context(message, max_chars=2000)
+
+    except ImportError as e:
+        log(f"MemoryRetriever import failed: {e}")
+        return ""
+    except Exception as e:
+        log(f"Memory retrieval error: {e}")
+        return ""
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -323,18 +447,38 @@ def main():
             print(json.dumps({"continue": True}))
             return
 
-        # Build context
+        # Get database path
         db_path = get_db_path()
-        context = build_lightweight_context(message, db_path)
+        ai_path = db_path.parent
 
-        # Format injection
-        injection = format_injection(context)
+        # Detect and save any user rules in the message
+        detected_rule = detect_and_save_user_rule(message, ai_path)
+        if detected_rule:
+            log(f"Detected user rule: {detected_rule[:50]}...")
 
-        if injection:
+        # Build lightweight context (GuardCode reminders)
+        lightweight_context = build_lightweight_context(message, db_path)
+        lightweight_injection = format_injection(lightweight_context)
+
+        # Get memory context (threads, rules)
+        memory_context = get_memory_context(message, db_path)
+
+        # Combine injections
+        injections = []
+
+        if memory_context:
+            injections.append(f"<system-reminder>\n{memory_context}\n</system-reminder>")
+
+        if lightweight_injection:
+            injections.append(lightweight_injection)
+
+        if injections:
             # Log the injection
-            log(f"Injected: {len(injection)} chars for message: {message[:50]}...")
+            total_chars = sum(len(i) for i in injections)
+            log(f"Injected: {total_chars} chars ({len(memory_context)} memory) for: {message[:50]}...")
 
             # Inject at the beginning (invisible to user)
+            injection = "\n".join(injections)
             augmented_message = f"{injection}\n\n{message}"
             print(json.dumps({"message": augmented_message}))
         else:

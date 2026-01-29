@@ -9,11 +9,15 @@ Handles:
 """
 
 import json
+import logging
 import subprocess
 from pathlib import Path
 from typing import Optional, List, Tuple
 from enum import Enum
 from dataclasses import dataclass
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 from ..models.thread import Thread, ThreadStatus, OriginType
 from ..storage.manager import StorageManager
@@ -145,12 +149,15 @@ class ThreadManager:
         Decide what action to take for this content.
 
         Searches ALL active threads for best match, not just current.
-        Uses lower thresholds (0.4 for active, 0.5 for suspended).
+        Uses lower thresholds (0.35 for active, 0.5 for suspended).
         """
         active_threads = self.storage.threads.get_active()
 
+        logger.info(f"DECIDE: {len(active_threads)} active threads, content={content[:50]}...")
+
         # Simple case: no active threads
         if not active_threads:
+            logger.info("DECIDE: No active threads → NEW_THREAD")
             return ThreadDecision(
                 action=ThreadAction.NEW_THREAD,
                 thread_id=None,
@@ -164,12 +171,17 @@ class ThreadManager:
 
         for thread in active_threads:
             similarity = self._calculate_similarity(content, extraction, thread)
+            if similarity > 0.3:  # Log candidates above noise threshold
+                logger.info(f"  SIM: {similarity:.3f} → '{thread.title[:30]}'")
             if similarity > best_similarity:
                 best_similarity = similarity
                 best_match = thread
 
-        # Lower threshold: 0.4 instead of 0.6
-        if best_similarity > 0.4 and best_match:
+        logger.info(f"DECIDE: best_similarity={best_similarity:.3f}, threshold=0.35")
+
+        # Lower threshold: 0.35 for better continuation
+        if best_similarity > 0.35 and best_match:
+            logger.info(f"DECIDE: CONTINUE → '{best_match.title[:30]}'")
             return ThreadDecision(
                 action=ThreadAction.CONTINUE,
                 thread_id=best_match.id,
@@ -177,11 +189,12 @@ class ThreadManager:
                 confidence=best_similarity
             )
 
-        # Check suspended threads for reactivation (threshold 0.5 instead of 0.7)
+        # Check suspended threads for reactivation (threshold 0.5)
         suspended = self.storage.threads.get_suspended()
         for thread in suspended:
             similarity = self._calculate_similarity(content, extraction, thread)
             if similarity > 0.5:
+                logger.info(f"DECIDE: REACTIVATE → '{thread.title[:30]}' (sim={similarity:.3f})")
                 return ThreadDecision(
                     action=ThreadAction.REACTIVATE,
                     thread_id=thread.id,
@@ -191,6 +204,7 @@ class ThreadManager:
 
         # Check for fork potential with best match
         if best_match and self._is_potential_fork(extraction, best_match):
+            logger.info(f"DECIDE: FORK from '{best_match.title[:30]}'")
             return ThreadDecision(
                 action=ThreadAction.FORK,
                 thread_id=best_match.id,
@@ -199,6 +213,7 @@ class ThreadManager:
             )
 
         # Default: new thread
+        logger.info(f"DECIDE: NEW_THREAD (best_sim={best_similarity:.3f} < 0.35)")
         return ThreadDecision(
             action=ThreadAction.NEW_THREAD,
             thread_id=None,
@@ -245,17 +260,24 @@ class ThreadManager:
 
         # Signal 2: Topic keyword overlap (secondary - 30% weight)
         topic_sim = 0.0
+        exact_match_boost = 0.0
+
         if extraction.subjects and thread.topics:
             extraction_topics = set(s.lower() for s in extraction.subjects)
             thread_topics = set(t.lower() for t in thread.topics)
             common = extraction_topics & thread_topics
+
             if extraction_topics:
                 topic_sim = len(common) / len(extraction_topics)
 
-        # Combine: 70% embedding, 30% topic overlap
-        combined = 0.7 * embedding_sim + 0.3 * topic_sim
+            # Boost if exact topic match found
+            if common:
+                exact_match_boost = 0.15
 
-        return combined
+        # Combine: 70% embedding, 30% topic overlap, + boost for exact match
+        combined = 0.7 * embedding_sim + 0.3 * topic_sim + exact_match_boost
+
+        return min(combined, 1.0)  # Cap at 1.0
 
     def _calculate_topic_similarity(self, extraction: Extraction, thread: Thread) -> float:
         """
