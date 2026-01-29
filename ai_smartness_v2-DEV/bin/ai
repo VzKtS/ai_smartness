@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# AI Smartness v2 CLI
+# Usage: ai [command] [options]
+#
+
+# Find the ai_smartness_v2 directory
+find_ai_smartness() {
+    local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+        if [ -d "$dir/ai_smartness_v2" ]; then
+            echo "$dir/ai_smartness_v2"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+AI_SMARTNESS_PATH=$(find_ai_smartness)
+
+if [ -z "$AI_SMARTNESS_PATH" ]; then
+    echo "Error: Could not find ai_smartness_v2 directory"
+    echo "Make sure you're in a project with AI Smartness installed"
+    exit 1
+fi
+
+# Run the CLI module
+exec python3 -m ai_smartness_v2.cli.main "$@" 2>/dev/null || \
+    exec python3 "$AI_SMARTNESS_PATH/cli/main.py" "$@"
