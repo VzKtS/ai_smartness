@@ -45,20 +45,30 @@ def load_bridges(ai_path: Path, thread_filter: Optional[str] = None) -> List[Dic
 
 
 def get_thread_title(ai_path: Path, thread_id: str) -> str:
-    """Get thread title by ID prefix."""
+    """Get thread title by full ID match."""
     threads_path = ai_path / "db" / "threads"
     if not threads_path.exists():
-        return thread_id[:12] + ".."
+        return thread_id[:20] + ".."
 
+    # Try direct file lookup first (faster)
+    thread_file = threads_path / f"{thread_id}.json"
+    if thread_file.exists():
+        try:
+            data = json.loads(thread_file.read_text())
+            return data.get("title", "")[:25]
+        except Exception:
+            pass
+
+    # Fallback: search all files
     for thread_file in threads_path.glob("thread_*.json"):
         try:
             data = json.loads(thread_file.read_text())
-            if data.get("id", "").startswith(thread_id[:12]):
+            if data.get("id") == thread_id:
                 return data.get("title", "")[:25]
         except Exception:
             pass
 
-    return thread_id[:12] + ".."
+    return thread_id[:20] + ".."
 
 
 def run_bridges(ai_path: Path, thread_filter: Optional[str], limit: int) -> int:

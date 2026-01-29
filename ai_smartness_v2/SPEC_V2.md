@@ -3,9 +3,9 @@
 ## Meta
 
 - **Version**: 2.0.0
-- **Date**: 2026-01-28
+- **Date**: 2026-01-29
 - **Auteur**: Claude (Opus 4.5) + User
-- **Status**: Draft - En attente validation
+- **Status**: Implemented
 
 ---
 
@@ -25,6 +25,7 @@ Donner à un agent LLM une **mémoire persistante** qui lui permet de :
 | **Thread** | Neurone | Sujet de travail actif |
 | **ThinkBridge** | Synapse | Connexion sémantique entre threads |
 | **Thread archived** | Neurone dormant | Sujet archivé mais réactivable |
+| **Memory Injection** | Signal | Contexte restauré à chaque prompt |
 
 ---
 
@@ -47,13 +48,13 @@ Donner à un agent LLM une **mémoire persistante** qui lui permet de :
 ### 2.3 Architecture
 | Règle | Justification |
 |-------|---------------|
-| **Zéro valeur hardcodée** | Pas de timestamps/seuils arbitraires |
-| **Décisions par raisonnement LLM** | Merge, split, affiliate = décisions intelligentes |
-| **Embeddings pour retrieval** | Rapide, pas de bruit, scalable |
+| **Daemon en arrière-plan** | Traitement rapide, modules chargés une seule fois |
+| **Embeddings pour retrieval** | Rapide, scalable |
+| **Installation automatisée** | sentence-transformers installé par install.sh |
 
 ---
 
-## 3. Architecture Simplifiée
+## 3. Architecture
 
 ### 3.1 Entités (2 seulement)
 
@@ -70,6 +71,7 @@ class Thread:
     # Contenu
     messages: List[Message]  # Historique complet
     summary: str  # Résumé LLM du thread
+    topics: List[str]  # Concepts clés extraits
 
     # Méta-info (origine et évolution)
     origin_type: Literal["prompt", "file_read", "task", "fetch", "split"]
@@ -82,23 +84,9 @@ class Thread:
     # Pondération (calculée par sollicitation)
     weight: float  # 0.0 - 1.0
     last_active: datetime
-    activation_count: int
 
     # Embeddings
-    embedding: List[float]  # Vecteur pour similarité
-    topics_embedding: List[float]  # Vecteur des topics
-```
-
-**Cycle de vie:**
-```
-[Nouveau sujet] → Thread créé (status=active)
-       ↓
-[Inactivité / faible poids] → Thread suspendu (status=suspended)
-       ↓
-[Longue inactivité] → Thread archivé (status=archived)
-       ↓
-[Sujet revient] → Thread réactivé (status=active)
-                  → LLM décide: merge OU parent/child affiliation
+    embedding: List[float]  # Vecteur pour similarité (384 dimensions)
 ```
 
 #### ThinkBridge
@@ -116,261 +104,274 @@ class ThinkBridge:
 
     # Sémantique
     reason: str  # Explication LLM de la connexion
-    shared_concepts: List[str]  # Concepts partagés
 
     # Confiance (calculée, pas hardcodée)
     confidence: float  # Basée sur embedding similarity
 
     # Propagation gossip
-    propagated_from: Optional[str]  # ID du bridge parent si propagé
     propagation_depth: int  # 0 = direct, 1+ = propagé
 ```
 
-### 3.2 Ce qui disparaît
+### 3.2 Composants Système
 
-| v1 | v2 | Raison |
-|----|----|----|
-| Fragment | Absorbé dans Thread | Chaque message/interaction = fragment implicite |
-| MemBloc | Thread.status=archived | Simplification |
-| Archive | Thread.status=archived | Simplification |
-| Graph nodes/edges séparés | Embeddings + ThinkBridges | Plus puissant |
+| Composant | Fichier | Rôle |
+|-----------|---------|------|
+| **Daemon** | `daemon/processor.py` | Traitement en arrière-plan |
+| **Client** | `daemon/client.py` | Communication rapide avec daemon |
+| **Hook Capture** | `hooks/capture.py` | Capture PostToolUse |
+| **Hook Injection** | `hooks/inject.py` | Injection UserPromptSubmit |
+| **Hook Compact** | `hooks/compact.py` | Synthèse PreCompact |
+| **Memory Retriever** | `intelligence/memory_retriever.py` | Récupération contexte pertinent |
+| **Thread Manager** | `intelligence/thread_manager.py` | Cycle de vie threads |
+| **Gossip Propagator** | `intelligence/gossip.py` | Propagation bridges |
+| **Embeddings** | `processing/embeddings.py` | Vecteurs sémantiques |
+| **Extractor** | `processing/extractor.py` | Extraction LLM |
 
 ---
 
 ## 4. Pipeline de Traitement
 
-### 4.1 Capture (Input)
+### 4.1 Capture (PostToolUse)
 
 ```
-[Source] → [Pré-filtre heuristique] → [Extraction LLM] → [Embedding] → [Storage]
+[Tool Result] → [Hook capture.py] → [Daemon via socket]
+                                           ↓
+[Noise Filter] → [LLM Extraction] → [Thread Decision] → [Storage]
+                                           ↓
+                                   [Gossip Propagation]
 ```
 
-#### Sources et pré-traitement
+### 4.2 Thread Decision
 
-| Source | Pré-filtre | Ce qu'on extrait |
-|--------|------------|------------------|
-| `prompt` | Tags IDE | Intention, sujet principal, questions |
-| `read` | Numéros de ligne | But de la lecture, structure, concepts clés |
-| `write` | Diff noise | Ce qui a changé, pourquoi |
-| `task` | Étapes intermédiaires | Résultat final, décisions prises |
-| `fetch` | HTML/CSS | Information recherchée |
-| `response` | Formatage | Décisions, specs, solutions |
+| Décision | Condition | Action |
+|----------|-----------|--------|
+| `NEW_THREAD` | Similarité < 0.35 avec tous actifs | Créer nouveau thread |
+| `CONTINUE` | Similarité > 0.35 avec actif | Ajouter au thread |
+| `REACTIVATE` | Similarité > 0.50 avec suspendu | Réactiver thread |
+| `FORK` | Sous-sujet détecté | Créer thread enfant |
 
-#### Extraction LLM (pour chaque input significatif)
-
-```json
-{
-  "type": "prompt",
-  "extract": {
-    "intent": "L'utilisateur veut comprendre l'architecture de capture",
-    "subjects": ["capture", "hooks", "traitement"],
-    "questions": ["Comment fonctionne la capture?"],
-    "implicit_context": "Discussion sur ai_smartness v2"
-  }
-}
-```
-
-### 4.2 Thread Management
-
-#### Création de thread
-```
-[Input] → LLM analyse → "Est-ce un nouveau sujet ou continuation?"
-                              ↓
-                    [Nouveau] → Créer Thread
-                    [Continuation] → Ajouter au Thread actif
-                    [Fork] → Créer Thread enfant
-                    [Retour] → Réactiver Thread archivé
-```
-
-#### Décisions Merge/Split/Affiliate (100% LLM)
-
-```python
-# Pseudo-code - JAMAIS de seuils hardcodés
-def should_merge(thread_a: Thread, thread_b: Thread) -> MergeDecision:
-    prompt = f"""
-    Thread A: {thread_a.summary}
-    Topics A: {thread_a.topics}
-
-    Thread B: {thread_b.summary}
-    Topics B: {thread_b.topics}
-
-    Ces threads doivent-ils être:
-    1. MERGE: Fusionnés en un seul (même sujet)
-    2. PARENT_CHILD: A parent de B ou B parent de A
-    3. SIBLINGS: Frères sous un nouveau parent
-    4. SEPARATE: Rester séparés
-
-    Raisonne et décide.
-    """
-    return llm.decide(prompt)
-```
-
-### 4.3 Gossip Propagation (ThinkBridges)
+### 4.3 Memory Injection (UserPromptSubmit)
 
 ```
-[Thread A modifié]
-       ↓
-[Calcul embedding A']
-       ↓
-[Pour chaque Thread B avec bridge vers A]
-       ↓
-[Similarity(A', B) > dynamic_threshold?]
-       ↓
-[Oui] → Propager: créer/renforcer bridges B→C pour tous C liés à A
-[Non] → Ne rien faire
+[User Message] → [Hook inject.py]
+                       ↓
+[Memory Retriever] → [Find similar threads]
+                       ↓
+[Build context string] → [Inject as <system-reminder>]
+                       ↓
+[Claude receives: context + message]
 ```
 
-Le `dynamic_threshold` n'est PAS hardcodé - il est calculé par le LLM en fonction du contexte.
+Exemple d'injection :
+```xml
+<system-reminder>
+AI Smartness Memory Context:
 
-### 4.4 Context Window Management
+Current thread: "JWT Authentication"
+Summary: Implementing refresh token rotation...
 
-À 95% de la fenêtre contextuelle:
+Related threads:
+- "Database Schema" - User tables
+- "Security Audit" - Token policies
 
+User rules:
+- always make a plan before implementation
+</system-reminder>
 ```
-1. LLM génère synthèse de la conversation actuelle
-2. Synthèse inclut:
-   - Décisions prises
-   - Questions ouvertes
-   - État actuel du travail
-   - Threads actifs avec résumés
-3. Synthèse réinjectée après compactage
-4. Utilisateur ne voit RIEN de ce processus
-```
+
+### 4.4 User Rules Detection
+
+Patterns détectés automatiquement dans les messages utilisateur :
+- `rappelle-toi : <rule>`
+- `règle : <rule>`
+- `toujours <action>`
+- `jamais <action>`
+- `remember: <rule>`
+- `rule: <rule>`
+- `always <action>`
+- `never <action>`
+
+Règles stockées dans `ai_smartness_v2/.ai/user_rules.json`.
 
 ---
 
-## 5. GuardCode
+## 5. Seuils de Continuation
 
-### 5.1 Règles d'enforcement
+### Valeurs
 
-| Règle | Action |
-|-------|--------|
-| **Plan mode obligatoire** | Bloquer toute modification de code sans plan validé |
-| **Pas de solutions rapides** | Rappel systématique que simple ≠ meilleur |
-| **Présenter TOUS les choix** | Obligation de montrer alternatives |
-| **Pas de drift** | Micro-injection du contexte pour éviter hallucinations |
+| Contexte | Seuil | Description |
+|----------|-------|-------------|
+| Thread actif | 0.35 | Similarité minimale pour continuer |
+| Thread suspendu | 0.50 | Similarité minimale pour réactiver |
+| Topic boost | +0.15 | Bonus si topic identique |
 
-### 5.2 Micro-injection
+### Calcul de similarité
 
-À chaque prompt utilisateur, injection invisible de:
 ```
-<context type="guard" hidden="true">
-Thread actif: {current_thread.title}
-Décisions en cours: {active_decisions}
-Focus: {current_focus}
-Contraintes: {project_constraints}
-</context>
+similarity = 0.7 * embedding_sim + 0.3 * topic_overlap + topic_boost
 ```
 
-Cette injection est **invisible** pour l'utilisateur mais guide l'agent.
+- `embedding_sim`: Cosine similarity entre embeddings
+- `topic_overlap`: Ratio de topics communs
+- `topic_boost`: +0.15 si au moins un topic identique
+
+### Embeddings
+
+| Méthode | Condition | Qualité |
+|---------|-----------|---------|
+| sentence-transformers | Si installé | Haute (semantic) |
+| TF-IDF fallback | Si non installé | Moyenne (lexical) |
+
+L'installateur installe sentence-transformers automatiquement.
 
 ---
 
 ## 6. Storage
 
-### 6.1 Structure
+### Structure
 
 ```
-.ai/
+ai_smartness_v2/.ai/
 ├── config.json           # Configuration
-├── db/
-│   ├── threads/          # Thread JSON files
-│   │   ├── {thread_id}.json
-│   │   └── _index.json   # Index rapide
-│   ├── bridges/          # ThinkBridge JSON files
-│   │   ├── {bridge_id}.json
-│   │   └── _index.json
-│   └── embeddings/       # Vecteurs (format efficace)
-│       ├── threads.bin   # Embeddings threads
-│       └── meta.json     # Mapping id → offset
-├── synthesis/            # Synthèses de compactage
-└── logs/                 # Debug (optionnel)
-```
-
-### 6.2 Embeddings
-
-- **Modèle**: À définir (local ou API)
-- **Dimension**: 384-768 selon modèle
-- **Usage**:
-  - Similarité entre threads
-  - Retrieval de contexte pertinent
-  - Détection de topics overlap
-
----
-
-## 7. Hooks Integration
-
-### 7.1 Points d'intégration Claude Code
-
-| Hook | Timing | Action |
-|------|--------|--------|
-| `UserPromptSubmit` | Pre-prompt | Micro-injection contexte + GuardCode |
-| `PostToolResult` | Post-tool | Capture et extraction |
-| `PreCompact` | 95% context | Synthèse et sauvegarde |
-| `Stop` | Session end | Flush et archivage |
-
-### 7.2 Format d'injection
-
-```python
-def inject_context(user_prompt: str) -> str:
-    context = build_context()  # Threads actifs, bridges, focus
-
-    # Injection INVISIBLE (HTML comment ou system tag)
-    injection = f"<!-- ai_smartness: {json.dumps(context)} -->"
-
-    return injection + user_prompt
+├── user_rules.json       # Règles utilisateur
+├── processor.pid         # PID daemon
+├── processor.sock        # Socket daemon
+├── processor.log         # Logs daemon
+├── inject.log            # Logs injection
+├── daemon_stderr.log     # Erreurs daemon
+└── db/
+    ├── threads/          # Thread JSON files
+    │   └── *.json
+    ├── bridges/          # ThinkBridge JSON files
+    │   └── *.json
+    └── synthesis/        # Synthèses compaction
 ```
 
 ---
 
-## 8. Ce que v2 NE FAIT PAS
+## 7. CLI Commands
+
+```bash
+ai status              # Vue d'ensemble
+ai threads             # Lister threads
+ai thread <id>         # Détails thread
+ai bridges             # Lister bridges
+ai search <query>      # Recherche sémantique
+ai health              # Vérification santé
+ai reindex             # Recalculer embeddings
+ai daemon              # Status daemon
+ai daemon start        # Démarrer daemon
+ai daemon stop         # Arrêter daemon
+```
+
+---
+
+## 8. Hooks Integration
+
+| Hook | Script | Timing | Action |
+|------|--------|--------|--------|
+| `UserPromptSubmit` | inject.py | Pre-prompt | Injection mémoire + GuardCode |
+| `PostToolUse` | capture.py | Post-tool | Capture et envoi au daemon |
+| `PreCompact` | compact.py | 95% context | Synthèse et sauvegarde |
+
+---
+
+## 9. Installation
+
+```bash
+/path/to/ai_smartness_v2-DEV/install.sh /path/to/project
+```
+
+### Ce que fait l'installateur
+
+1. Sélection langue (en/fr/es)
+2. Sélection mode (heavy/normal/light)
+3. **Installation sentence-transformers** si non présent
+4. Détection chemin CLI Claude
+5. Copie fichiers avec chemins absolus
+6. Configuration hooks dans `.claude/settings.json`
+7. Initialisation base de données
+8. Installation CLI dans `~/.local/bin/ai`
+
+---
+
+## 10. GuardCode
+
+### Règles
+
+| Règle | Action |
+|-------|--------|
+| `enforce_plan_mode` | Rappel pour tâches complexes |
+| `warn_quick_solutions` | Rappel que simple ≠ meilleur |
+| `require_all_choices` | Présenter alternatives |
+
+### Configuration
+
+```json
+{
+  "guardcode": {
+    "enforce_plan_mode": true,
+    "warn_quick_solutions": true,
+    "require_all_choices": true
+  }
+}
+```
+
+---
+
+## 11. Métriques de Santé
+
+| Métrique | Cible | Signification |
+|----------|-------|---------------|
+| Continuation rate | > 20% | % threads avec >1 message |
+| Embedding coverage | 100% | Tous threads ont embedding |
+| Daemon status | Running | Daemon actif |
+
+Vérifier avec `ai health`.
+
+---
+
+## 12. Phases d'Implémentation
+
+### Phase 1: Core - COMPLETE
+- [x] Modèle Thread simplifié
+- [x] Storage JSON
+- [x] Hook capture basique
+
+### Phase 2: Intelligence - COMPLETE
+- [x] Extraction LLM
+- [x] Embeddings (sentence-transformers + TF-IDF fallback)
+- [x] ThinkBridges avec gossip
+
+### Phase 3: GuardCode - COMPLETE
+- [x] Micro-injection contexte
+- [x] Enforcement plan mode
+- [x] Synthèse à 95%
+
+### Phase 4: Polish - COMPLETE
+- [x] Daemon architecture
+- [x] CLI complet
+- [x] Documentation multilingue
+
+### Phase 5: Memory Injection - COMPLETE
+- [x] MemoryRetriever
+- [x] User rules detection
+- [x] Context injection in inject.py
+
+### Phase 6: Optimizations - COMPLETE
+- [x] Seuil 0.35
+- [x] Topic boost +0.15
+- [x] Daemon CLI control
+- [x] Auto-install sentence-transformers
+
+---
+
+## 13. Ce que v2 NE FAIT PAS
 
 | Anti-pattern | Pourquoi |
 |--------------|----------|
 | Regex pour classification | Inopérant pour la complexité sémantique |
-| Seuils hardcodés (0.7, 25%, etc.) | Décisions arbitraires sans raisonnement |
-| Fragments séparés | Explosion d'entités sans consolidation |
-| Edges vides dans un graph | Complexité sans valeur |
-| Titres = noms de fichiers | Aucune compréhension du contenu |
-| "markdown" comme topic | Bruit technique, pas sémantique |
-| Actions utilisateur requises | Casse la transparence |
-
----
-
-## 9. Métriques de succès
-
-| Métrique | Cible |
-|----------|-------|
-| Edges créés / fragments | > 2.0 (chaque fragment lié à 2+ autres) |
-| Topics vides | < 5% |
-| Titres sémantiques | 100% générés par LLM |
-| Utilisation context window | < 80% sur session longue |
-| Temps reprise après pause | < 30s (synthèse injectée) |
-
----
-
-## 10. Phases d'implémentation (Proposition)
-
-### Phase 1: Core
-- [ ] Modèle Thread simplifié
-- [ ] Storage JSON basique
-- [ ] Hook capture basique
-
-### Phase 2: Intelligence
-- [ ] Extraction LLM pour tous les inputs
-- [ ] Embeddings pour similarité
-- [ ] ThinkBridges avec gossip
-
-### Phase 3: GuardCode
-- [ ] Micro-injection contexte
-- [ ] Enforcement plan mode
-- [ ] Synthèse à 95%
-
-### Phase 4: Polish
-- [ ] Performance optimization
-- [ ] Edge cases
-- [ ] Documentation
-
----
-
-
+| Seuils hardcodés arbitraires | Décisions basées sur embeddings |
+| Stockage du code complet | Uniquement sémantique |
+| Envoi de données externes | 100% local |
+| Actions utilisateur requises | 100% transparent |

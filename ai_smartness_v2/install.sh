@@ -267,6 +267,30 @@ else
 fi
 
 # ============================================================================
+# INSTALL SENTENCE-TRANSFORMERS
+# ============================================================================
+
+echo "🧠 Checking sentence-transformers..."
+
+# Check if sentence-transformers is installed
+if python3 -c "import sentence_transformers" 2>/dev/null; then
+    echo "   ✓ sentence-transformers already installed"
+else
+    echo "   📦 Installing sentence-transformers (required for semantic memory)..."
+    echo "   This may take a few minutes on first install..."
+
+    if pip3 install --user sentence-transformers --quiet 2>/dev/null; then
+        echo "   ✓ sentence-transformers installed successfully"
+    elif pip install --user sentence-transformers --quiet 2>/dev/null; then
+        echo "   ✓ sentence-transformers installed successfully"
+    else
+        echo "   ⚠️  Could not install sentence-transformers automatically"
+        echo "   Please install manually: pip install sentence-transformers"
+        echo "   (AI Smartness will use TF-IDF fallback until installed)"
+    fi
+fi
+
+# ============================================================================
 # DETECT CLAUDE CLI
 # ============================================================================
 
@@ -494,6 +518,71 @@ fi
 echo "   ✓ .claudeignore configured"
 
 # ============================================================================
+# INSTALL CLI
+# ============================================================================
+
+echo "🖥️  Installing CLI..."
+
+# Create bin directory if needed
+mkdir -p "$AI_SMARTNESS_DIR/bin"
+
+# Create the ai wrapper script
+cat > "$AI_SMARTNESS_DIR/bin/ai" << 'AIEOF'
+#!/bin/bash
+#
+# AI Smartness v2 CLI
+#
+
+# Find the ai_smartness_v2 directory
+find_ai_smartness() {
+    local dir="$PWD"
+    while [ "$dir" != "/" ]; do
+        if [ -d "$dir/ai_smartness_v2" ]; then
+            echo "$dir/ai_smartness_v2"
+            return 0
+        fi
+        dir="$(dirname "$dir")"
+    done
+    return 1
+}
+
+AI_SMARTNESS_PATH=$(find_ai_smartness)
+
+if [ -z "$AI_SMARTNESS_PATH" ]; then
+    echo "Error: Could not find ai_smartness_v2 directory"
+    exit 1
+fi
+
+# Add parent to PYTHONPATH for imports
+export PYTHONPATH="${AI_SMARTNESS_PATH%/*}:$PYTHONPATH"
+
+exec python3 "$AI_SMARTNESS_PATH/cli/main.py" "$@"
+AIEOF
+
+chmod +x "$AI_SMARTNESS_DIR/bin/ai"
+
+# Install to ~/.local/bin if available
+LOCAL_BIN="$HOME/.local/bin"
+if [ -d "$LOCAL_BIN" ]; then
+    cp "$AI_SMARTNESS_DIR/bin/ai" "$LOCAL_BIN/ai"
+    chmod +x "$LOCAL_BIN/ai"
+    echo "   ✓ CLI installed to $LOCAL_BIN/ai"
+
+    # Check if ~/.local/bin is in PATH
+    if [[ ":$PATH:" != *":$LOCAL_BIN:"* ]]; then
+        echo "   ⚠️  Add $LOCAL_BIN to your PATH:"
+        echo "      export PATH=\"\$HOME/.local/bin:\$PATH\""
+    fi
+else
+    mkdir -p "$LOCAL_BIN"
+    cp "$AI_SMARTNESS_DIR/bin/ai" "$LOCAL_BIN/ai"
+    chmod +x "$LOCAL_BIN/ai"
+    echo "   ✓ CLI installed to $LOCAL_BIN/ai"
+    echo "   ⚠️  Add $LOCAL_BIN to your PATH:"
+    echo "      export PATH=\"\$HOME/.local/bin:\$PATH\""
+fi
+
+# ============================================================================
 # COMPLETE
 # ============================================================================
 
@@ -515,6 +604,16 @@ echo "   • ThinkBridges (Synapses)"
 echo "   • Gossip propagation"
 echo "   • GuardCode enforcement"
 echo "   • 95% context synthesis"
+echo ""
+echo "🖥️  CLI Commands:"
+echo "   ai status      - Show memory status"
+echo "   ai threads     - List threads"
+echo "   ai thread <id> - Show thread details"
+echo "   ai bridges     - List bridges"
+echo "   ai search <q>  - Search threads"
+echo "   ai reindex     - Recalculate embeddings"
+echo "   ai health      - System health check"
+echo "   ai daemon      - Daemon control (start/stop/status)"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""

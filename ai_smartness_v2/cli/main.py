@@ -10,6 +10,7 @@ Usage:
     ai search <query>      Search threads
     ai reindex             Recalculate all embeddings
     ai health              System health check
+    ai daemon [status|start|stop]  Manage daemon
 """
 
 import argparse
@@ -97,6 +98,16 @@ def main():
     # health command
     health_parser = subparsers.add_parser("health", help="System health check")
 
+    # daemon command
+    daemon_parser = subparsers.add_parser("daemon", help="Manage daemon")
+    daemon_parser.add_argument(
+        "action",
+        nargs="?",
+        choices=["status", "start", "stop"],
+        default="status",
+        help="Action to perform (default: status)"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -135,6 +146,14 @@ def main():
             elif args.command == "health":
                 from .commands.health import run_health
                 return run_health(ai_path)
+            elif args.command == "daemon":
+                from .commands.daemon import run_daemon_status, run_daemon_start, run_daemon_stop
+                if args.action == "start":
+                    return run_daemon_start(ai_path)
+                elif args.action == "stop":
+                    return run_daemon_stop(ai_path)
+                else:
+                    return run_daemon_status(ai_path)
         except ImportError:
             # Fallback to absolute imports (when running as script)
             cli_dir = Path(__file__).parent
@@ -161,6 +180,14 @@ def main():
             elif args.command == "health":
                 from commands.health import run_health
                 return run_health(ai_path)
+            elif args.command == "daemon":
+                from commands.daemon import run_daemon_status, run_daemon_start, run_daemon_stop
+                if args.action == "start":
+                    return run_daemon_start(ai_path)
+                elif args.action == "stop":
+                    return run_daemon_stop(ai_path)
+                else:
+                    return run_daemon_status(ai_path)
 
     except ImportError as e:
         print(f"Error loading command module: {e}")

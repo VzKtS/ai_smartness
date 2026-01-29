@@ -1,10 +1,20 @@
 # AI Smartness v2 - User Guide
 
-## Overview
+## Quick Start
 
-AI Smartness v2 is a persistent memory system for Claude Code. It automatically captures your work context, organizes it into semantic threads, and maintains connections between related concepts.
+1. **Install** in your project:
+   ```bash
+   /path/to/ai_smartness_v2-DEV/install.sh /path/to/your/project
+   ```
 
-**Key principle**: 100% transparent - you don't need to do anything special. Just work normally.
+2. **Work normally** - the system captures everything automatically
+
+3. **Check status** anytime:
+   ```bash
+   ai status
+   ```
+
+That's it. The system is 100% transparent.
 
 ---
 
@@ -12,7 +22,7 @@ AI Smartness v2 is a persistent memory system for Claude Code. It automatically 
 
 ### Threads
 
-A **Thread** is a semantic work unit representing a topic or task:
+A **Thread** is a semantic work unit representing a topic or task.
 
 | Status | Description |
 |--------|-------------|
@@ -21,16 +31,16 @@ A **Thread** is a semantic work unit representing a topic or task:
 | `archived` | Completed or dormant |
 
 Threads contain:
-- **Title**: LLM-generated semantic title
+- **Title**: Auto-generated semantic title
 - **Messages**: History of interactions
-- **Summary**: LLM-generated summary
+- **Summary**: Auto-generated summary
+- **Topics**: Key concepts extracted
 - **Embedding**: Vector for similarity search
 
 ### ThinkBridges
 
 A **ThinkBridge** is a semantic connection between two threads.
 
-Bridge types:
 | Type | Meaning |
 |------|---------|
 | `extends` | A extends/refines B |
@@ -39,142 +49,251 @@ Bridge types:
 | `replaces` | A replaces B |
 | `child_of` | A is a subtopic of B |
 
-Bridges are created automatically when the system detects semantic similarity between threads.
+Bridges are created automatically when the system detects semantic similarity.
 
-### Gossip Propagation
+### User Rules
 
-When a thread changes, its connections **propagate** through the network:
-- Thread A modified → its bridges are evaluated
-- If strong similarity with connected threads → new bridges created
-- Creates a "web of knowledge" that grows organically
+The system detects and remembers your preferences. Say things like:
+- "remember: always use TypeScript"
+- "rule: no direct commits to main"
+- "always make a plan before implementation"
+- "never use console.log in production"
 
----
-
-## How It Works (Behind the Scenes)
-
-### 1. Capture
-
-Every tool result (Read, Write, Task, Bash, etc.) is captured and processed:
-1. **Noise filter**: Remove IDE tags, line numbers, formatting
-2. **LLM extraction**: Extract intent, subjects, questions
-3. **Thread decision**: New thread? Continue existing? Fork?
-
-### 2. Thread Management
-
-The LLM decides what to do with each input:
-
-| Decision | When |
-|----------|------|
-| `NEW_THREAD` | Different topic from active threads |
-| `CONTINUE` | Same topic as active thread |
-| `FORK` | Sub-topic of active thread |
-| `REACTIVATE` | Old topic returns |
-
-### 3. Context Injection
-
-Before each of your prompts, invisible context is injected:
-- Active thread info
-- Recent decisions
-- GuardCode reminders
-
-You never see this, but it helps the agent maintain coherence.
-
-### 4. 95% Synthesis
-
-When the context window fills to 95%:
-1. LLM generates a synthesis of current state
-2. Key decisions, open questions, active work
-3. Synthesis is injected after compaction
-4. You see nothing - context is preserved
+These rules are stored permanently and injected into every prompt.
 
 ---
 
-## CLI Commands
+## CLI Reference
 
-### Status
+### `ai status`
 
-```bash
-# Global overview
-python3 ai_smartness_v2/cli/main.py status
+Shows global overview:
+```
+=== AI Smartness Status ===
+Project: MyProject
+
+Threads: 45 total
+  Active:    12
+  Suspended: 33
+  Archived:  0
+
+Bridges: 234 connections
+
+Last activity: 2026-01-29 15:30:22
+Current thread: "Authentication System"
 ```
 
-Shows:
-- Thread counts by status
-- Bridge count
-- Last activity
-- Active thread title
+### `ai threads`
 
-### Threads
-
+List threads with filtering:
 ```bash
-# List all threads
-python3 ai_smartness_v2/cli/main.py threads
-
-# Filter by status
-python3 ai_smartness_v2/cli/main.py threads --status active
-python3 ai_smartness_v2/cli/main.py threads --status suspended
-python3 ai_smartness_v2/cli/main.py threads --status archived
-
-# Limit results
-python3 ai_smartness_v2/cli/main.py threads --limit 10
-
-# View specific thread
-python3 ai_smartness_v2/cli/main.py thread thread_20260128_143022_abc123
+ai threads                    # Active threads (default)
+ai threads --status active    # Active only
+ai threads --status suspended # Suspended only
+ai threads --status all       # All threads
+ai threads --limit 20         # Limit to 20 results
 ```
 
-### Bridges
-
-```bash
-# List all bridges
-python3 ai_smartness_v2/cli/main.py bridges
-
-# Filter by thread
-python3 ai_smartness_v2/cli/main.py bridges --thread thread_20260128_143022
-
-# Limit results
-python3 ai_smartness_v2/cli/main.py bridges --limit 20
+Output:
+```
+ID         Title                           Status    Weight  Messages
+---------- ------------------------------- --------- ------- --------
+abc123...  Authentication System           active    0.92    8
+def456...  Database Schema Design          active    0.78    5
+ghi789...  API Rate Limiting               suspended 0.45    3
 ```
 
-### Search
+### `ai thread <id>`
 
+Show thread details:
 ```bash
-# Semantic search across threads
-python3 ai_smartness_v2/cli/main.py search "authentication"
-python3 ai_smartness_v2/cli/main.py search "database migration"
+ai thread abc123
+```
 
-# Limit results
-python3 ai_smartness_v2/cli/main.py search "api" --limit 5
+### `ai bridges`
+
+List semantic connections:
+```bash
+ai bridges                    # All bridges
+ai bridges --thread abc123    # Bridges for specific thread
+ai bridges --limit 50         # Limit results
+```
+
+Output:
+```
+Source                Target                Type       Confidence
+--------------------- --------------------- ---------- ----------
+Authentication...     Database Schema...    depends    0.85
+API Rate Limiting...  Authentication...     extends    0.72
+```
+
+### `ai search`
+
+Semantic search across all threads:
+```bash
+ai search "authentication"
+ai search "database migration" --limit 10
+```
+
+### `ai health`
+
+System health check:
+```bash
+ai health
+```
+
+Output:
+```
+=== AI Smartness Health ===
+Threads: 158 (100 active, 58 suspended)
+Bridges: 3374
+Continuation rate: 23.4%
+Embedding coverage: 100.0%
+Daemon: Running (PID 12345)
+```
+
+**Key metrics:**
+- **Continuation rate**: % of threads with >1 message (higher is better)
+- **Embedding coverage**: % of threads with valid embeddings (should be 100%)
+- **Daemon**: Should be "Running"
+
+### `ai reindex`
+
+Recalculate all embeddings:
+```bash
+ai reindex           # Standard
+ai reindex --verbose # With progress details
+```
+
+Use this after:
+- Installing sentence-transformers
+- Upgrading AI Smartness
+- If embedding coverage is below 100%
+
+### `ai daemon`
+
+Control the background daemon:
+```bash
+ai daemon           # Show status (default)
+ai daemon status    # Show status
+ai daemon start     # Start daemon
+ai daemon stop      # Stop daemon
 ```
 
 ---
 
-## GuardCode
+## How Memory Works
 
-GuardCode protects your development process with configurable rules.
+### Capture Flow
 
-### Default Rules
+```
+You use a tool (Read, Write, etc.)
+         ↓
+PostToolUse hook triggers
+         ↓
+Content sent to daemon (fast, non-blocking)
+         ↓
+Daemon extracts semantics (LLM)
+         ↓
+Thread decision: NEW / CONTINUE / FORK / REACTIVATE
+         ↓
+Thread updated, bridges recalculated
+```
 
-| Rule | Effect |
-|------|--------|
-| `enforce_plan_mode` | Blocks code changes without a validated plan |
-| `warn_quick_solutions` | Reminds that simple ≠ better |
-| `require_all_choices` | Must present all alternatives |
+### Injection Flow
 
-### How It Works
+```
+You type a message
+         ↓
+UserPromptSubmit hook triggers
+         ↓
+Memory Retriever finds relevant threads (by similarity)
+         ↓
+Context string built:
+  - Current thread title + summary
+  - Related threads (via bridges)
+  - User rules
+         ↓
+Injected as invisible <system-reminder>
+         ↓
+Claude receives your message + context
+```
 
-Before each prompt, GuardCode checks:
-1. Is there an active plan for this work?
-2. Has the plan been validated by user?
-3. Are there alternatives that should be presented?
+### What Gets Injected
 
-If rules are violated, reminders are injected into context.
+Example injection (invisible to you):
+```xml
+<system-reminder>
+AI Smartness Memory Context:
 
-### Configuration
+Current thread: "JWT Authentication"
+Summary: Implementing refresh token rotation with Redis storage.
 
-Edit `ai_smartness_v2/.ai/config.json`:
+Related threads:
+- "Database Schema" - User and session tables
+- "Security Audit" - Token expiration policies
+
+User rules:
+- always make a plan before implementation
+- use TypeScript strict mode
+</system-reminder>
+
+Your actual message here...
+```
+
+---
+
+## Best Practices
+
+### Let It Work
+
+Don't try to "help" the system:
+- Work normally
+- The system captures everything automatically
+- Threads form naturally based on your work
+
+### Express Preferences
+
+Tell the agent your rules:
+- "remember: I prefer functional programming"
+- "rule: always add tests for new functions"
+- "never use any as a type"
+
+These get stored and applied to all future sessions.
+
+### Check Health Regularly
+
+```bash
+ai health
+```
+
+- Continuation rate below 10%? Check embeddings
+- Daemon stopped? Run `ai daemon start`
+- Embedding coverage below 100%? Run `ai reindex`
+
+### Session Resumption
+
+When starting a new session:
+1. Memory is injected automatically
+2. Check status: `ai status`
+3. Your agent "remembers" previous context
+
+---
+
+## Configuration
+
+### Location
+
+`ai_smartness_v2/.ai/config.json`
+
+### Key Settings
 
 ```json
 {
+  "settings": {
+    "thread_mode": "heavy",
+    "active_threads_limit": 100
+  },
   "guardcode": {
     "enforce_plan_mode": true,
     "warn_quick_solutions": true,
@@ -183,142 +302,93 @@ Edit `ai_smartness_v2/.ai/config.json`:
 }
 ```
 
----
+### Mode Comparison
 
-## Best Practices
-
-### Let the System Work
-
-Don't try to "help" the system - it captures everything automatically. Just:
-- Work normally
-- Make decisions explicitly when asked
-- Let threads form naturally
-
-### Session Resumption
-
-When starting a new session:
-1. The system injects context automatically
-2. You can check status: `python3 ai_smartness_v2/cli/main.py status`
-3. Your agent will have access to previous context
-
-### Long Projects
-
-For projects spanning weeks/months:
-- Threads accumulate knowledge
-- Bridges connect related work
-- Context is synthesized at 95%
-- Resumption feels seamless
-
-### Large Projects
-
-For large codebases (blockchain, enterprise):
-- Increase thread limit in config
-- Mode "heavy" supports up to 100 threads
-- Edit config to go higher if needed
-
----
-
-## Configuration
-
-### Thread Limits
-
-```json
-{
-  "settings": {
-    "thread_mode": "heavy",
-    "active_threads_limit": 100
-  }
-}
-```
-
-| Mode | Default Limit | Typical Use |
-|------|---------------|-------------|
-| light | 15 | Small projects |
+| Mode | Thread Limit | Best For |
+|------|--------------|----------|
+| light | 15 | Small scripts, quick tasks |
 | normal | 50 | Medium projects |
-| heavy | 100 | Large/complex projects |
-
-### Extraction Model
-
-```json
-{
-  "llm": {
-    "extraction_model": "claude-3-5-haiku-20241022",
-    "claude_cli_path": "/usr/local/bin/claude"
-  }
-}
-```
-
-Extraction always uses Haiku (economical). This is independent of your main agent model.
+| heavy | 100 | Large codebases, long projects |
 
 ---
 
 ## Troubleshooting
 
+### "Daemon not running"
+
+```bash
+ai daemon start
+```
+
+If it fails, check logs:
+```bash
+cat ai_smartness_v2/.ai/daemon_stderr.log
+```
+
 ### "Heuristic fallback" in titles
 
-The Claude CLI was not found. Check:
+Claude CLI not found. Check:
 ```bash
 which claude
 ```
 
-If not found, install Claude Code CLI or update the path in config.
+Update path in config if needed.
 
-### Captures not happening
+### Low continuation rate
 
-Check hooks in `.claude/settings.json`:
+Threads not consolidating? Check:
+1. Is sentence-transformers installed?
+   ```bash
+   python3 -c "import sentence_transformers; print('OK')"
+   ```
+2. If not: `pip install sentence-transformers`
+3. Restart daemon: `ai daemon stop && ai daemon start`
+4. Reindex: `ai reindex`
+
+### Memory not being injected
+
+Check injection logs:
+```bash
+tail -20 ai_smartness_v2/.ai/inject.log
+```
+
+Should show lines like:
+```
+[2026-01-29 15:30:22] Injected: 450 chars (380 memory) for: How do I...
+```
+
+### Hooks not triggering
+
+Check `.claude/settings.json`:
 - Paths must be **absolute**
 - Python3 must be in PATH
 
-### Too many threads
+---
 
-Increase the limit:
-```json
-"active_threads_limit": 150
-```
+## Files Reference
 
-### Context drift
-
-If the agent seems to "forget" context:
-1. Check thread status: active threads have context
-2. Check bridges: related threads should be connected
-3. The 95% synthesis preserves key info
+| File | Purpose |
+|------|---------|
+| `.ai/config.json` | Configuration |
+| `.ai/user_rules.json` | Your stored rules |
+| `.ai/processor.pid` | Daemon process ID |
+| `.ai/processor.sock` | Daemon socket |
+| `.ai/processor.log` | Daemon logs |
+| `.ai/inject.log` | Injection logs |
+| `.ai/db/threads/*.json` | Thread data |
+| `.ai/db/bridges/*.json` | Bridge data |
+| `.ai/db/synthesis/*.json` | Compaction syntheses |
 
 ---
 
-## Database Files
-
-Location: `ai_smartness_v2/.ai/`
-
-| File/Folder | Content |
-|-------------|---------|
-| `config.json` | Configuration |
-| `db/threads/` | Thread JSON files |
-| `db/bridges/` | Bridge JSON files |
-| `db/synthesis/` | Compaction syntheses |
-
-### Manual Inspection
-
-```bash
-# Count threads
-ls ai_smartness_v2/.ai/db/threads/ | wc -l
-
-# Count bridges
-ls ai_smartness_v2/.ai/db/bridges/ | wc -l
-
-# View a thread
-cat ai_smartness_v2/.ai/db/threads/thread_20260128_143022_abc123.json | python3 -m json.tool
-```
-
----
-
-## What v2 Does NOT Do
+## What AI Smartness Does NOT Do
 
 | Feature | Why Not |
 |---------|---------|
 | Require user action | 100% transparent |
-| Use regex for semantics | LLM-only for meaning |
-| Hardcode thresholds | LLM decides intelligently |
-| Pollute your prompts | Context is invisible |
+| Store code content | Only semantics, not full code |
+| Send data externally | 100% local |
+| Modify your code | Read-only memory system |
 | Require configuration | Works out of the box |
 
 ---
@@ -326,7 +396,7 @@ cat ai_smartness_v2/.ai/db/threads/thread_20260128_143022_abc123.json | python3 
 ## Support
 
 If you encounter issues:
-1. Check `.claude/settings.json` for correct hook paths
-2. Verify Claude CLI is accessible
-3. Review thread/bridge counts with CLI
-4. Check `ai_smartness_v2/.ai/` for database integrity
+1. Run `ai health` to diagnose
+2. Check logs in `ai_smartness_v2/.ai/`
+3. Verify hooks in `.claude/settings.json`
+4. Try `ai daemon stop && ai daemon start`
