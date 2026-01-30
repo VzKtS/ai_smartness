@@ -314,7 +314,7 @@ class ThreadManager:
             thread = Thread.create(title, OriginType(source_type))
             thread.topics = extraction.subjects + extraction.key_concepts
             thread.summary = extraction.summary  # Store the summary
-            thread.add_message(content, "user")
+            thread.add_message(content, "user", source_type=source_type)
             self.storage.threads.save(thread)
             return thread
 
@@ -322,7 +322,7 @@ class ThreadManager:
             # Continue existing thread
             thread = self.storage.threads.get(decision.thread_id)
             if thread:
-                thread.add_message(content, "user")
+                thread.add_message(content, "user", source_type=source_type)
                 thread.topics = list(set(thread.topics + extraction.subjects))
                 # Update summary: append new info if significant
                 if extraction.summary and extraction.summary not in thread.summary:
@@ -346,7 +346,7 @@ class ThreadManager:
             thread = Thread.create(title, OriginType.SPLIT, parent_id=decision.thread_id)
             thread.topics = extraction.subjects + extraction.key_concepts
             thread.summary = extraction.summary  # Store the summary
-            thread.add_message(content, "user")
+            thread.add_message(content, "user", source_type=source_type)
 
             if parent:
                 parent.add_child(thread.id)
@@ -360,7 +360,7 @@ class ThreadManager:
             thread = self.storage.threads.get(decision.thread_id)
             if thread:
                 thread.reactivate()
-                thread.add_message(content, "user")
+                thread.add_message(content, "user", source_type=source_type)
                 thread.topics = list(set(thread.topics + extraction.subjects))
                 # Update summary with new context
                 if extraction.summary and extraction.summary not in thread.summary:
