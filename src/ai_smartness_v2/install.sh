@@ -280,6 +280,7 @@ cp -r "$SCRIPT_DIR" "$AI_SMARTNESS_DIR"
 rm -rf "$AI_SMARTNESS_DIR/.git" 2>/dev/null || true
 rm -f "$AI_SMARTNESS_DIR/.gitignore" 2>/dev/null || true
 rm -rf "$AI_SMARTNESS_DIR/__pycache__" 2>/dev/null || true
+rm -f "$AI_SMARTNESS_DIR/install.sh" 2>/dev/null || true
 find "$AI_SMARTNESS_DIR" -name "*.pyc" -delete 2>/dev/null || true
 find "$AI_SMARTNESS_DIR" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
@@ -447,8 +448,8 @@ if 'allow' not in settings['permissions']:
 if "Bash(python3:*)" not in settings['permissions']['allow']:
     settings['permissions']['allow'].append("Bash(python3:*)")
 
-# v2 Hooks - SIMPLIFIED
-# Only 3 hooks: capture (PostToolUse), inject (UserPromptSubmit), compact (PreCompact)
+# v2 Hooks
+# 4 hooks: inject (UserPromptSubmit), guard (PreToolUse), capture (PostToolUse), compact (PreCompact)
 ai_hooks = {
     "UserPromptSubmit": [
         {
@@ -456,6 +457,17 @@ ai_hooks = {
                 {
                     "type": "command",
                     "command": f"python3 {ai_path}/hooks/inject.py"
+                }
+            ]
+        }
+    ],
+    "PreToolUse": [
+        {
+            "matcher": "Edit|Write",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"python3 {ai_path}/hooks/guard_write.py"
                 }
             ]
         }
@@ -507,7 +519,7 @@ for hook_type, hook_list in ai_hooks.items():
     settings['hooks'][hook_type].extend(hook_list)
 
 settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
-print("   ✓ Hooks configured (UserPromptSubmit, PostToolUse, PreCompact)")
+print("   ✓ Hooks configured (UserPromptSubmit, PreToolUse, PostToolUse, PreCompact)")
 print(f"   ✓ Using absolute path: {ai_path}")
 EOF
 

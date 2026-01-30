@@ -395,6 +395,10 @@ def save_user_rule(rule: str, ai_path: Path):
 # PROMPT CAPTURE
 # =============================================================================
 
+# Marqueur pour identifier les prompts LLM internes (extractor, synthesis, etc.)
+# Format HTML comment - ignoré par le LLM, détectable ici
+INTERNAL_PROMPT_MARKER = "<!-- AI_SMARTNESS_INTERNAL_CALL -->"
+
 # Minimum length for a prompt to be worth capturing
 MIN_PROMPT_LENGTH = 50
 
@@ -411,7 +415,10 @@ def should_capture_prompt(message: str) -> bool:
     """
     Check if prompt should be captured for thread processing.
 
-    Filters out short messages and acknowledgements.
+    Filters out:
+    - Internal LLM calls (marked prompts from extractor/synthesis)
+    - Short messages
+    - Acknowledgements
 
     Args:
         message: User message
@@ -419,11 +426,20 @@ def should_capture_prompt(message: str) -> bool:
     Returns:
         True if prompt should be captured
     """
+    # Skip internal LLM calls (marked prompts from extractor, synthesis, etc.)
+    if message.startswith(INTERNAL_PROMPT_MARKER):
+        return False
+
+    # Legacy: Skip via env var (kept as fallback)
+    if os.environ.get('CLAUDE_INTERNAL_CALL') == '1':
+        return False
+
     if len(message) < MIN_PROMPT_LENGTH:
         return False
 
     message_lower = message.lower().strip()
 
+    # Skip acknowledgements
     for pattern in SKIP_PROMPT_PATTERNS:
         if re.match(pattern, message_lower, re.IGNORECASE):
             return False
@@ -498,6 +514,184 @@ def get_memory_context(message: str, db_path: Path) -> str:
 
 
 # =============================================================================
+# PLAN VALIDATION DETECTION
+# =============================================================================
+
+# Patterns indiquant qu'un plan a été approuvé
+PLAN_APPROVED_PATTERNS = [
+    r"plan\s+approu?v[eé]",
+    r"plan\s+approved",
+    r"plan\s+valid[eé]",
+    r"plan\s+validated",
+    r"approu?v[eé]\s+le\s+plan",
+    r"approve\s+the\s+plan",
+    r"go\s+ahead",
+    r"vas-y",
+    r"proceed",
+    r"lance",
+    r"execute",
+    r"impl[eé]mente",
+    r"^oui$",
+    r"^yes$",
+    r"^ok$",
+    r"^d'accord$",
+]
+
+
+def detect_plan_approval(message: str) -> bool:
+    """
+    Détecte si le message indique une approbation de plan.
+
+    Args:
+        message: User message
+
+    Returns:
+        True if plan approval detected
+    """
+    message_lower = message.lower().strip()
+
+    for pattern in PLAN_APPROVED_PATTERNS:
+        if re.search(pattern, message_lower, re.IGNORECASE):
+            return True
+
+    return False
+
+
+def find_latest_plan_file() -> Optional[Path]:
+    """
+    Trouve le fichier plan le plus récent.
+
+    Returns:
+        Path to latest plan file, or None
+    """
+    # Claude Code stocke les plans dans ~/.claude/plans/
+    home = Path.home()
+    plans_dir = home / ".claude" / "plans"
+
+    if not plans_dir.exists():
+        return None
+
+    plan_files = list(plans_dir.glob("*.md"))
+    if not plan_files:
+        return None
+
+    # Trier par date de modification (plus récent en premier)
+    plan_files.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+
+    return plan_files[0]
+
+
+def extract_files_from_plan(plan_path: Path) -> list:
+    """
+    Extrait les chemins de fichiers mentionnés dans un plan.
+
+    Args:
+        plan_path: Path to plan file
+
+    Returns:
+        List of file paths found in plan
+    """
+    try:
+        content = plan_path.read_text(encoding='utf-8')
+    except Exception:
+        return []
+
+    files = set()
+
+    # Patterns pour trouver les chemins de fichiers
+    patterns = [
+        # Fichiers en backticks avec extension
+        r'`([^`\s]+\.(?:py|sh|js|ts|tsx|jsx|json|md|yaml|yml|toml|cfg|ini|txt|html|css|sql))`',
+        # Dans tableaux markdown
+        r'\|\s*`?([^|`\s]+\.(?:py|sh|js|ts|tsx|jsx|json|md|yaml|yml|toml))`?\s*\|',
+        # Après "Fichier:" ou "File:"
+        r'(?:Fichier|File)[:\s]+`?([^\s`\n]+\.(?:py|sh|js|ts|json|md))`?',
+        # Chemins avec src/ ou hooks/
+        r'((?:src|hooks|lib|bin)/[^\s`\n\|]+\.(?:py|sh|js|ts|json))',
+    ]
+
+    for pattern in patterns:
+        matches = re.findall(pattern, content, re.IGNORECASE)
+        for match in matches:
+            if match and len(match) > 3:
+                # Nettoyer le chemin
+                clean_path = match.strip('`"\' ')
+                if clean_path:
+                    files.add(clean_path)
+
+    return list(files)
+
+
+def save_plan_state(ai_path: Path, files: list, plan_summary: str = ""):
+    """
+    Sauvegarde l'état du plan validé.
+
+    Args:
+        ai_path: Path to .ai directory
+        files: List of validated files
+        plan_summary: Optional summary of the plan
+    """
+    state_file = ai_path / "plan_state.json"
+
+    state = {
+        "validated_at": datetime.now().isoformat(),
+        "plan_summary": plan_summary,
+        "validated_files": files,
+        "expires_at": None  # Pas d'expiration par défaut
+    }
+
+    try:
+        state_file.write_text(
+            json.dumps(state, indent=2, ensure_ascii=False),
+            encoding='utf-8'
+        )
+        log(f"Plan state saved: {len(files)} files validated")
+    except Exception as e:
+        log(f"Failed to save plan state: {e}")
+
+
+def process_plan_approval(message: str, ai_path: Path):
+    """
+    Traite une approbation de plan détectée.
+
+    Args:
+        message: User message
+        ai_path: Path to .ai directory
+    """
+    # Trouver le fichier plan le plus récent
+    plan_file = find_latest_plan_file()
+
+    if not plan_file:
+        log("Plan approval detected but no plan file found")
+        return
+
+    # Extraire les fichiers du plan
+    files = extract_files_from_plan(plan_file)
+
+    if not files:
+        log(f"Plan approval detected but no files found in {plan_file.name}")
+        # Autoriser tout le scope ai_smartness_v2 par défaut
+        files = ["src/ai_smartness_v2/*"]
+
+    # Extraire un résumé du plan (première ligne non vide après #)
+    plan_summary = ""
+    try:
+        content = plan_file.read_text(encoding='utf-8')
+        for line in content.split('\n'):
+            line = line.strip()
+            if line.startswith('#') and len(line) > 2:
+                plan_summary = line.lstrip('#').strip()
+                break
+    except Exception:
+        pass
+
+    # Sauvegarder l'état
+    save_plan_state(ai_path, files, plan_summary)
+
+    log(f"Plan validated: {plan_summary[:50]}... ({len(files)} files)")
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -530,6 +724,11 @@ def main():
         detected_rule = detect_and_save_user_rule(message, ai_path)
         if detected_rule:
             log(f"Detected user rule: {detected_rule[:50]}...")
+
+        # Detect plan approval and update plan_state.json
+        if detect_plan_approval(message):
+            process_plan_approval(message, ai_path)
+            log(f"Plan approval detected in: {message[:50]}...")
 
         # Send prompt to daemon for thread capture (non-blocking)
         if should_capture_prompt(message):

@@ -214,9 +214,19 @@ Formato JSON:
         Returns:
             LLM response string
         """
+        import os
+
+        # Marqueur pour que inject.py ignore ce prompt interne
+        INTERNAL_PROMPT_MARKER = "<!-- AI_SMARTNESS_INTERNAL_CALL -->"
+        marked_prompt = f"{INTERNAL_PROMPT_MARKER}\n{prompt}"
+
+        # Set env to signal internal call (legacy fallback)
+        env = os.environ.copy()
+        env['CLAUDE_INTERNAL_CALL'] = '1'
+
         try:
             cmd = [
-                "claude", "-p", prompt,
+                "claude", "-p", marked_prompt,
                 "--model", self.config.extraction_model,
                 "--output-format", "text"
             ]
@@ -225,7 +235,8 @@ Formato JSON:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=60
+                timeout=60,
+                env=env
             )
 
             if result.returncode == 0:

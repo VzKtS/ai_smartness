@@ -285,16 +285,25 @@ class LLMExtractor:
         Falls back to heuristic extraction if CLI not available.
         """
         import logging
+        import os
         logger = logging.getLogger(__name__)
+
+        # Marqueur pour que inject.py ignore ce prompt interne
+        INTERNAL_PROMPT_MARKER = "<!-- AI_SMARTNESS_INTERNAL_CALL -->"
+        marked_prompt = f"{INTERNAL_PROMPT_MARKER}\n{prompt}"
+
+        # Set env to signal internal call (legacy fallback)
+        env = os.environ.copy()
+        env['CLAUDE_INTERNAL_CALL'] = '1'
 
         try:
             # Build command - include model if specified
             if self.model:
-                cmd = [self.claude_cli_path, "--model", self.model, "--print", prompt]
+                cmd = [self.claude_cli_path, "--model", self.model, "--print", marked_prompt]
             else:
-                cmd = [self.claude_cli_path, "--print", prompt]
+                cmd = [self.claude_cli_path, "--print", marked_prompt]
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
 
             if result.returncode == 0:
                 return result.stdout.strip()
@@ -304,10 +313,11 @@ class LLMExtractor:
                 logger.warning(f"Model '{self.model}' not found, retrying with default model")
                 # Retry without --model (use session default)
                 result = subprocess.run(
-                    [self.claude_cli_path, "--print", prompt],
+                    [self.claude_cli_path, "--print", marked_prompt],
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=30,
+                    env=env
                 )
                 if result.returncode == 0:
                     return result.stdout.strip()
