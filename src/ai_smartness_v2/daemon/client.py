@@ -127,7 +127,65 @@ def stop_daemon(ai_path: Path) -> bool:
     return response is not None
 
 
-def ensure_daemon_running(ai_path: Path, max_wait: float = 2.0) -> bool:
+def cleanup_zombie_daemons(ai_path: Path) -> None:
+    """
+    Kill any zombie daemon processes for this project.
+
+    Uses multiple strategies to find and kill zombies:
+    1. PID file lookup
+    2. Pattern matching with pkill
+
+    Args:
+        ai_path: Path to .ai directory
+    """
+    import signal
+
+    # Strategy 1: Kill by PID file
+    pid_file = ai_path / "processor.pid"
+    if pid_file.exists():
+        try:
+            pid = int(pid_file.read_text().strip())
+            os.kill(pid, signal.SIGKILL)
+        except (ValueError, OSError, ProcessLookupError):
+            pass
+        try:
+            pid_file.unlink()
+        except Exception:
+            pass
+
+    # Strategy 2: Kill by pattern matching (finds zombies without PID file)
+    # Get the project path from ai_path (ai_path is .ai, parent is ai_smartness_v2, grandparent is project)
+    project_path = ai_path.parent.parent
+    db_path = ai_path / "db"
+
+    patterns = [
+        f"ai_smartness_v2.daemon.processor.*{project_path}",
+        f"ai_smartness_v2/daemon/processor.py.*{db_path}",
+    ]
+
+    for pattern in patterns:
+        try:
+            subprocess.run(
+                ["pkill", "-9", "-f", pattern],
+                capture_output=True,
+                timeout=2
+            )
+        except Exception:
+            pass
+
+    # Clean up socket file
+    socket_path = ai_path / "processor.sock"
+    if socket_path.exists():
+        try:
+            socket_path.unlink()
+        except Exception:
+            pass
+
+    # Small delay to ensure processes are fully terminated
+    time.sleep(0.2)
+
+
+def ensure_daemon_running(ai_path: Path, max_wait: float = 5.0) -> bool:
     """
     Ensure the daemon is running, starting it if necessary.
 
@@ -141,44 +199,12 @@ def ensure_daemon_running(ai_path: Path, max_wait: float = 2.0) -> bool:
     socket_path = ai_path / "processor.sock"
     db_path = ai_path / "db"
 
-    # Check if already running
+    # Check if already running and responding
     if is_daemon_running(ai_path):
         return True
 
-    # Clean up stale socket
-    if socket_path.exists():
-        try:
-            socket_path.unlink()
-        except Exception:
-            pass
-
-    # Clean up old daemon process
-    pid_file = ai_path / "processor.pid"
-    if pid_file.exists():
-        try:
-            pid = int(pid_file.read_text().strip())
-            # Check if process exists
-            os.kill(pid, 0)
-            # Process EXISTS but doesn't respond to socket → kill it
-            try:
-                os.kill(pid, 15)  # SIGTERM
-                time.sleep(0.3)
-                # Force kill if still running
-                try:
-                    os.kill(pid, 0)
-                    os.kill(pid, 9)  # SIGKILL
-                except OSError:
-                    pass  # Already dead
-            except OSError:
-                pass
-        except (ValueError, OSError):
-            # Process doesn't exist, remove stale PID
-            pass
-        # Always remove PID file before starting new daemon
-        try:
-            pid_file.unlink()
-        except Exception:
-            pass
+    # Clean up ALL zombie daemons for this project
+    cleanup_zombie_daemons(ai_path)
 
     # Start the daemon
     try:

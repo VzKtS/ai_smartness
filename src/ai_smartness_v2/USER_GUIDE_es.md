@@ -192,6 +192,8 @@ El hook UserPromptSubmit se dispara
          ↓
 Memory Retriever encuentra threads relevantes (por similitud)
          ↓
+Reactivación automática de threads suspendidos si son relevantes
+         ↓
 Cadena de contexto construida:
   - Título + resumen del thread actual
   - Threads relacionados (via bridges)
@@ -201,6 +203,28 @@ Inyectado como <system-reminder> invisible
          ↓
 Claude recibe tu mensaje + contexto
 ```
+
+### Reactivación Automática de Threads
+
+Cuando mencionas un tema relacionado con un thread suspendido, el sistema puede reactivarlo automáticamente:
+
+| Similitud | Acción |
+|-----------|--------|
+| > 0.35 | Reactivación auto (alta confianza) |
+| 0.15 - 0.35 | LLM Haiku decide (zona borderline) |
+| < 0.15 | Sin reactivación |
+
+**Ejemplo:** Si trabajaste en "sistema de memoria IA" ayer (ahora suspendido), y hoy preguntas:
+> "cuéntame sobre la capa de meta cognición"
+
+El sistema:
+1. Calcula la similitud con "sistema de memoria IA" (borderline: 0.28)
+2. Consulta a Haiku: "¿Este mensaje está relacionado con este thread?"
+3. Haiku confirma la relación semántica
+4. Reactiva el thread
+5. Inyecta el contexto en tu conversación
+
+**Liberación de Slots:** Si estás en el máximo de threads activos (ej: 100/100), el sistema suspende automáticamente el thread activo menos importante para hacer espacio al thread reactivado.
 
 ### Qué se Inyecta
 
@@ -289,9 +313,15 @@ Cuando inicias una nueva sesión:
 
 | Modo | Límite Threads | Ideal Para |
 |------|----------------|------------|
-| light | 15 | Scripts pequeños, tareas rápidas |
-| normal | 50 | Proyectos medianos |
+| MAX | 200 | Proyectos complejos, sesiones 15+ horas |
 | heavy | 100 | Codebases grandes, proyectos largos |
+| normal | 50 | Proyectos medianos |
+| light | 15 | Scripts pequeños, tareas rápidas |
+
+El modo **MAX** es recomendado para:
+- Proyectos con muchos componentes interdependientes
+- Sesiones de trabajo muy largas (15+ horas)
+- Casos donde la pérdida de memoria sería crítica
 
 ---
 

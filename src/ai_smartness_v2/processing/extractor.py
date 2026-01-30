@@ -21,6 +21,7 @@ class Extraction:
     source_type: SourceType
     title: str  # Short subject title (3-5 words, NO action verbs)
     intent: str  # What the user/system intended
+    summary: str  # Brief summary of the content (1-2 sentences)
     subjects: List[str]  # Main subjects/topics
     questions: List[str]  # Questions asked or implied
     decisions: List[str]  # Decisions made or proposed
@@ -34,6 +35,7 @@ class Extraction:
             "source_type": self.source_type,
             "title": self.title,
             "intent": self.intent,
+            "summary": self.summary,
             "subjects": self.subjects,
             "questions": self.questions,
             "decisions": self.decisions,
@@ -59,6 +61,7 @@ IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
 Réponds en JSON strict:
 {{
   "title": "Sujet principal en 3-5 mots (nom, pas verbe)",
+  "summary": "Résumé bref du contenu en 1-2 phrases",
   "intent": "L'intention principale de l'utilisateur (1 phrase)",
   "subjects": ["sujet1", "sujet2"],
   "questions": ["question posée ou implicite"],
@@ -82,6 +85,7 @@ IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
 Réponds en JSON strict:
 {{
   "title": "Sujet principal du fichier en 3-5 mots",
+  "summary": "Ce que fait ce fichier/module en 1-2 phrases",
   "intent": "Pourquoi ce fichier est probablement lu (1 phrase)",
   "subjects": ["sujet principal du fichier"],
   "questions": [],
@@ -105,6 +109,7 @@ IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
 Réponds en JSON strict:
 {{
   "title": "Sujet de la modification en 3-5 mots",
+  "summary": "Ce qui a été modifié et le résultat en 1-2 phrases",
   "intent": "Ce qui a été modifié et pourquoi (1 phrase)",
   "subjects": ["sujet de la modification"],
   "questions": [],
@@ -127,6 +132,7 @@ IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
 Réponds en JSON strict:
 {{
   "title": "Sujet traité en 3-5 mots",
+  "summary": "Ce que le sous-agent a accompli et découvert en 1-2 phrases",
   "intent": "Ce que le sous-agent a accompli (1 phrase)",
   "subjects": ["sujet traité"],
   "questions": ["question ouverte si applicable"],
@@ -150,6 +156,7 @@ IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
 Réponds en JSON strict:
 {{
   "title": "Sujet de la page en 3-5 mots",
+  "summary": "Informations clés trouvées sur la page en 1-2 phrases",
   "intent": "Information recherchée (1 phrase)",
   "subjects": ["sujet de la recherche"],
   "questions": [],
@@ -172,6 +179,7 @@ IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
 Réponds en JSON strict:
 {{
   "title": "Sujet traité en 3-5 mots",
+  "summary": "Ce que l'assistant a proposé/expliqué en 1-2 phrases",
   "intent": "Ce que l'assistant a fait/proposé (1 phrase)",
   "subjects": ["sujet traité"],
   "questions": ["question posée à l'utilisateur"],
@@ -251,12 +259,13 @@ class LLMExtractor:
         # Call LLM
         try:
             response = self._call_llm(prompt)
-            return self._parse_response(response, source_type)
+            return self._parse_response(response, source_type, content)
         except Exception as e:
             # Return minimal extraction on error
             return Extraction(
                 source_type=source_type,
                 title="Extraction error",
+                summary="",
                 intent=f"Extraction failed: {e}",
                 subjects=[],
                 questions=[],
@@ -335,8 +344,13 @@ class LLMExtractor:
         # Build title from significant words (noun-based)
         title = ' '.join(significant_words[:3]) if significant_words else "Unknown topic"
 
+        # Build summary from first sentence
+        first_sentence = content.split('.')[0].strip() if '.' in content else content[:100]
+        summary = first_sentence[:150] if first_sentence else ""
+
         return json.dumps({
             "title": title,
+            "summary": summary,
             "intent": "Extraction heuristique (LLM non disponible)",
             "subjects": significant_words[:2] if significant_words else ["unknown"],
             "questions": [],
@@ -384,13 +398,14 @@ class LLMExtractor:
 
         return cleaned
 
-    def _parse_response(self, response: str, source_type: SourceType) -> Extraction:
+    def _parse_response(self, response: str, source_type: SourceType, original_content: str = "") -> Extraction:
         """
         Parse LLM response into Extraction.
 
         Args:
             response: Raw LLM response
             source_type: Source type for the extraction
+            original_content: Original content for fallback summary
 
         Returns:
             Parsed Extraction
@@ -414,9 +429,17 @@ class LLMExtractor:
                 if not title and subjects:
                     title = subjects[0].title()
 
+                # Get summary, generate fallback if empty
+                summary = data.get("summary", "")
+                if not summary and original_content:
+                    # Generate summary from first sentence of content
+                    first_sentence = original_content.split('.')[0].strip()
+                    summary = first_sentence[:150] if first_sentence else ""
+
                 return Extraction(
                     source_type=source_type,
                     title=title,
+                    summary=summary,
                     intent=data.get("intent", ""),
                     subjects=subjects,
                     questions=data.get("questions", []),
@@ -429,10 +452,16 @@ class LLMExtractor:
         except json.JSONDecodeError:
             pass
 
-        # Parsing failed, return minimal extraction
+        # Parsing failed, generate fallback summary
+        fallback_summary = ""
+        if original_content:
+            first_sentence = original_content.split('.')[0].strip()
+            fallback_summary = first_sentence[:150] if first_sentence else ""
+
         return Extraction(
             source_type=source_type,
             title="Unknown",
+            summary=fallback_summary,
             intent="Parsing failed",
             subjects=[],
             questions=[],

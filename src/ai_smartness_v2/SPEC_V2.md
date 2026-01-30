@@ -195,14 +195,15 @@ Règles stockées dans `ai_smartness_v2/.ai/user_rules.json`.
 
 ---
 
-## 5. Seuils de Continuation
+## 5. Seuils de Continuation et Réactivation Hybride
 
 ### Valeurs
 
 | Contexte | Seuil | Description |
 |----------|-------|-------------|
 | Thread actif | 0.35 | Similarité minimale pour continuer |
-| Thread suspendu | 0.50 | Similarité minimale pour réactiver |
+| Thread suspendu (auto) | 0.35 | Haute confiance → réactivation automatique |
+| Thread suspendu (LLM) | 0.15-0.35 | Zone borderline → LLM décide |
 | Topic boost | +0.15 | Bonus si topic identique |
 
 ### Calcul de similarité
@@ -214,6 +215,47 @@ similarity = 0.7 * embedding_sim + 0.3 * topic_overlap + topic_boost
 - `embedding_sim`: Cosine similarity entre embeddings
 - `topic_overlap`: Ratio de topics communs
 - `topic_boost`: +0.15 si au moins un topic identique
+
+### Réactivation Hybride LLM
+
+La réactivation des threads suspendus utilise une approche **hybride** combinant embeddings et raisonnement LLM :
+
+```
+Message utilisateur
+        ↓
+   Embedding similarity
+        ↓
+┌───────┴───────────────┐
+│                       │
+Sim > 0.35             0.15 < Sim < 0.35         Sim < 0.15
+(haute confiance)       (borderline)              (basse)
+│                       │                         │
+↓                       ↓                         ↓
+Auto-réactivation       LLM Haiku décide          Pas de
+(sans LLM)              "Ce message concerne-     réactivation
+                         t-il ce thread?"
+```
+
+**Avantages** :
+- **Performance** : LLM appelé uniquement pour ~20% des cas (borderline)
+- **Précision** : Relations sémantiques subtiles capturées (ex: "meta cognition" ↔ "ai_smartness")
+- **Économie** : Haiku économique (~$0.00025/appel)
+
+### Libération de Slots
+
+Quand la limite de threads actifs est atteinte et qu'un thread doit être réactivé :
+
+1. Identification des threads actifs non pertinents au message courant
+2. Sélection du thread avec le plus faible poids (`weight`)
+3. Suspension automatique de ce thread
+4. Réactivation du thread cible
+
+```python
+# Critères de sélection pour suspension
+1. Thread non présent dans les résultats de similarité
+2. Poids (weight) le plus faible
+3. Date last_active la plus ancienne
+```
 
 ### Embeddings
 
@@ -282,10 +324,24 @@ ai daemon stop         # Arrêter daemon
 /path/to/ai_smartness_v2-DEV/install.sh /path/to/project
 ```
 
+### Modes disponibles
+
+| Mode | Threads actifs | Description | Cas d'usage |
+|------|----------------|-------------|-------------|
+| **MAX** | 200 | Mémoire maximale | Projets complexes, sessions 15+ heures |
+| **Heavy** | 100 | Analyse profonde | Gros projets |
+| **Normal** | 50 | Équilibré | Usage standard |
+| **Light** | 15 | Rapide & économique | Petits projets |
+
+Le mode **MAX** est recommandé pour :
+- Projets avec de nombreux composants interdépendants
+- Sessions de travail de 15+ heures
+- Contextes où la perte de mémoire est critique
+
 ### Ce que fait l'installateur
 
 1. Sélection langue (en/fr/es)
-2. Sélection mode (heavy/normal/light)
+2. Sélection mode (MAX/heavy/normal/light)
 3. **Installation sentence-transformers** si non présent
 4. Détection chemin CLI Claude
 5. Copie fichiers avec chemins absolus

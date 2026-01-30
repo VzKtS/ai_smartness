@@ -1,6 +1,11 @@
 # AI Smartness v1 - legacy folder (not part of this repo)
 /ai_smartness/
 
+# AI Smartness v2 - Active augmentation at root (not the sources)
+# Sources are in src/ai_smartness_v2/
+# GitHub Action flattens src/ to ai_smartness_v2/ on push
+/ai_smartness_v2/
+
 # Runtime data (created when installed in projects)
 **/.ai/
 

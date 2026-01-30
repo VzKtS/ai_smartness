@@ -209,6 +209,8 @@ UserPromptSubmit hook triggers
          ↓
 Memory Retriever finds relevant threads (by similarity)
          ↓
+Auto-reactivation of suspended threads if relevant
+         ↓
 Context string built:
   - Current thread title + summary
   - Related threads (via bridges)
@@ -218,6 +220,28 @@ Injected as invisible <system-reminder>
          ↓
 Claude receives your message + context
 ```
+
+### Automatic Thread Reactivation
+
+When you mention a topic related to a suspended thread, the system can automatically reactivate it:
+
+| Similarity | Action |
+|------------|--------|
+| > 0.35 | Auto-reactivate (high confidence) |
+| 0.15 - 0.35 | LLM Haiku decides (borderline) |
+| < 0.15 | No reactivation |
+
+**Example:** If you worked on "AI memory system" yesterday (now suspended), and today you ask:
+> "tell me about the meta cognition layer"
+
+The system:
+1. Calculates similarity with "AI memory system" (borderline: 0.28)
+2. Consults Haiku: "Is this related to this thread?"
+3. Haiku confirms the semantic relationship
+4. Reactivates the thread
+5. Injects the context into your conversation
+
+**Slot Liberation:** If you're at max active threads (e.g., 100/100), the system automatically suspends the least important active thread to make room for the reactivated one.
 
 ### What Gets Injected
 
@@ -306,9 +330,15 @@ When starting a new session:
 
 | Mode | Thread Limit | Best For |
 |------|--------------|----------|
-| light | 15 | Small scripts, quick tasks |
-| normal | 50 | Medium projects |
+| MAX | 200 | Complex projects, 15+ hour sessions |
 | heavy | 100 | Large codebases, long projects |
+| normal | 50 | Medium projects |
+| light | 15 | Small scripts, quick tasks |
+
+The **MAX** mode is recommended for:
+- Projects with many interdependent components
+- Very long work sessions (15+ hours)
+- Cases where memory loss would be critical
 
 ---
 

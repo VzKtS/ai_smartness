@@ -88,24 +88,29 @@ declare -A MSG_MODE_TITLE=(
     ["es"]="Seleccione el Modo Guardian"
 )
 declare -A MSG_MODE_HEAVY=(
-    ["en"]="Deep analysis (Opus)"
-    ["fr"]="Analyse profonde (Opus)"
-    ["es"]="Análisis profundo (Opus)"
+    ["en"]="Deep analysis (100 threads)"
+    ["fr"]="Analyse profonde (100 threads)"
+    ["es"]="Análisis profundo (100 threads)"
 )
 declare -A MSG_MODE_NORMAL=(
-    ["en"]="Balanced (Sonnet)"
-    ["fr"]="Équilibré (Sonnet)"
-    ["es"]="Equilibrado (Sonnet)"
+    ["en"]="Balanced (50 threads)"
+    ["fr"]="Équilibré (50 threads)"
+    ["es"]="Equilibrado (50 threads)"
 )
 declare -A MSG_MODE_LIGHT=(
-    ["en"]="Fast & economical (Haiku)"
-    ["fr"]="Rapide & économique (Haiku)"
-    ["es"]="Rápido & económico (Haiku)"
+    ["en"]="Fast & light (15 threads)"
+    ["fr"]="Rapide & léger (15 threads)"
+    ["es"]="Rápido & ligero (15 threads)"
+)
+declare -A MSG_MODE_MAX=(
+    ["en"]="Maximum memory (200 threads)"
+    ["fr"]="Mémoire maximale (200 threads)"
+    ["es"]="Memoria máxima (200 threads)"
 )
 declare -A MSG_CHOICE=(
-    ["en"]="Choice [1-3]: "
-    ["fr"]="Choix [1-3]: "
-    ["es"]="Elección [1-3]: "
+    ["en"]="Choice [1-4]: "
+    ["fr"]="Choix [1-4]: "
+    ["es"]="Elección [1-4]: "
 )
 declare -A MSG_COPYING=(
     ["en"]="Copying files..."
@@ -133,9 +138,39 @@ declare -A MSG_ALREADY_INSTALLED=(
     ["es"]="Ya instalado. ¿Reinstalar?"
 )
 declare -A MSG_KEEP_DB=(
-    ["en"]="Keep existing data? [K/R]: "
-    ["fr"]="Conserver les données? [C/R]: "
-    ["es"]="¿Conservar datos? [C/R]: "
+    ["en"]="(K)eep data / (R)eset: "
+    ["fr"]="(C)onserver / (R)éinitialiser: "
+    ["es"]="(C)onservar / (R)einiciar: "
+)
+declare -A MSG_CONTINUE=(
+    ["en"]="(Y)es, reinstall / (N)o, cancel: "
+    ["fr"]="(O)ui, réinstaller / (N)on, annuler: "
+    ["es"]="(S)í, reinstalar / (N)o, cancelar: "
+)
+declare -A MSG_DAEMON_START=(
+    ["en"]="Starting daemon..."
+    ["fr"]="Démarrage du daemon..."
+    ["es"]="Iniciando daemon..."
+)
+declare -A MSG_DAEMON_STOP=(
+    ["en"]="Stopping existing daemon"
+    ["fr"]="Arrêt du daemon existant"
+    ["es"]="Deteniendo daemon existente"
+)
+declare -A MSG_DAEMON_OK=(
+    ["en"]="Daemon started"
+    ["fr"]="Daemon démarré"
+    ["es"]="Daemon iniciado"
+)
+declare -A MSG_DAEMON_MANUAL=(
+    ["en"]="Daemon failed to start"
+    ["fr"]="Le daemon n'a pas démarré correctement"
+    ["es"]="El daemon no se inició correctamente"
+)
+declare -A MSG_DAEMON_HELP=(
+    ["en"]="Manual start command:"
+    ["fr"]="Commande de démarrage manuel:"
+    ["es"]="Comando de inicio manual:"
 )
 
 # ============================================================================
@@ -147,17 +182,19 @@ echo "╔═══════════════════════�
 echo "║         ${MSG_MODE_TITLE[$LANG]}                         ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
-echo "  [1] Heavy  - ${MSG_MODE_HEAVY[$LANG]}"
-echo "  [2] Normal - ${MSG_MODE_NORMAL[$LANG]}"
-echo "  [3] Light  - ${MSG_MODE_LIGHT[$LANG]}"
+echo "  [1] MAX    - ${MSG_MODE_MAX[$LANG]}"
+echo "  [2] Heavy  - ${MSG_MODE_HEAVY[$LANG]}"
+echo "  [3] Normal - ${MSG_MODE_NORMAL[$LANG]}"
+echo "  [4] Light  - ${MSG_MODE_LIGHT[$LANG]}"
 echo ""
 read -p "  ${MSG_CHOICE[$LANG]}" -n 1 -r MODE_CHOICE
 echo ""
 
 case "$MODE_CHOICE" in
-    1|h|H) THREAD_MODE="heavy" ;;
-    2|n|N) THREAD_MODE="normal" ;;
-    3|l|L) THREAD_MODE="light" ;;
+    1|m|M) THREAD_MODE="max" ;;
+    2|h|H) THREAD_MODE="heavy" ;;
+    3|n|N) THREAD_MODE="normal" ;;
+    4|l|L) THREAD_MODE="light" ;;
     *)     THREAD_MODE="normal" ;;
 esac
 
@@ -215,7 +252,7 @@ if [ -d "$AI_SMARTNESS_DIR" ]; then
         fi
     fi
 
-    read -p "   Continue? [y/N] " -n 1 -r
+    read -p "   ${MSG_CONTINUE[$LANG]}" -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[YyOoSs]$ ]]; then
         echo "Cancelled."
@@ -336,6 +373,7 @@ guardian_model = extraction_model  # Guardian also uses Haiku
 
 # Thread limits by mode
 thread_limits = {
+    "max": 200,
     "heavy": 100,
     "normal": 50,
     "light": 15
@@ -343,7 +381,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "2.0.0",
+    "version": "2.2.0",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
@@ -580,6 +618,66 @@ else
     echo "   ✓ CLI installed to $LOCAL_BIN/ai"
     echo "   ⚠️  Add $LOCAL_BIN to your PATH:"
     echo "      export PATH=\"\$HOME/.local/bin:\$PATH\""
+fi
+
+# ============================================================================
+# START/RESTART DAEMON
+# ============================================================================
+
+echo "🚀 ${MSG_DAEMON_START[$LANG]}"
+
+PID_FILE="$AI_SMARTNESS_DIR/.ai/processor.pid"
+SOCKET_FILE="$AI_SMARTNESS_DIR/.ai/processor.sock"
+
+# Kill ALL existing daemons for this project (including zombies)
+echo "   Cleaning up existing daemons..."
+pkill -9 -f "ai_smartness_v2.daemon.processor.*$TARGET_DIR" 2>/dev/null || true
+pkill -9 -f "ai_smartness_v2/daemon/processor.py.*$AI_SMARTNESS_DIR" 2>/dev/null || true
+
+# Also kill by PID file if exists
+if [ -f "$PID_FILE" ]; then
+    OLD_PID=$(cat "$PID_FILE" 2>/dev/null)
+    if [ -n "$OLD_PID" ]; then
+        kill -9 "$OLD_PID" 2>/dev/null || true
+    fi
+fi
+
+# Clean up stale files
+rm -f "$PID_FILE" 2>/dev/null
+rm -f "$SOCKET_FILE" 2>/dev/null
+sleep 1
+
+# Start the daemon
+export PYTHONPATH="$TARGET_DIR:$PYTHONPATH"
+python3 -c "
+import sys
+sys.path.insert(0, '$TARGET_DIR')
+from ai_smartness_v2.daemon.client import ensure_daemon_running
+from pathlib import Path
+ai_path = Path('$AI_SMARTNESS_DIR/.ai')
+ensure_daemon_running(ai_path)
+" 2>/dev/null
+
+# Wait for daemon to start (polling up to 10 seconds)
+DAEMON_STARTED=false
+for i in {1..10}; do
+    if [ -f "$PID_FILE" ]; then
+        NEW_PID=$(cat "$PID_FILE" 2>/dev/null)
+        if [ -n "$NEW_PID" ] && kill -0 "$NEW_PID" 2>/dev/null; then
+            DAEMON_STARTED=true
+            break
+        fi
+    fi
+    sleep 1
+done
+
+if [ "$DAEMON_STARTED" = true ]; then
+    echo "   ✓ ${MSG_DAEMON_OK[$LANG]} (PID $NEW_PID)"
+else
+    echo "   ❌ ${MSG_DAEMON_MANUAL[$LANG]}"
+    echo ""
+    echo "   ⚠️  ${MSG_DAEMON_HELP[$LANG]}"
+    echo "      cd $TARGET_DIR && python3 -m ai_smartness_v2.daemon.processor --db-path $AI_SMARTNESS_DIR/.ai/db"
 fi
 
 # ============================================================================

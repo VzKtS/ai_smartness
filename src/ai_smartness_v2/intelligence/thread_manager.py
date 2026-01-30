@@ -313,6 +313,7 @@ class ThreadManager:
             title = extraction.title or extract_title_from_content(content)
             thread = Thread.create(title, OriginType(source_type))
             thread.topics = extraction.subjects + extraction.key_concepts
+            thread.summary = extraction.summary  # Store the summary
             thread.add_message(content, "user")
             self.storage.threads.save(thread)
             return thread
@@ -323,6 +324,12 @@ class ThreadManager:
             if thread:
                 thread.add_message(content, "user")
                 thread.topics = list(set(thread.topics + extraction.subjects))
+                # Update summary: append new info if significant
+                if extraction.summary and extraction.summary not in thread.summary:
+                    if thread.summary:
+                        thread.summary = f"{thread.summary} {extraction.summary}"[:500]
+                    else:
+                        thread.summary = extraction.summary
                 thread.record_drift(source_type)
                 self.storage.threads.save(thread)
                 return thread
@@ -338,6 +345,7 @@ class ThreadManager:
             title = extraction.title or extract_title_from_content(content)
             thread = Thread.create(title, OriginType.SPLIT, parent_id=decision.thread_id)
             thread.topics = extraction.subjects + extraction.key_concepts
+            thread.summary = extraction.summary  # Store the summary
             thread.add_message(content, "user")
 
             if parent:
@@ -354,6 +362,12 @@ class ThreadManager:
                 thread.reactivate()
                 thread.add_message(content, "user")
                 thread.topics = list(set(thread.topics + extraction.subjects))
+                # Update summary with new context
+                if extraction.summary and extraction.summary not in thread.summary:
+                    if thread.summary:
+                        thread.summary = f"{thread.summary} {extraction.summary}"[:500]
+                    else:
+                        thread.summary = extraction.summary
                 self.storage.threads.save(thread)
                 return thread
             # Fallback: create new

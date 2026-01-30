@@ -15,7 +15,16 @@ from datetime import datetime
 GUARDIAN_MODELS = {
     "light": "claude-haiku-3-5-20250620",
     "normal": "claude-sonnet-4-20250514",
-    "heavy": "claude-opus-4-5-20250514"
+    "heavy": "claude-opus-4-5-20250514",
+    "max": "claude-opus-4-5-20250514"  # MAX mode uses Opus for quality
+}
+
+# Thread limits by mode
+THREAD_LIMITS = {
+    "light": 15,
+    "normal": 50,
+    "heavy": 100,
+    "max": 200
 }
 
 # Default embedding model (local, free)
@@ -32,11 +41,11 @@ class Config:
     # Project info
     project_name: str = "unnamed"
     language: Literal["en", "fr", "es"] = "en"
-    version: str = "2.0.0"
+    version: str = "2.2.0"
     initialized_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    # Mode (determines Guardian LLM)
-    mode: Literal["light", "normal", "heavy"] = "normal"
+    # Mode (determines Guardian LLM and thread limits)
+    mode: Literal["light", "normal", "heavy", "max"] = "normal"
 
     # LLM settings
     extraction_model: str = "claude-haiku-3-5-20250620"  # Default to Haiku for extraction
@@ -85,7 +94,7 @@ class Config:
         return cls(
             project_name=data.get("project_name", "unnamed"),
             language=data.get("language", "en"),
-            version=data.get("version", "2.0.0"),
+            version=data.get("version", "2.2.0"),
             initialized_at=data.get("initialized_at", datetime.now().isoformat()),
             mode=mode,
             extraction_model=llm.get("extraction_model", GUARDIAN_MODELS.get(mode, GUARDIAN_MODELS["normal"])),

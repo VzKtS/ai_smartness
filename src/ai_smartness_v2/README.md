@@ -178,7 +178,7 @@ Config stored in `ai_smartness_v2/.ai/config.json`:
 
 ```json
 {
-  "version": "2.0.0",
+  "version": "2.2.0",
   "project_name": "MyProject",
   "language": "en",
   "settings": {

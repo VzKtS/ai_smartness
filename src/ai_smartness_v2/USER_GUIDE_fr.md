@@ -192,6 +192,8 @@ Le hook UserPromptSubmit se déclenche
          ↓
 Memory Retriever trouve les threads pertinents (par similarité)
          ↓
+Réactivation automatique des threads suspendus si pertinents
+         ↓
 Chaîne de contexte construite :
   - Titre + résumé du thread courant
   - Threads liés (via bridges)
@@ -201,6 +203,28 @@ Injecté comme <system-reminder> invisible
          ↓
 Claude reçoit votre message + contexte
 ```
+
+### Réactivation Automatique des Threads
+
+Quand vous mentionnez un sujet lié à un thread suspendu, le système peut automatiquement le réactiver :
+
+| Similarité | Action |
+|------------|--------|
+| > 0.35 | Réactivation auto (haute confiance) |
+| 0.15 - 0.35 | LLM Haiku décide (zone borderline) |
+| < 0.15 | Pas de réactivation |
+
+**Exemple :** Si vous avez travaillé sur "système de mémoire IA" hier (maintenant suspendu), et aujourd'hui vous demandez :
+> "parle-moi de la couche de meta cognition"
+
+Le système :
+1. Calcule la similarité avec "système de mémoire IA" (borderline: 0.28)
+2. Consulte Haiku : "Ce message concerne-t-il ce thread ?"
+3. Haiku confirme la relation sémantique
+4. Réactive le thread
+5. Injecte le contexte dans votre conversation
+
+**Libération de Slots :** Si vous êtes au maximum de threads actifs (ex: 100/100), le système suspend automatiquement le thread actif le moins important pour faire de la place au thread réactivé.
 
 ### Ce qui est Injecté
 
@@ -289,9 +313,15 @@ Quand vous démarrez une nouvelle session :
 
 | Mode | Limite Threads | Idéal Pour |
 |------|----------------|------------|
-| light | 15 | Petits scripts, tâches rapides |
-| normal | 50 | Projets moyens |
+| MAX | 200 | Projets complexes, sessions 15+ heures |
 | heavy | 100 | Grandes codebases, projets longs |
+| normal | 50 | Projets moyens |
+| light | 15 | Petits scripts, tâches rapides |
+
+Le mode **MAX** est recommandé pour :
+- Projets avec de nombreux composants interdépendants
+- Sessions de travail très longues (15+ heures)
+- Cas où la perte de mémoire serait critique
 
 ---
 
