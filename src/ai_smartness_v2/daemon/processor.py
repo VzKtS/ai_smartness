@@ -86,6 +86,11 @@ class ProcessorDaemon:
         self.thread_manager = None
         self.gossip = None
 
+        # Pending context for coherence-based child linking
+        # Set when Glob/Grep creates a thread, cleared after use or timeout
+        self.pending_context: Optional[Dict[str, Any]] = None
+        self.pending_context_lock = threading.Lock()
+
     def _init_modules(self):
         """Initialize the heavy modules."""
         logger.info("Loading modules...")
@@ -253,9 +258,19 @@ class ProcessorDaemon:
             logger.error(f"Error processing capture: {e}")
             return {"status": "error", "error": str(e)}
 
+    # Context tools that trigger coherence-based child linking
+    CONTEXT_TOOLS = {"Glob", "Grep"}
+
     def _process_capture(self, tool: str, content: str, file_path: Optional[str]) -> dict:
         """
         Process a capture through ThreadManager.
+
+        Includes coherence-based child linking for context tools (Glob/Grep):
+        - Context tool creates thread + sets pending_context
+        - Next content checks coherence with pending_context
+        - High coherence (>0.6) → child thread
+        - Medium coherence (0.3-0.6) → orphan thread
+        - Low coherence (<0.3) → forget (skip)
 
         Args:
             tool: Tool name (Read, Write, Task, etc.)
@@ -268,15 +283,72 @@ class ProcessorDaemon:
         if not self.thread_manager:
             return {"status": "error", "error": "ThreadManager not initialized"}
 
+        # Clean content before processing
+        logger.info(f"Processing [{tool}]: {len(content)} chars input")
+
+        try:
+            # Import cleaner dynamically using absolute file path
+            import importlib.util
+            cleaner_path = Path(__file__).parent.parent / "processing" / "cleaner.py"
+
+            spec = importlib.util.spec_from_file_location("cleaner", cleaner_path)
+            cleaner_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(cleaner_module)
+
+            cleaned_content, extracted_path = cleaner_module.clean_tool_output(content, tool)
+        except Exception as e:
+            logger.error(f"Cleaner error [{tool}]: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # Fallback: use raw content
+            cleaned_content = content[:5000] if len(content) > 5000 else content
+            extracted_path = None
+
+        # Log cleaning stats
+        logger.info(f"Cleaned [{tool}]: {len(content)} → {len(cleaned_content)} chars")
+
+        # Use extracted path if none provided
+        if not file_path and extracted_path:
+            file_path = extracted_path
+
+        # Skip if cleaning resulted in empty content
+        if not cleaned_content:
+            logger.warning(f"Skipped [{tool}]: empty after cleaning (input was {len(content)} chars)")
+            return {"status": "skipped", "reason": "empty_after_cleaning"}
+
         # Map tool to source type
         source_type = self.SOURCE_MAP.get(tool, "prompt")
 
+        # Check for pending context (coherence-based child linking)
+        parent_thread_id = None
+        with self.pending_context_lock:
+            if self.pending_context and tool not in self.CONTEXT_TOOLS:
+                # Check coherence with pending context
+                parent_thread_id = self._check_coherence_and_decide(cleaned_content)
+
+        # Handle "forget" case - low coherence, skip thread creation
+        if parent_thread_id == "__FORGET__":
+            logger.info(f"Skipped [{tool}]: low coherence with context (forget)")
+            return {"status": "skipped", "reason": "low_coherence_forget"}
+
         # Process through ThreadManager
         thread, extraction = self.thread_manager.process_input(
-            content=content,
+            content=cleaned_content,
             source_type=source_type,
-            file_path=file_path
+            file_path=file_path,
+            parent_hint=parent_thread_id  # Pass parent hint for child linking
         )
+
+        # If this is a context tool, set pending_context for next capture
+        if tool in self.CONTEXT_TOOLS:
+            with self.pending_context_lock:
+                self.pending_context = {
+                    "thread_id": thread.id,
+                    "content": cleaned_content,
+                    "tool": tool,
+                    "timestamp": datetime.now()
+                }
+                logger.info(f"Set pending_context from [{tool}] → {thread.id[:8]}...")
 
         # Trigger gossip propagation
         if self.gossip:
@@ -288,8 +360,71 @@ class ProcessorDaemon:
             "status": "ok",
             "thread_id": thread.id,
             "thread_title": thread.title,
-            "action": "created" if len(thread.messages) == 1 else "continued"
+            "action": "created" if len(thread.messages) == 1 else "continued",
+            "parent_id": parent_thread_id
         }
+
+    def _check_coherence_and_decide(self, content: str) -> Optional[str]:
+        """
+        Check coherence with pending context and decide action.
+
+        Returns:
+            parent_thread_id if child, None if orphan/forget
+        """
+        if not self.pending_context:
+            return None
+
+        context_content = self.pending_context.get("content", "")
+        context_thread_id = self.pending_context.get("thread_id")
+        context_tool = self.pending_context.get("tool", "")
+
+        # Check context age (expire after 10 minutes)
+        context_time = self.pending_context.get("timestamp")
+        if context_time:
+            age_minutes = (datetime.now() - context_time).total_seconds() / 60
+            if age_minutes > 10:
+                logger.info(f"Pending context expired ({age_minutes:.1f} min old)")
+                self.pending_context = None
+                return None
+
+        try:
+            # Import coherence module dynamically
+            import importlib.util
+            coherence_path = Path(__file__).parent.parent / "processing" / "coherence.py"
+
+            spec = importlib.util.spec_from_file_location("coherence", coherence_path)
+            coherence_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(coherence_module)
+
+            # Check coherence
+            coherence_score, reason = coherence_module.check_coherence(
+                context_content,
+                content
+            )
+
+            # Decide action
+            action = coherence_module.decide_thread_action(coherence_score)
+
+            logger.info(f"Coherence with [{context_tool}]: {coherence_score:.2f} → {action} ({reason})")
+
+            # Clear pending context after use
+            self.pending_context = None
+
+            if action == "child":
+                return context_thread_id
+            elif action == "forget":
+                # Return special marker to skip thread creation
+                return "__FORGET__"
+            else:  # orphan
+                return None
+
+        except Exception as e:
+            logger.error(f"Coherence check error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # Clear context on error, default to orphan
+            self.pending_context = None
+            return None
 
     def _get_uptime(self) -> str:
         """Get daemon uptime."""

@@ -25,6 +25,20 @@ from ..processing.extractor import LLMExtractor, Extraction, extract_title_from_
 from ..processing.embeddings import get_embedding_manager
 
 
+# Map source_type (from extractor) to OriginType (for thread)
+# source_type: "prompt", "read", "write", "task", "fetch", "response", "command"
+# OriginType: "prompt", "file_read", "task", "fetch", "split", "reactivation"
+SOURCE_TO_ORIGIN = {
+    "prompt": OriginType.PROMPT,
+    "read": OriginType.FILE_READ,
+    "write": OriginType.FILE_READ,
+    "task": OriginType.TASK,
+    "fetch": OriginType.FETCH,
+    "response": OriginType.PROMPT,
+    "command": OriginType.PROMPT,  # Bash commands treated as prompt origin
+}
+
+
 class ThreadAction(Enum):
     """Action to take for incoming content."""
     NEW_THREAD = "new_thread"
@@ -114,7 +128,8 @@ class ThreadManager:
         self,
         content: str,
         source_type: str = "prompt",
-        file_path: Optional[str] = None
+        file_path: Optional[str] = None,
+        parent_hint: Optional[str] = None
     ) -> Tuple[Thread, Extraction]:
         """
         Process incoming content and update threads.
@@ -123,6 +138,8 @@ class ThreadManager:
             content: Content to process
             source_type: Type of source (prompt, read, write, task, fetch)
             file_path: Optional file path for file-related sources
+            parent_hint: Optional parent thread ID for forced child linking
+                        (from coherence-based context linking)
 
         Returns:
             Tuple of (Thread, Extraction)
@@ -130,8 +147,18 @@ class ThreadManager:
         # 1. Extract semantic information
         extraction = self.extractor.extract(content, source_type, file_path)
 
-        # 2. Decide action
-        decision = self._decide_action(extraction, content)
+        # 2. Decide action (or force FORK if parent_hint provided)
+        if parent_hint:
+            # Coherence-based child linking - force FORK
+            logger.info(f"DECIDE: Forcing FORK (parent_hint={parent_hint[:8]}...)")
+            decision = ThreadDecision(
+                action=ThreadAction.FORK,
+                thread_id=parent_hint,
+                reason="Coherence-based child linking",
+                confidence=0.8
+            )
+        else:
+            decision = self._decide_action(extraction, content)
 
         # 3. Execute action
         thread = self._execute_action(decision, content, extraction, source_type)
@@ -311,7 +338,8 @@ class ThreadManager:
         if decision.action == ThreadAction.NEW_THREAD:
             # Create new thread - use title (subject-based), not intent (action-based)
             title = extraction.title or extract_title_from_content(content)
-            thread = Thread.create(title, OriginType(source_type))
+            origin = SOURCE_TO_ORIGIN.get(source_type, OriginType.PROMPT)
+            thread = Thread.create(title, origin)
             thread.topics = extraction.subjects + extraction.key_concepts
             thread.summary = extraction.summary  # Store the summary
             thread.add_message(content, "user", source_type=source_type)
