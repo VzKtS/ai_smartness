@@ -159,7 +159,9 @@ def get_message_from_stdin() -> str:
     """
     Get user message from stdin.
 
-    Claude Code sends JSON: {"message": "user prompt"}
+    Claude Code sends JSON with different keys depending on context:
+    - VSCode extension: {"prompt": "user message", "session_id": "...", ...}
+    - CLI: {"message": "user message"}
 
     Returns:
         User message string
@@ -171,7 +173,9 @@ def get_message_from_stdin() -> str:
                 stdin_data = sanitize_unicode(stdin_data)
                 try:
                     data = json.loads(stdin_data)
-                    return sanitize_unicode(data.get('message', ''))
+                    # VSCode uses "prompt", CLI uses "message"
+                    msg = data.get('prompt') or data.get('message', '')
+                    return sanitize_unicode(msg)
                 except json.JSONDecodeError:
                     return stdin_data  # Return raw if not JSON
     except Exception:
