@@ -388,6 +388,77 @@ def save_user_rule(rule: str, ai_path: Path):
 
 
 # =============================================================================
+# PROMPT CAPTURE
+# =============================================================================
+
+# Minimum length for a prompt to be worth capturing
+MIN_PROMPT_LENGTH = 50
+
+# Patterns to skip (acknowledgements, thanks, etc.)
+SKIP_PROMPT_PATTERNS = [
+    r"^(ok|oui|non|yes|no|d'accord|bien|sure|yep|nope)\.?$",
+    r"^[\.!?\s]+$",
+    r"^(merci|thanks|gracias|thx)\.?$",
+    r"^(go|do it|lance|vas-y|fais-le)\.?$",
+]
+
+
+def should_capture_prompt(message: str) -> bool:
+    """
+    Check if prompt should be captured for thread processing.
+
+    Filters out short messages and acknowledgements.
+
+    Args:
+        message: User message
+
+    Returns:
+        True if prompt should be captured
+    """
+    if len(message) < MIN_PROMPT_LENGTH:
+        return False
+
+    message_lower = message.lower().strip()
+
+    for pattern in SKIP_PROMPT_PATTERNS:
+        if re.match(pattern, message_lower, re.IGNORECASE):
+            return False
+
+    return True
+
+
+def send_prompt_to_daemon(message: str, ai_path: Path) -> bool:
+    """
+    Send user prompt to daemon for thread processing.
+
+    Args:
+        message: User message
+        ai_path: Path to .ai directory
+
+    Returns:
+        True if sent successfully
+    """
+    try:
+        package_root = get_package_root()
+        sys.path.insert(0, str(package_root.parent))
+
+        from ai_smartness_v2.daemon.client import send_capture_with_retry
+
+        # Send with tool="UserPrompt" (processor defaults to source_type="prompt")
+        return send_capture_with_retry(ai_path, {
+            "tool": "UserPrompt",
+            "content": message
+        })
+
+    except ImportError as e:
+        log(f"Daemon client import failed: {e}")
+        return False
+    except Exception as e:
+        log(f"Failed to send prompt to daemon: {e}")
+        return False
+
+
+# =============================================================================
 # MEMORY RETRIEVAL
 # =============================================================================
 
@@ -455,6 +526,13 @@ def main():
         detected_rule = detect_and_save_user_rule(message, ai_path)
         if detected_rule:
             log(f"Detected user rule: {detected_rule[:50]}...")
+
+        # Send prompt to daemon for thread capture (non-blocking)
+        if should_capture_prompt(message):
+            if send_prompt_to_daemon(message, ai_path):
+                log(f"[UserPrompt] Sent to daemon: {len(message)} chars")
+            else:
+                log(f"[UserPrompt] Failed to send to daemon")
 
         # Build lightweight context (GuardCode reminders)
         lightweight_context = build_lightweight_context(message, db_path)
