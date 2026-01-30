@@ -41,14 +41,14 @@ class Config:
     # Project info
     project_name: str = "unnamed"
     language: Literal["en", "fr", "es"] = "en"
-    version: str = "2.5.0"
+    version: str = "2.2.0"
     initialized_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     # Mode (determines Guardian LLM and thread limits)
     mode: Literal["light", "normal", "heavy", "max"] = "normal"
 
     # LLM settings
-    extraction_model: str = "claude-haiku-3-5-20250620"  # Default to Haiku for extraction
+    extraction_model: Optional[str] = None  # None = use session default model
     embedding_model: str = DEFAULT_EMBEDDING_MODEL
 
     # Capture settings
@@ -94,7 +94,7 @@ class Config:
         return cls(
             project_name=data.get("project_name", "unnamed"),
             language=data.get("language", "en"),
-            version=data.get("version", "2.2.0"),
+            version=data.get("version", "2.4.1"),
             initialized_at=data.get("initialized_at", datetime.now().isoformat()),
             mode=mode,
             extraction_model=llm.get("extraction_model", GUARDIAN_MODELS.get(mode, GUARDIAN_MODELS["normal"])),

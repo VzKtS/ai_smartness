@@ -8,6 +8,7 @@ When the conversation context reaches 95%, this module:
 """
 
 import json
+import os
 import subprocess
 from datetime import datetime
 from typing import Optional, List
@@ -214,22 +215,15 @@ Formato JSON:
         Returns:
             LLM response string
         """
-        import os
-
-        # Marqueur pour que inject.py ignore ce prompt interne
-        INTERNAL_PROMPT_MARKER = "<!-- AI_SMARTNESS_INTERNAL_CALL -->"
-        marked_prompt = f"{INTERNAL_PROMPT_MARKER}\n{prompt}"
-
-        # Set env to signal internal call (legacy fallback)
-        env = os.environ.copy()
-        env['CLAUDE_INTERNAL_CALL'] = '1'
-
         try:
-            cmd = [
-                "claude", "-p", marked_prompt,
-                "--model", self.config.extraction_model,
-                "--output-format", "text"
-            ]
+            # Build command - only add --model if specified
+            cmd = ["claude", "-p", prompt, "--output-format", "text"]
+            if self.config.extraction_model:
+                cmd.extend(["--model", self.config.extraction_model])
+
+            # CRITICAL: Set guard to prevent hook loops
+            env = os.environ.copy()
+            env["AI_SMARTNESS_V2_HOOK_RUNNING"] = "1"
 
             result = subprocess.run(
                 cmd,

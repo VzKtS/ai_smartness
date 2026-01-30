@@ -280,7 +280,6 @@ cp -r "$SCRIPT_DIR" "$AI_SMARTNESS_DIR"
 rm -rf "$AI_SMARTNESS_DIR/.git" 2>/dev/null || true
 rm -f "$AI_SMARTNESS_DIR/.gitignore" 2>/dev/null || true
 rm -rf "$AI_SMARTNESS_DIR/__pycache__" 2>/dev/null || true
-rm -f "$AI_SMARTNESS_DIR/install.sh" 2>/dev/null || true
 find "$AI_SMARTNESS_DIR" -name "*.pyc" -delete 2>/dev/null || true
 find "$AI_SMARTNESS_DIR" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
@@ -366,11 +365,11 @@ lang = "$LANG"
 project_name = "$PROJECT_NAME"
 claude_cli_path = "$CLAUDE_CLI_PATH"
 
-# Extraction always uses Haiku (sufficient for semantic extraction, economical)
-# The mode only affects thread limits and injection depth, not extraction cost
-# Note: If model becomes invalid, extractor will fallback to session default
-extraction_model = "claude-3-5-haiku-20241022"
-guardian_model = extraction_model  # Guardian also uses Haiku
+# Extraction uses the session default model (no hardcoded version)
+# This ensures compatibility with future model releases
+# The extractor will use whatever model is available in the user's Claude session
+extraction_model = None  # Use session default
+guardian_model = None  # Use session default
 
 # Thread limits by mode
 thread_limits = {
@@ -382,7 +381,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "2.2.0",
+    "version": "2.4.1",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
@@ -448,8 +447,8 @@ if 'allow' not in settings['permissions']:
 if "Bash(python3:*)" not in settings['permissions']['allow']:
     settings['permissions']['allow'].append("Bash(python3:*)")
 
-# v2 Hooks
-# 4 hooks: inject (UserPromptSubmit), guard (PreToolUse), capture (PostToolUse), compact (PreCompact)
+# v2 Hooks - SIMPLIFIED
+# Only 3 hooks: capture (PostToolUse), inject (UserPromptSubmit), compact (PreCompact)
 ai_hooks = {
     "UserPromptSubmit": [
         {
@@ -457,17 +456,6 @@ ai_hooks = {
                 {
                     "type": "command",
                     "command": f"python3 {ai_path}/hooks/inject.py"
-                }
-            ]
-        }
-    ],
-    "PreToolUse": [
-        {
-            "matcher": "Edit|Write",
-            "hooks": [
-                {
-                    "type": "command",
-                    "command": f"python3 {ai_path}/hooks/guard_write.py"
                 }
             ]
         }
@@ -519,7 +507,7 @@ for hook_type, hook_list in ai_hooks.items():
     settings['hooks'][hook_type].extend(hook_list)
 
 settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
-print("   ✓ Hooks configured (UserPromptSubmit, PreToolUse, PostToolUse, PreCompact)")
+print("   ✓ Hooks configured (UserPromptSubmit, PostToolUse, PreCompact)")
 print(f"   ✓ Using absolute path: {ai_path}")
 EOF
 

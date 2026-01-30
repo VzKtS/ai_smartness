@@ -54,13 +54,13 @@ EXTRACTION_PROMPTS = {
 MESSAGE:
 {content}
 
-IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+IMPORTANT pour "title": donne le SUJET en 5-10 mots, PAS une action.
 - MAUVAIS: "Analyser le fichier de config"
 - BON: "Configuration système"
 
 Réponds en JSON strict:
 {{
-  "title": "Sujet principal en 3-5 mots (nom, pas verbe)",
+  "title": "Sujet principal en 5-10 mots (nom, pas verbe)",
   "summary": "Résumé bref du contenu en 1-2 phrases",
   "intent": "L'intention principale de l'utilisateur (1 phrase)",
   "subjects": ["sujet1", "sujet2"],
@@ -78,13 +78,13 @@ FICHIER: {file_path}
 CONTENU (extrait):
 {content}
 
-IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+IMPORTANT pour "title": donne le SUJET en 5-10 mots, PAS une action.
 - MAUVAIS: "Lire le fichier de handshake"
 - BON: "P2P Handshake Protocol"
 
 Réponds en JSON strict:
 {{
-  "title": "Sujet principal du fichier en 3-5 mots",
+  "title": "Sujet principal du fichier en 5-10 mots",
   "summary": "Ce que fait ce fichier/module en 1-2 phrases",
   "intent": "Pourquoi ce fichier est probablement lu (1 phrase)",
   "subjects": ["sujet principal du fichier"],
@@ -102,13 +102,13 @@ FICHIER: {file_path}
 CHANGEMENTS:
 {content}
 
-IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+IMPORTANT pour "title": donne le SUJET en 5-10 mots, PAS une action.
 - MAUVAIS: "Modifier la gestion des erreurs"
 - BON: "Error handling system"
 
 Réponds en JSON strict:
 {{
-  "title": "Sujet de la modification en 3-5 mots",
+  "title": "Sujet de la modification en 5-10 mots",
   "summary": "Ce qui a été modifié et le résultat en 1-2 phrases",
   "intent": "Ce qui a été modifié et pourquoi (1 phrase)",
   "subjects": ["sujet de la modification"],
@@ -125,13 +125,13 @@ Sois concis. Pas de texte hors du JSON.""",
 RÉSULTAT:
 {content}
 
-IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+IMPORTANT pour "title": donne le SUJET en 5-10 mots, PAS une action.
 - MAUVAIS: "Analyser l'architecture du projet"
 - BON: "Architecture projet"
 
 Réponds en JSON strict:
 {{
-  "title": "Sujet traité en 3-5 mots",
+  "title": "Sujet traité en 5-10 mots",
   "summary": "Ce que le sous-agent a accompli et découvert en 1-2 phrases",
   "intent": "Ce que le sous-agent a accompli (1 phrase)",
   "subjects": ["sujet traité"],
@@ -149,13 +149,13 @@ URL: {url}
 CONTENU:
 {content}
 
-IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+IMPORTANT pour "title": donne le SUJET en 5-10 mots, PAS une action.
 - MAUVAIS: "Rechercher la documentation API"
 - BON: "API Documentation"
 
 Réponds en JSON strict:
 {{
-  "title": "Sujet de la page en 3-5 mots",
+  "title": "Sujet de la page en 5-10 mots",
   "summary": "Informations clés trouvées sur la page en 1-2 phrases",
   "intent": "Information recherchée (1 phrase)",
   "subjects": ["sujet de la recherche"],
@@ -172,13 +172,13 @@ Sois concis. Pas de texte hors du JSON.""",
 RÉPONSE:
 {content}
 
-IMPORTANT pour "title": donne le SUJET en 3-5 mots, PAS une action.
+IMPORTANT pour "title": donne le SUJET en 5-10 mots, PAS une action.
 - MAUVAIS: "Proposer une solution de cache"
 - BON: "Cache system design"
 
 Réponds en JSON strict:
 {{
-  "title": "Sujet traité en 3-5 mots",
+  "title": "Sujet traité en 5-10 mots",
   "summary": "Ce que l'assistant a proposé/expliqué en 1-2 phrases",
   "intent": "Ce que l'assistant a fait/proposé (1 phrase)",
   "subjects": ["sujet traité"],
@@ -186,6 +186,29 @@ Réponds en JSON strict:
   "decisions": ["décision prise ou proposée"],
   "key_concepts": ["concept clé mentionné"],
   "context_hints": ["prochaine étape probable"]
+}}
+
+Sois concis. Pas de texte hors du JSON.""",
+
+    "command": """Analyse cette sortie de commande shell et extrait les informations structurées.
+
+COMMANDE EXÉCUTÉE:
+{content}
+
+IMPORTANT pour "title": donne le SUJET en 5-10 mots, PAS une action.
+- MAUVAIS: "Exécuter git status"
+- BON: "Git repository status"
+
+Réponds en JSON strict:
+{{
+  "title": "Sujet de la commande en 5-10 mots",
+  "summary": "Ce que la commande a fait/révélé en 1-2 phrases",
+  "intent": "Pourquoi cette commande a été exécutée (1 phrase)",
+  "subjects": ["sujet principal"],
+  "questions": [],
+  "decisions": ["action effectuée si applicable"],
+  "key_concepts": ["information importante de la sortie"],
+  "context_hints": ["implication pour la suite du travail"]
 }}
 
 Sois concis. Pas de texte hors du JSON."""
@@ -214,7 +237,7 @@ class LLMExtractor:
 
     def __init__(
         self,
-        model: str = "claude-haiku-3-5-20250620",
+        model: Optional[str] = None,  # None = use session default
         claude_cli_path: Optional[str] = None
     ):
         """
@@ -283,25 +306,25 @@ class LLMExtractor:
         Uses subprocess to call claude CLI with absolute path.
         Falls back to default model if specified model not found.
         Falls back to heuristic extraction if CLI not available.
+
+        CRITICAL: Sets AI_SMARTNESS_V2_HOOK_RUNNING env var to prevent
+        infinite loop when claude CLI triggers UserPromptSubmit hooks.
         """
         import logging
         import os
         logger = logging.getLogger(__name__)
 
-        # Marqueur pour que inject.py ignore ce prompt interne
-        INTERNAL_PROMPT_MARKER = "<!-- AI_SMARTNESS_INTERNAL_CALL -->"
-        marked_prompt = f"{INTERNAL_PROMPT_MARKER}\n{prompt}"
-
-        # Set env to signal internal call (legacy fallback)
+        # CRITICAL: Propagate hook guard to subprocess to prevent infinite loop
+        # Without this, claude --print triggers hooks which call the extractor again
         env = os.environ.copy()
-        env['CLAUDE_INTERNAL_CALL'] = '1'
+        env["AI_SMARTNESS_V2_HOOK_RUNNING"] = "1"
 
         try:
             # Build command - include model if specified
             if self.model:
-                cmd = [self.claude_cli_path, "--model", self.model, "--print", marked_prompt]
+                cmd = [self.claude_cli_path, "--model", self.model, "--print", prompt]
             else:
-                cmd = [self.claude_cli_path, "--print", marked_prompt]
+                cmd = [self.claude_cli_path, "--print", prompt]
 
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=env)
 
@@ -313,11 +336,11 @@ class LLMExtractor:
                 logger.warning(f"Model '{self.model}' not found, retrying with default model")
                 # Retry without --model (use session default)
                 result = subprocess.run(
-                    [self.claude_cli_path, "--print", marked_prompt],
+                    [self.claude_cli_path, "--print", prompt],
                     capture_output=True,
                     text=True,
                     timeout=30,
-                    env=env
+                    env=env  # CRITICAL: Keep hook guard
                 )
                 if result.returncode == 0:
                     return result.stdout.strip()

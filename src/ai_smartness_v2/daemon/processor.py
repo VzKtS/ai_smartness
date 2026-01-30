@@ -46,13 +46,23 @@ class ProcessorDaemon:
     """
 
     # Tool to source_type mapping
+    # Must match keys in EXTRACTION_PROMPTS (extractor.py)
     SOURCE_MAP = {
-        "Read": "file_read",
-        "Write": "file_write",
+        # File operations (match extractor.py keys)
+        "Read": "read",
+        "Write": "write",
+        "Edit": "write",
+        "NotebookEdit": "write",
+        # Search operations (use "read" - examining file content)
+        "Glob": "read",
+        "Grep": "read",
+        # External operations
         "Task": "task",
         "WebFetch": "fetch",
+        "WebSearch": "fetch",
         "Bash": "command",
-        "Edit": "file_write",
+        # User prompts (via inject.py)
+        "UserPrompt": "prompt",
     }
 
     def __init__(self, db_path: Path):

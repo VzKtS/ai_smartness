@@ -67,7 +67,7 @@ class ThreadManager:
         if extractor is None:
             llm_config = self._load_llm_config()
             self.extractor = LLMExtractor(
-                model=llm_config.get("extraction_model", "claude-haiku-3-5-20250620"),
+                model=llm_config.get("extraction_model"),  # None = use session default
                 claude_cli_path=llm_config.get("claude_cli_path")
             )
         else:

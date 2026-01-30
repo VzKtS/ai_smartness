@@ -342,8 +342,8 @@ def main():
             if stdin_output:
                 args.output = stdin_output
 
-        # Skip tools that don't need capture
-        skip_tools = ['Glob', 'Grep', 'TodoWrite', 'AskUserQuestion']
+        # Skip only pure interaction tools (no useful content)
+        skip_tools = ['AskUserQuestion']
         if args.tool in skip_tools:
             print(json.dumps({"continue": True}))
             return

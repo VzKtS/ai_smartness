@@ -285,20 +285,24 @@ def call_llm_synthesis(prompt: str, config: dict) -> Optional[str]:
     """Call LLM for synthesis generation."""
     import subprocess
 
-    model = config.get("llm", {}).get("extraction_model", "claude-haiku-3-5-20250620")
+    model = config.get("llm", {}).get("extraction_model")
 
     try:
-        cmd = [
-            "claude", "-p", prompt,
-            "--model", model,
-            "--output-format", "text"
-        ]
+        # Build command - only add --model if specified
+        cmd = ["claude", "-p", prompt, "--output-format", "text"]
+        if model:
+            cmd.extend(["--model", model])
+
+        # CRITICAL: Set guard to prevent hook loops
+        env = os.environ.copy()
+        env["AI_SMARTNESS_V2_HOOK_RUNNING"] = "1"
 
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=60,
+            env=env
         )
 
         if result.returncode == 0:
