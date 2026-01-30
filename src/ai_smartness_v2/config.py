@@ -41,7 +41,7 @@ class Config:
     # Project info
     project_name: str = "unnamed"
     language: Literal["en", "fr", "es"] = "en"
-    version: str = "2.2.0"
+    version: str = "2.5.0"
     initialized_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     # Mode (determines Guardian LLM and thread limits)
