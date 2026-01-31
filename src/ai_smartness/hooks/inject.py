@@ -632,7 +632,7 @@ def main():
     if not check_hook_guard():
         # Already in a hook, pass through unchanged
         message = get_message_from_stdin()
-        print(json.dumps({"result": message}))
+        print(message)  # Raw text output
         return
 
     set_hook_guard()
@@ -642,8 +642,8 @@ def main():
         message = get_message_from_stdin()
 
         if not message:
-            # No message, pass through
-            print(json.dumps({"continue": True}))
+            # No message, pass through unchanged
+            print("")
             return
 
         # Get database path
@@ -668,7 +668,8 @@ def main():
             # Return the CLI response injected into a neutral prompt
             # The user's original "ai X" is replaced with context about the result
             augmented_message = f"{cli_response}\n\nThe user executed a CLI command. Summarize the result above briefly."
-            print(json.dumps({"result": augmented_message}))
+            # Output raw text - Claude Code may expect plain text, not JSON
+            print(augmented_message)
 
             log(f"[CLI] Executed: ai {command} {args} ({len(output)} chars)")
             return
@@ -713,20 +714,19 @@ def main():
             # Inject at the beginning (invisible to user)
             injection = "\n".join(injections)
             augmented_message = f"{injection}\n\n{message}"
-            print(json.dumps({"result": augmented_message}))
+            print(augmented_message)  # Raw text output
         else:
             # No injection needed
-            print(json.dumps({"result": message}))
+            print(message)  # Raw text output
 
     except Exception as e:
         # Log error but don't crash - pass through original
         log(f"[ERROR] {e}")
         # Note: can't re-read stdin, use message if available
         try:
-            msg = message
+            print(message)  # Raw text output
         except NameError:
-            msg = ""
-        print(json.dumps({"result": msg, "continue": True}))
+            print("")  # Empty output on error
 
     finally:
         clear_hook_guard()
