@@ -116,6 +116,11 @@ def main():
         action="store_true",
         help="Show detailed progress"
     )
+    reindex_parser.add_argument(
+        "--reset-weights",
+        action="store_true",
+        help="Reset all thread weights to 1.0"
+    )
 
     # health command
     health_parser = subparsers.add_parser("health", help="System health check")
@@ -181,7 +186,7 @@ def main():
                 return run_search(ai_path, args.query, args.limit)
             elif args.command == "reindex":
                 from .commands.reindex import run_reindex
-                return run_reindex(ai_path, args.verbose)
+                return run_reindex(ai_path, args.verbose, args.reset_weights)
             elif args.command == "health":
                 from .commands.health import run_health
                 return run_health(ai_path)
@@ -225,7 +230,7 @@ def main():
                 return run_search(ai_path, args.query, args.limit)
             elif args.command == "reindex":
                 from commands.reindex import run_reindex
-                return run_reindex(ai_path, args.verbose)
+                return run_reindex(ai_path, args.verbose, args.reset_weights)
             elif args.command == "health":
                 from commands.health import run_health
                 return run_health(ai_path)
