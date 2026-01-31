@@ -381,7 +381,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "2.4.1",
+    "version": "3.0.0",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
@@ -712,6 +712,10 @@ echo "   ai search <q>  - Search threads"
 echo "   ai reindex     - Recalculate embeddings"
 echo "   ai health      - System health check"
 echo "   ai daemon      - Daemon control (start/stop/status)"
+echo "   ai mode        - View/change mode (light/normal/heavy/max)"
+echo "   ai help        - Show help"
+echo ""
+echo "💡 v3.0.0: Type 'ai status' directly in your prompt!"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""

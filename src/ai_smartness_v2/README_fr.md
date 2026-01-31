@@ -1,10 +1,12 @@
-# AI Smartness v2
+# AI Smartness v3
 
 **Couche de méta-cognition pour agents Claude Code.**
 
 Un système de mémoire persistante qui transforme Claude Code en un agent capable de maintenir le contexte sémantique sur de longues sessions, de détecter les connexions entre concepts, et de reprendre le travail après des semaines/mois comme si vous veniez de faire une pause café.
 
 Compatible avec VS Code & Claude Code CLI.
+
+**Nouveau en v3.0.0** : Commandes CLI directement dans le prompt ! Tapez `ai status`, `ai threads`, etc. dans votre prompt et obtenez les résultats automatiquement injectés.
 
 ---
 

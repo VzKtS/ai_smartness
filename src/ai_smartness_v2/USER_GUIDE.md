@@ -1,4 +1,4 @@
-# AI Smartness v2 - User Guide
+# AI Smartness v3 - User Guide
 
 ## Quick Start
 
@@ -13,6 +13,7 @@
    ```bash
    ai status
    ```
+   Or type `ai status` directly in your prompt! (v3.0.0)
 
 That's it. The system is 100% transparent.
 
@@ -63,6 +64,27 @@ These rules are stored permanently and injected into every prompt.
 
 ---
 
+## CLI in Prompt (v3.0.0)
+
+Type CLI commands directly in your prompt and they will be executed automatically:
+
+```
+You: ai status
+Claude: [Shows memory status from CLI]
+
+You: ai threads
+Claude: [Lists active threads]
+
+You: ai search authentication
+Claude: [Shows search results for "authentication"]
+```
+
+**Supported commands:** `ai status`, `ai threads`, `ai thread <id>`, `ai bridges`, `ai search <query>`, `ai health`, `ai daemon`, `ai mode`, `ai help`
+
+This is equivalent to running the command in your terminal - the result is injected into Claude's context and summarized for you.
+
+---
+
 ## CLI Reference
 
 ### `ai status`
@@ -92,6 +114,7 @@ ai threads --status active    # Active only
 ai threads --status suspended # Suspended only
 ai threads --status all       # All threads
 ai threads --limit 20         # Limit to 20 results
+ai threads --prune            # Apply decay and suspend low-weight threads
 ```
 
 Output:
@@ -117,6 +140,7 @@ List semantic connections:
 ai bridges                    # All bridges
 ai bridges --thread abc123    # Bridges for specific thread
 ai bridges --limit 50         # Limit results
+ai bridges --prune            # Apply decay and remove dead bridges
 ```
 
 Output:
@@ -178,6 +202,30 @@ ai daemon           # Show status (default)
 ai daemon status    # Show status
 ai daemon start     # Start daemon
 ai daemon stop      # Stop daemon
+```
+
+The daemon also runs automatic pruning every 5 minutes:
+- Applies decay to threads and bridges
+- Suspends low-weight threads
+- Deletes dead bridges
+
+### `ai mode`
+
+View or change the operating mode:
+```bash
+ai mode             # Show current mode
+ai mode status      # Show current mode
+ai mode light       # Switch to light mode (15 threads)
+ai mode normal      # Switch to normal mode (50 threads)
+ai mode heavy       # Switch to heavy mode (100 threads)
+ai mode max         # Switch to max mode (200 threads)
+```
+
+### `ai help`
+
+Show all available commands:
+```bash
+ai help
 ```
 
 ---
@@ -242,6 +290,24 @@ The system:
 5. Injects the context into your conversation
 
 **Slot Liberation:** If you're at max active threads (e.g., 100/100), the system automatically suspends the least important active thread to make room for the reactivated one.
+
+### Neural Decay System
+
+Threads and bridges use a neural-inspired weight system (Hebbian learning):
+
+| Action | Effect on Weight |
+|--------|------------------|
+| New thread | Starts at 1.0 |
+| Fork thread | Inherits parent's weight |
+| Each use (message) | +0.1 boost (max 1.0) |
+| Time decay | Halves every 7 days |
+| Below 0.1 | Thread auto-suspended |
+| Below 0.05 | Bridge auto-deleted |
+
+This ensures:
+- Frequently used threads stay active
+- Dormant threads are auto-suspended (never deleted)
+- Dead bridges are cleaned up automatically
 
 ### What Gets Injected
 

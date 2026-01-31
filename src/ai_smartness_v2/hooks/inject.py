@@ -7,9 +7,21 @@ Includes anti-autohook guard to prevent infinite loops.
 
 This hook:
 1. Receives the user's prompt
-2. Builds context from current state (threads, decisions, reminders)
-3. Injects invisible context into the prompt
-4. Returns the augmented prompt
+2. Detects CLI commands (e.g., "ai status", "ai threads") and executes them
+3. Builds context from current state (threads, decisions, reminders)
+4. Injects invisible context into the prompt
+5. Returns the augmented prompt
+
+CLI Commands (v3.0.0):
+- "ai status" - Show memory status
+- "ai threads" - List threads
+- "ai thread <id>" - Show thread details
+- "ai bridges" - List bridges
+- "ai search <query>" - Search threads
+- "ai health" - System health check
+- "ai daemon [status|start|stop]" - Daemon control
+- "ai mode [status|light|normal|heavy|max]" - Mode control
+- "ai help" - Show help
 
 Usage: python3 inject.py
        Receives JSON via stdin from Claude Code: {"message": "user prompt"}
@@ -19,9 +31,10 @@ import sys
 import os
 import json
 import re
+import subprocess
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 
 
 # =============================================================================
@@ -463,6 +476,117 @@ def send_prompt_to_daemon(message: str, ai_path: Path) -> bool:
 
 
 # =============================================================================
+# CLI COMMAND INTERCEPTION (v3.0.0)
+# =============================================================================
+
+# Pattern to match CLI commands in prompt
+CLI_COMMAND_PATTERN = re.compile(
+    r'^ai\s+(status|threads?|bridges?|search|reindex|health|daemon|mode|help)(?:\s+(.*))?$',
+    re.IGNORECASE
+)
+
+
+def detect_cli_command(message: str) -> Optional[Tuple[str, str]]:
+    """
+    Detect if the message is a CLI command.
+
+    Args:
+        message: User message
+
+    Returns:
+        Tuple of (command, args) if CLI command detected, None otherwise
+    """
+    message_stripped = message.strip()
+
+    match = CLI_COMMAND_PATTERN.match(message_stripped)
+    if match:
+        command = match.group(1).lower()
+        args = match.group(2) or ""
+        return (command, args.strip())
+
+    return None
+
+
+def execute_cli_command(command: str, args: str, ai_path: Path) -> str:
+    """
+    Execute a CLI command and return the output.
+
+    Args:
+        command: CLI command (status, threads, etc.)
+        args: Command arguments
+        ai_path: Path to .ai directory
+
+    Returns:
+        Command output string
+    """
+    try:
+        # Build the command
+        package_root = get_package_root()
+        cli_script = package_root / "cli" / "main.py"
+
+        if not cli_script.exists():
+            return f"Error: CLI script not found at {cli_script}"
+
+        # Build command args
+        cmd_args = ["python3", str(cli_script), command]
+        if args:
+            # Split args but preserve quoted strings
+            cmd_args.extend(args.split())
+
+        # Set up environment with correct PYTHONPATH
+        env = os.environ.copy()
+        parent_path = str(package_root.parent)
+        if 'PYTHONPATH' in env:
+            env['PYTHONPATH'] = f"{parent_path}:{env['PYTHONPATH']}"
+        else:
+            env['PYTHONPATH'] = parent_path
+
+        # Execute with timeout
+        result = subprocess.run(
+            cmd_args,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+            cwd=str(ai_path.parent)  # Run from project root
+        )
+
+        output = result.stdout
+        if result.stderr:
+            output += f"\n{result.stderr}"
+
+        return output.strip() if output else "Command completed (no output)"
+
+    except subprocess.TimeoutExpired:
+        return "Error: Command timed out (30s)"
+    except Exception as e:
+        return f"Error executing command: {e}"
+
+
+def format_cli_response(command: str, args: str, output: str) -> str:
+    """
+    Format CLI command output as a system reminder.
+
+    Args:
+        command: CLI command
+        args: Command arguments
+        output: Command output
+
+    Returns:
+        Formatted system reminder string
+    """
+    cmd_str = f"ai {command}"
+    if args:
+        cmd_str += f" {args}"
+
+    return f"""<system-reminder>
+CLI Command: {cmd_str}
+
+{output}
+</system-reminder>"""
+
+
+# =============================================================================
 # MEMORY RETRIEVAL
 # =============================================================================
 
@@ -525,6 +649,33 @@ def main():
         # Get database path
         db_path = get_db_path()
         ai_path = db_path.parent
+
+        # =================================================================
+        # CLI COMMAND INTERCEPTION (v3.0.0)
+        # =================================================================
+        # Check if the message is a CLI command (e.g., "ai status")
+        cli_cmd = detect_cli_command(message)
+        if cli_cmd:
+            command, args = cli_cmd
+            log(f"[CLI] Detected command: ai {command} {args}")
+
+            # Execute the CLI command
+            output = execute_cli_command(command, args, ai_path)
+
+            # Format as system reminder
+            cli_response = format_cli_response(command, args, output)
+
+            # Return the CLI response injected into a neutral prompt
+            # The user's original "ai X" is replaced with context about the result
+            augmented_message = f"{cli_response}\n\nThe user executed a CLI command. Summarize the result above briefly."
+            print(json.dumps({"message": augmented_message}))
+
+            log(f"[CLI] Executed: ai {command} {args} ({len(output)} chars)")
+            return
+
+        # =================================================================
+        # NORMAL PROMPT PROCESSING
+        # =================================================================
 
         # Detect and save any user rules in the message
         detected_rule = detect_and_save_user_rule(message, ai_path)

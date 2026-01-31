@@ -1,4 +1,4 @@
-# AI Smartness v2.6 - Quick Reference
+# AI Smartness v3.0 - Quick Reference
 
 ## Seuils Clés
 
@@ -21,19 +21,24 @@
 sim = 0.7×embedding + 0.3×topic_overlap + 0.15 (si topic match)
 ```
 
-**Poids thread:**
+**Poids thread (decay exponentiel):**
 ```
-recency = 0.5^(heures/24)
-activity = min(1.0, msgs×0.1 + activations×0.05)
-weight = recency×0.6 + activity×0.4
+decay_factor = 0.5^(days_since_use / 7.0)  # Half-life 7 jours
+weight = weight * decay_factor
+```
+
+**Boost (Hebbian):**
+```
+weight = min(1.0, weight + 0.1)  # +0.1 par activation
 ```
 
 ## Pipeline
 
 ```
 PostToolUse → capture.py → daemon → ThreadManager → Gossip → Storage
-UserPromptSubmit → inject.py → MemoryRetriever → <system-reminder>
+UserPromptSubmit → inject.py → CLI detect → MemoryRetriever → <system-reminder>
 PreCompact (95%) → compact.py → Synthesis → db/synthesis/
+Daemon (5min) → Prune timer → decay threads/bridges
 ```
 
 ## Coherence Flow (Glob/Grep)
@@ -51,13 +56,28 @@ Next content → Haiku coherence check
 ```bash
 ai status          # Overview
 ai threads         # List active
+ai threads --prune # Apply decay + suspend
 ai thread <id>     # Details
 ai bridges         # Connections
+ai bridges --prune # Apply decay + delete dead
 ai search <query>  # Semantic search
 ai health          # System check
 ai daemon start    # Start background
 ai daemon stop     # Stop
+ai mode status     # Show current mode
+ai mode heavy      # Change mode
+ai help            # Help
 ```
+
+## CLI in Prompt (v3.0.0)
+
+Type CLI commands directly in your prompt:
+```
+You: ai status
+Claude: [Shows memory status from CLI]
+```
+
+**Pattern:** `^ai\s+(status|threads?|bridges?|search|health|daemon|mode|help)`
 
 ## Fichiers Clés
 
@@ -160,6 +180,18 @@ ai mode max               # Switch to max mode
 ```
 
 **Note:** Changing to a lower quota will auto-suspend excess threads.
+
+## Daemon Auto-Pruning (v3.0.0)
+
+```python
+PRUNE_INTERVAL_SECONDS = 300  # Every 5 minutes
+```
+
+**Actions:**
+1. Apply decay to all threads
+2. Suspend threads with weight < 0.1
+3. Apply decay to all bridges
+4. Delete bridges with weight < 0.05
 
 ## Timeouts
 

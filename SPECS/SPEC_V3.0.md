@@ -1,8 +1,8 @@
-# AI Smartness v2.9 - Spécification Technique Complète
+# AI Smartness v3.0 - Spécification Technique Complète
 
 ## Meta
 
-- **Version**: 2.9.0
+- **Version**: 3.0.0
 - **Date**: 2026-01-31
 - **Auteur**: Claude (Opus 4.5) + User
 - **Status**: Implemented
@@ -10,6 +10,8 @@
   - v2.7.0: Universal Coherence Chain (Phase 15)
   - v2.8.0: Bridge Weight Decay (Phase 17)
   - v2.9.0: Thread Decay & Mode Management (Phase 18)
+  - v2.9.1: Weight system alignment (FORK inherits, boost_weight unified)
+  - v3.0.0: CLI in Prompt + Daemon auto-pruning timer (Phase 19)
 
 ---
 
@@ -314,6 +316,14 @@ User Prompt
     │
     ▼
 ┌─────────────────────────────────┐
+│ 0. CLI Command Detection (v3)   │
+│    Pattern: ^ai\s+(command)     │
+│    → Execute + inject result    │
+│    → Skip rest of pipeline      │
+└─────────────────┬───────────────┘
+                  │ (if not CLI command)
+                  ▼
+┌─────────────────────────────────┐
 │ 1. Détection règles utilisateur │
 │    "rappelle-toi:", "toujours"  │
 │    → save user_rules.json       │
@@ -343,6 +353,42 @@ User Prompt
 │ 5. Inject <system-reminder>     │
 │    Prepend to original message  │
 └─────────────────────────────────┘
+```
+
+### 3.3.1 CLI in Prompt (v3.0.0)
+
+Le hook UserPromptSubmit détecte les commandes CLI dans le prompt et les exécute directement.
+
+**Pattern de détection:**
+```python
+CLI_COMMAND_PATTERN = r'^ai\s+(status|threads?|bridges?|search|reindex|health|daemon|mode|help)(?:\s+(.*))?$'
+```
+
+**Commandes supportées:**
+| Commande | Exemple | Description |
+|----------|---------|-------------|
+| `ai status` | `ai status` | Vue d'ensemble mémoire |
+| `ai threads` | `ai threads` | Liste threads actifs |
+| `ai thread` | `ai thread abc123` | Détails d'un thread |
+| `ai bridges` | `ai bridges` | Liste bridges |
+| `ai search` | `ai search auth` | Recherche sémantique |
+| `ai health` | `ai health` | Vérification santé |
+| `ai daemon` | `ai daemon status` | Contrôle daemon |
+| `ai mode` | `ai mode heavy` | Voir/changer mode |
+| `ai help` | `ai help` | Aide CLI |
+
+**Format d'injection:**
+```xml
+<system-reminder>
+CLI Command: ai status
+
+=== AI Smartness Status ===
+Project: MyProject
+Threads: 45 total
+...
+</system-reminder>
+
+The user executed a CLI command. Summarize the result above briefly.
 ```
 
 ### 3.4 Réactivation Hybride
@@ -555,7 +601,30 @@ embedding_manager.similarity(vec1, vec2)  # → float 0.0-1.0
 | `{"shutdown": true}` | Arrêt graceful |
 | `{"tool": "X", "content": "..."}` | Process capture |
 
-### 7.4 Anti-Loop Guard
+### 7.4 Auto-Pruning Timer (v3.0.0)
+
+Le daemon exécute automatiquement le pruning toutes les 5 minutes :
+
+```python
+PRUNE_INTERVAL_SECONDS = 300  # 5 minutes
+
+def _prune_timer_loop(self):
+    """Thread background qui exécute le pruning périodique."""
+    while self.running:
+        time.sleep(PRUNE_INTERVAL_SECONDS)
+        # Prune threads (decay + suspend)
+        self.thread_manager.prune_threads()
+        # Prune bridges (decay + delete dead)
+        self.gossip.prune_dead_bridges()
+```
+
+**Actions du pruning:**
+1. Appliquer decay à tous les threads actifs
+2. Suspendre threads avec weight < 0.1
+3. Appliquer decay à tous les bridges
+4. Supprimer bridges avec weight < 0.05
+
+### 7.5 Anti-Loop Guard
 
 Variable d'environnement `AI_SMARTNESS_V2_HOOK_RUNNING=1` :
 - Définie pendant les appels LLM internes
@@ -618,7 +687,7 @@ Variable d'environnement `AI_SMARTNESS_V2_HOOK_RUNNING=1` :
 {
   "project_name": "my_project",
   "language": "fr",
-  "version": "2.9.0",
+  "version": "3.0.0",
   "initialized_at": "2026-01-30T12:00:00",
   "mode": "normal",
   "settings": {
@@ -820,6 +889,29 @@ Neuronal dormancy - les threads inactifs s'endorment :
 - Suspension (pas suppression) quand weight < 0.1
 - Quota dynamique par mode (light/normal/heavy/max)
 - Changement de mode à la volée avec `ai mode`
+
+### 14.4 Weight System Alignment (v2.9.1)
+
+Unification du système de poids threads/bridges :
+- Thread.weight initialisé à 1.0 (au lieu de 0.5)
+- FORK threads héritent du poids parent
+- Suppression de `_update_weight()` (conflit avec decay)
+- `add_message()` et `reactivate()` passent par `boost_weight()`
+
+### 14.5 CLI in Prompt + Auto-Pruning (v3.0.0)
+
+Deux nouvelles fonctionnalités majeures :
+
+**CLI dans le Prompt:**
+- Détection pattern `^ai\s+(command)` dans UserPromptSubmit
+- Exécution CLI et injection résultat en `<system-reminder>`
+- Commandes: status, threads, thread, bridges, search, health, daemon, mode, help
+
+**Daemon Auto-Pruning:**
+- Timer de 5 minutes pour pruning automatique
+- Decay appliqué à tous les threads et bridges
+- Suspension threads dormants, suppression bridges morts
+- Zero intervention utilisateur requise
 
 ---
 

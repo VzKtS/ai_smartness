@@ -1,4 +1,4 @@
-# AI Smartness v2 - Guía de Usuario
+# AI Smartness v3 - Guía de Usuario
 
 ## Inicio Rápido
 
