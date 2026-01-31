@@ -374,6 +374,11 @@ class ThreadManager:
             thread = Thread.create(title, OriginType.SPLIT, parent_id=decision.thread_id)
             thread.topics = extraction.subjects + extraction.key_concepts
             thread.summary = extraction.summary  # Store the summary
+
+            # Inherit parent's weight (child starts with parent's importance)
+            if parent:
+                thread.weight = parent.weight
+
             thread.add_message(content, "user", source_type=source_type)
 
             if parent:

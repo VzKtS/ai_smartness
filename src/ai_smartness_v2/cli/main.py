@@ -4,14 +4,15 @@ AI Smartness v2 CLI - Main entry point.
 
 Usage:
     ai status              Show memory status
-    ai threads             List threads
+    ai threads             List threads (--prune, --show-weight)
     ai thread <id>         Show thread details
-    ai bridges             List bridges
+    ai bridges             List bridges (--prune, --show-weight)
     ai search <query>      Search threads
     ai reindex             Recalculate all embeddings
     ai health              System health check
     ai daemon [status|start|stop]  Manage daemon
     ai mode [status|light|normal|heavy|max]  View/change mode
+    ai help                Show help message
 """
 
 import argparse
@@ -139,9 +140,12 @@ def main():
         help="Mode to set or 'status' to view current (default: status)"
     )
 
+    # help command (alias for --help)
+    help_parser = subparsers.add_parser("help", help="Show this help message")
+
     args = parser.parse_args()
 
-    if not args.command:
+    if not args.command or args.command == "help":
         parser.print_help()
         return 0
 

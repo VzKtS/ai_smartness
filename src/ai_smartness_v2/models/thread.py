@@ -115,8 +115,8 @@ class Thread:
     parent_id: Optional[str] = None
     child_ids: List[str] = field(default_factory=list)
 
-    # Weighting (calculated by usage)
-    weight: float = 0.5
+    # Weighting (starts at 1.0, decays over time, boosted by usage)
+    weight: float = 1.0
     last_active: datetime = field(default_factory=datetime.now)
     activation_count: int = 0
 
@@ -152,9 +152,8 @@ class Thread:
         """Add a message to the thread."""
         msg = Message.create(content, source, **metadata)
         self.messages.append(msg)
-        self.last_active = datetime.now()
         self.activation_count += 1
-        self._update_weight()
+        self.boost_weight()  # Hebbian reinforcement
         return msg
 
     def record_drift(self, new_origin: str):
@@ -175,36 +174,14 @@ class Thread:
     def reactivate(self):
         """Reactivate a suspended or archived thread."""
         self.status = ThreadStatus.ACTIVE
-        self.last_active = datetime.now()
         self.activation_count += 1
         self.record_drift("reactivation")
-        self._update_weight()
+        self.boost_weight()  # Hebbian reinforcement
 
     def add_child(self, child_id: str):
         """Add a child thread reference."""
         if child_id not in self.child_ids:
             self.child_ids.append(child_id)
-
-    def _update_weight(self):
-        """
-        Update thread weight based on activity.
-
-        Weight formula (no hardcoded thresholds - relative calculation):
-        - Recency bonus: higher if recently active
-        - Activation frequency: more activations = more important
-        - Message count: more content = more value
-        """
-        now = datetime.now()
-        hours_since_active = (now - self.last_active).total_seconds() / 3600
-
-        # Recency: decays over time (half-life of 24 hours)
-        recency = 0.5 ** (hours_since_active / 24)
-
-        # Activity: based on message count and activations
-        activity = min(1.0, (len(self.messages) * 0.1 + self.activation_count * 0.05))
-
-        # Combined weight (normalized 0-1)
-        self.weight = (recency * 0.6 + activity * 0.4)
 
     def decay(self) -> bool:
         """

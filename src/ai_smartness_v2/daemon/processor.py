@@ -92,6 +92,10 @@ class ProcessorDaemon:
         self.pending_context: Optional[Dict[str, Any]] = None
         self.pending_context_lock = threading.Lock()
 
+        # Periodic pruning (every 5 minutes)
+        self.PRUNE_INTERVAL_SECONDS = 300  # 5 minutes
+        self.last_prune_time: Optional[datetime] = None
+
     def _init_modules(self):
         """Initialize the heavy modules."""
         logger.info("Loading modules...")
@@ -436,6 +440,44 @@ class ProcessorDaemon:
             return str(delta).split('.')[0]
         return "unknown"
 
+    def _prune_timer_loop(self):
+        """
+        Background thread that runs periodic pruning.
+
+        Applies decay to threads and bridges, suspending/deleting
+        those below thresholds. Runs every PRUNE_INTERVAL_SECONDS.
+        """
+        import time
+        logger.info(f"Prune timer started (interval: {self.PRUNE_INTERVAL_SECONDS}s)")
+
+        while self.running:
+            time.sleep(self.PRUNE_INTERVAL_SECONDS)
+
+            if not self.running:
+                break
+
+            try:
+                logger.info("Running periodic prune...")
+
+                # Prune threads (suspend low-weight)
+                if self.thread_manager:
+                    result = self.thread_manager.prune_threads()
+                    if result.get("suspended_count", 0) > 0:
+                        logger.info(f"Pruned threads: {result['suspended_count']} suspended")
+
+                # Prune bridges (delete dead)
+                if self.gossip:
+                    pruned = self.gossip.prune_dead_bridges()
+                    if pruned > 0:
+                        logger.info(f"Pruned bridges: {pruned} deleted")
+
+                self.last_prune_time = datetime.now()
+
+            except Exception as e:
+                logger.error(f"Prune error: {e}")
+
+        logger.info("Prune timer stopped")
+
     def run(self):
         """Run the daemon main loop."""
         # Initialize modules
@@ -455,6 +497,14 @@ class ProcessorDaemon:
 
         self.running = True
         self._start_time = datetime.now()
+
+        # Start prune timer thread
+        prune_thread = threading.Thread(
+            target=self._prune_timer_loop,
+            daemon=True,
+            name="prune-timer"
+        )
+        prune_thread.start()
 
         logger.info("Daemon started, waiting for connections...")
 
