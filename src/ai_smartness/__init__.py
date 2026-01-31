@@ -18,7 +18,7 @@ Usage:
     gossip = GossipPropagator(storage)
 """
 
-__version__ = "4.0.0"
+__version__ = "4.3.0"
 __author__ = "AI Smartness Team"
 
 # Models
@@ -35,7 +35,11 @@ from .storage.heartbeat import (
     init_heartbeat,
     increment_beat,
     record_interaction,
-    get_temporal_context
+    get_temporal_context,
+    is_new_session,
+    get_time_since_last,
+    update_context_tokens,
+    get_context_info
 )
 
 # Processing
@@ -79,13 +83,17 @@ __all__ = [
     "StorageManager",
     "ThreadStorage",
     "BridgeStorage",
-    # Heartbeat (v4.1)
+    # Heartbeat (v4.1) + Session (v4.2) + Context (v4.3)
     "load_heartbeat",
     "save_heartbeat",
     "init_heartbeat",
     "increment_beat",
     "record_interaction",
     "get_temporal_context",
+    "is_new_session",
+    "get_time_since_last",
+    "update_context_tokens",
+    "get_context_info",
 
     # Processing
     "LLMExtractor",

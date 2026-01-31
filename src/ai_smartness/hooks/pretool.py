@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-PreToolUse hook for AI Smartness v4.0.
+PreToolUse hook for AI Smartness v4.3.
 
-Intercepts tool calls before execution to enable:
-1. Active Recall: Read(".ai/recall/<query>") virtual file pattern
-2. Future expansions (context tools, etc.)
+Intercepts tool calls before execution to enable virtual .ai/ paths:
+1. Agent Help: Read(".ai/help")
+2. Active Recall: Read(".ai/recall/<query>")
+3. Merge Threads: Read(".ai/merge/<survivor>/<absorbed>")
+4. Split Threads: Read(".ai/split/<thread_id>") + Read(".ai/split/<id>/confirm?...")
+5. Unlock Threads: Read(".ai/unlock/<thread_id>")
 
 This hook is called by Claude Code before executing a tool.
-For recall patterns, it denies the Read and returns the memory context
-via additionalContext - more transparent than temp file redirection.
+For virtual paths, it returns the result via additionalContext.
 
 Usage:
     Configure in Claude Code hooks:
@@ -171,30 +173,31 @@ def get_hook_input_from_stdin() -> dict:
 
 
 # =============================================================================
-# RECALL PATTERN
+# VIRTUAL PATH PATTERN (v4.3)
 # =============================================================================
 
-# Pattern to match recall virtual path
-# Matches: .ai/recall/<query> or /path/to/.ai/recall/<query>
-RECALL_PATTERN = re.compile(r'(?:^|/)\.ai/recall/(.+)$')
+# Pattern to match virtual .ai/ paths
+# Matches: .ai/help, .ai/recall/<query>, .ai/merge/x/y, .ai/split/x, .ai/unlock/x
+VIRTUAL_PATH_PATTERN = re.compile(r'(?:^|/)\.ai/(help|recall|merge|split|unlock)(/.*)?(\?.*)?$')
 
 
-def detect_recall(file_path: str) -> Optional[str]:
+def detect_virtual_path(file_path: str) -> Optional[str]:
     """
-    Detect if the file path is a recall query.
+    Detect if the file path is a virtual .ai/ path.
 
     Args:
         file_path: File path from Read tool
 
     Returns:
-        Query string if recall pattern matched, None otherwise
+        Virtual path string (e.g., ".ai/recall/query") if matched, None otherwise
     """
     if not file_path:
         return None
 
-    match = RECALL_PATTERN.search(file_path)
-    if match:
-        return match.group(1)
+    # Find the .ai/ part
+    idx = file_path.find('.ai/')
+    if idx != -1:
+        return file_path[idx:]
 
     return None
 
@@ -228,33 +231,37 @@ def main():
 
         file_path = tool_input.get("file_path", "")
 
-        # Check for recall pattern
-        query = detect_recall(file_path)
-        if query:
+        # Check for virtual .ai/ path (recall, merge, split, unlock)
+        virtual_path = detect_virtual_path(file_path)
+        if virtual_path:
             # Determine AI path from cwd (project working directory)
             if cwd:
                 ai_path = Path(cwd) / ".ai"
             else:
                 ai_path = get_ai_path()
 
-            log(f"[RECALL] Detected query: {query} (cwd={cwd}, ai_path={ai_path})")
+            log(f"[VIRTUAL] Detected path: {virtual_path} (cwd={cwd}, ai_path={ai_path})")
 
             # Skip if no .ai directory
             if not ai_path.exists():
-                log(f"[RECALL] No .ai directory at {ai_path}")
+                log(f"[VIRTUAL] No .ai directory at {ai_path}")
                 return
 
-            # Import and execute recall handler
+            # Import and execute virtual path handler
             try:
                 # Add package to path
                 package_root = get_package_root()
                 sys.path.insert(0, str(package_root.parent))
 
-                from ai_smartness.hooks.recall import handle_recall
+                from ai_smartness.hooks.recall import handle_virtual_path
 
-                result = handle_recall(query, ai_path)
+                result = handle_virtual_path(virtual_path, ai_path)
 
-                log(f"[RECALL] Returned {len(result)} chars for: {query}")
+                if result is None:
+                    log(f"[VIRTUAL] Unknown path: {virtual_path}")
+                    return
+
+                log(f"[VIRTUAL] Returned {len(result)} chars for: {virtual_path}")
 
                 # Limit additionalContext to avoid "prompt is too long" error
                 MAX_CONTEXT_SIZE = 8000
@@ -266,9 +273,9 @@ def main():
                     if last_section > MAX_CONTEXT_SIZE // 2:
                         truncated = truncated[:last_section]
                     result = truncated + f"\n\n... (truncated, {len(result) - len(truncated)} chars omitted)"
-                    log(f"[RECALL] Truncated to {len(result)} chars")
+                    log(f"[VIRTUAL] Truncated to {len(result)} chars")
 
-                # Return JSON that allows the Read but injects memory context
+                # Return JSON that allows the Read but injects context
                 # VSCode bug: "deny" is ignored, so we use "allow" + additionalContext
                 # The Read will fail naturally (file doesn't exist) but context is injected
                 output = {
@@ -282,12 +289,12 @@ def main():
                 return
 
             except ImportError as e:
-                log(f"[RECALL] Import error: {e}")
+                log(f"[VIRTUAL] Import error: {e}")
                 # Can't redirect, let it fail naturally
                 return
 
             except Exception as e:
-                log(f"[RECALL] Error: {e}")
+                log(f"[VIRTUAL] Error: {e}")
                 # Can't redirect, let it fail naturally
                 return
 

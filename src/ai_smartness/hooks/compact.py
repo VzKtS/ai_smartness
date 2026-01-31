@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """
-Compact hook for AI Smartness.
+Compact hook for AI Smartness v4.3.
 
 Called by PreCompact when context reaches 95% capacity.
 Triggers synthesis generation and saves session state.
 
 This hook:
-1. Generates a comprehensive synthesis via LLM
-2. Saves all active thread states
-3. Prepares summary for context continuation
-4. Returns synthesis for injection into compacted context
+1. Unlocks threads with split_locked_until='compaction' (v4.3)
+2. Generates a comprehensive synthesis via LLM
+3. Saves all active thread states
+4. Prepares summary for context continuation
+5. Returns synthesis for injection into compacted context
 
 Usage: python3 compact.py
        Receives context info via stdin from Claude Code
@@ -356,6 +357,33 @@ def save_synthesis(synthesis: dict, db_path: Path):
     log(f"Synthesis saved: {filename}")
 
 
+def unlock_compacted_threads(db_path: Path):
+    """
+    Unlock all threads with split_locked_until='compaction'.
+
+    Called at compaction time to release split locks.
+
+    Args:
+        db_path: Path to database
+    """
+    try:
+        package_root = get_package_root()
+        sys.path.insert(0, str(package_root.parent))
+
+        from ai_smartness.storage.threads import ThreadStorage
+
+        storage = ThreadStorage(db_path / "threads")
+        unlocked = storage.unlock_compacted()
+
+        if unlocked > 0:
+            log(f"Unlocked {unlocked} threads (split_locked_until=compaction)")
+
+    except ImportError as e:
+        log(f"Could not import ThreadStorage: {e}")
+    except Exception as e:
+        log(f"Error unlocking threads: {e}")
+
+
 def format_synthesis_for_injection(synthesis: dict, config: dict) -> str:
     """Format synthesis for context injection."""
     lang = config.get("language", "en")
@@ -411,6 +439,9 @@ def main():
         # Get database path
         db_path = get_db_path()
         db_path.mkdir(parents=True, exist_ok=True)
+
+        # Unlock threads with split_locked_until="compaction" (v4.3)
+        unlock_compacted_threads(db_path)
 
         # Load config
         config = load_config(db_path)

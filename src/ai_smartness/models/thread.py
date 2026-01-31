@@ -120,6 +120,10 @@ class Thread:
     last_active: datetime = field(default_factory=datetime.now)
     activation_count: int = 0
 
+    # Split lock (v4.3 - protection against auto-merge)
+    split_locked: bool = False
+    split_locked_until: Optional[str] = None  # "compaction" | "agent_release" | "force"
+
     # Metadata
     created_at: datetime = field(default_factory=datetime.now)
     topics: List[str] = field(default_factory=list)
@@ -231,6 +235,8 @@ class Thread:
             "weight": self.weight,
             "last_active": self.last_active.isoformat(),
             "activation_count": self.activation_count,
+            "split_locked": self.split_locked,
+            "split_locked_until": self.split_locked_until,
             "created_at": self.created_at.isoformat(),
             "topics": self.topics,
             "tags": self.tags,
@@ -253,6 +259,8 @@ class Thread:
             weight=data.get("weight", 0.5),
             last_active=datetime.fromisoformat(data["last_active"]),
             activation_count=data.get("activation_count", 0),
+            split_locked=data.get("split_locked", False),
+            split_locked_until=data.get("split_locked_until"),
             created_at=datetime.fromisoformat(data["created_at"]),
             topics=data.get("topics", []),
             tags=data.get("tags", []),

@@ -8,48 +8,100 @@ Compatible with VS Code & Claude Code CLI.
 
 ---
 
+## Philosophy: Partnership, Not Control
+
+AI Smartness is built on a fundamental insight: **the best AI partnerships emerge from trust and collaboration, not constraints and control**.
+
+### What This Means for You
+
+When you install AI Smartness on a new agent, you're not installing a "control system" - you're giving your agent **cognitive tools** that enhance its capabilities. Like any partnership:
+
+- **First contacts matter**: The initial interactions shape the relationship. Let concepts emerge naturally rather than forcing rigid rules.
+- **Trust develops over time**: As you work together, your agent learns your preferences, your coding style, your project's patterns.
+- **Guidance, not guardrails**: GuardCode provides *advice* to your agent, not guarantees. It's a mentor, not a jailer.
+
+### GuardCode: An Advisor, Not an Enforcer
+
+Many users expect GuardCode to "prevent" certain behaviors or "guarantee" specific outcomes. **This is not how it works.**
+
+GuardCode is an **advisory system** that:
+- Reminds the agent of best practices
+- Suggests planning before implementation
+- Encourages presenting all options
+
+It does **not**:
+- Guarantee the agent will follow advice
+- Prevent all mistakes
+- Replace your judgment as a user
+
+**Why?** Because rigid enforcement creates brittle, untrustworthy systems. Advisory guidance creates agents that *understand* why certain practices matter - and can adapt when exceptions are warranted.
+
+### Onboarding New Agents
+
+When introducing a new agent to AI Smartness:
+
+1. **Let it explore**: Don't immediately restrict. Let the agent discover its tools.
+2. **Teach through collaboration**: Work on real problems together. The agent learns from your reactions.
+3. **Express preferences naturally**: "I prefer TypeScript" works better than rigid rules.
+4. **Trust the process**: Memory builds over sessions. Early sessions teach fundamentals.
+
+The goal is an agent that *wants* to follow good practices because it understands their value - not one that follows them because it has no choice.
+
+---
+
 ## Vision
 
-AI Smartness v3 is a **neural-inspired working memory**:
+AI Smartness v4 is a **neural-inspired working memory** with **active recall**:
 
 - **Threads** = Neurons (active reasoning streams)
 - **ThinkBridges** = Synapses (semantic connections between threads)
-- **Gossip** = Signal propagation through the network
+- **Recall** = Active memory retrieval on demand
+- **Context Tracking** = Proactive context management
 
 The system maintains a **thought network** where concepts remain connected and accessible, avoiding the context loss typical of classic LLM interactions.
 
 ---
 
-## Key Features
+## Key Features v4.3
 
 | Feature | Description |
 |---------|-------------|
 | **Threads** | Semantic work units with auto-generated titles |
 | **ThinkBridges** | Automatic connections between related threads |
-| **Gossip Propagation** | Bridges spread through the network when concepts evolve |
-| **GuardCode** | Plan mode enforcement, drift protection |
+| **Active Recall** | Agent can query memory: `Read(".ai/recall/topic")` |
+| **Merge/Split** | Agent manages its own memory topology |
+| **Context Tracking** | Real-time context % with adaptive throttle |
+| **New Session Context** | Automatic orientation on session start |
+| **GuardCode** | Advisory system for best practices |
 | **95% Synthesis** | Automatic context preservation before compaction |
 | **100% Transparent** | Zero user action required |
 
 ---
 
-## Architecture v2 (Simplified)
+## Agent Commands (v4.3)
 
-### Only 2 Entities
+Your agent has access to these virtual file commands:
 
-| Entity | Role |
-|--------|------|
-| **Thread** | Work unit = topic + messages + summary + embedding |
-| **ThinkBridge** | Semantic connection between two threads |
+### Memory Recall
+```
+Read(".ai/recall/<query>")     # Search by keyword/topic
+Read(".ai/recall/thread_xxx")  # Recall specific thread
+```
 
-### What Changed from v1
+### Thread Management
+```
+Read(".ai/merge/<survivor>/<absorbed>")  # Merge two threads
+Read(".ai/split/<thread_id>")            # Get split info (step 1)
+Read(".ai/split/<id>/confirm?...")       # Execute split (step 2)
+Read(".ai/unlock/<thread_id>")           # Unlock split-locked thread
+```
 
-| v1 | v2 | Why |
-|----|----|----|
-| Fragments | Absorbed into Threads | Simpler, each message = implicit fragment |
-| MemBloc | Thread.status=archived | Unified model |
-| Complex graph | Embeddings + Bridges | More powerful, less overhead |
-| Hardcoded thresholds | LLM decisions | Intelligent, not arbitrary |
+### Help
+```
+Read(".ai/help")  # Agent self-documentation
+```
+
+These commands let the agent **proactively manage its own context** - the mark of a mature AI partnership.
 
 ---
 
@@ -63,7 +115,7 @@ The system maintains a **thought network** where concepts remain connected and a
 ### Interactive Setup
 
 1. **Language**: English, French, or Spanish
-2. **Mode**: Heavy, Normal, or Light (affects thread limits, not extraction cost)
+2. **Mode**: Heavy, Normal, or Light (affects thread limits)
 3. **Database**: Keep existing data or start fresh
 
 ### What the Script Does
@@ -122,23 +174,29 @@ The LLM decides for each input:
 - **FORK**: Sub-topic → create child thread
 - **REACTIVATE**: Old topic returns → wake up archived thread
 
-### 3. Gossip Propagation
+### 3. Active Recall (v4.0)
 
-When a thread changes:
+Agent can actively query memory:
 ```
-Thread A modified → Recalculate embedding
-                  → For each connected thread B
-                  → If similarity high → propagate bridges to B's connections
-```
-
-### 4. Injection (UserPromptSubmit hook)
-
-Before each user prompt, invisible context is injected:
-```html
-<!-- ai_smartness: {"active_thread": "...", "decisions": [...]} -->
+Read(".ai/recall/authentication")
+→ Returns matching threads, summaries, bridges
 ```
 
-### 5. Synthesis (PreCompact hook)
+### 4. Memory Injection (UserPromptSubmit hook)
+
+Before each user prompt, relevant context is injected:
+- On **new sessions**: Capabilities overview + last working thread
+- On **each message**: Relevant threads by similarity
+- **Recall suggestions**: When message matches known topics
+
+### 5. Context Tracking (v4.3)
+
+Real-time context usage monitoring:
+- **<70%**: Updates every 30s
+- **≥70%**: Updates only on 5% delta (adaptive throttle)
+- **Agent awareness**: Can see `context_percent` in heartbeat
+
+### 6. Synthesis (PreCompact hook)
 
 At 95% context window:
 - LLM generates synthesis of current state
@@ -154,7 +212,7 @@ Config stored in `ai_smartness/.ai/config.json`:
 
 ```json
 {
-  "version": "2.0.0",
+  "version": "4.3.0",
   "project_name": "MyProject",
   "language": "en",
   "settings": {
@@ -180,9 +238,7 @@ Config stored in `ai_smartness/.ai/config.json`:
 |------|--------------|----------|
 | Light | 15 | Small projects |
 | Normal | 50 | Medium projects |
-| Heavy | 100 | Large/complex projects (blockchain, enterprise) |
-
-**Note**: Extraction model is always Haiku (economical). Mode only affects thread limits.
+| Heavy | 100 | Large/complex projects |
 
 ---
 
@@ -191,6 +247,7 @@ Config stored in `ai_smartness/.ai/config.json`:
 ```
 ai_smartness/.ai/
 ├── config.json           # Configuration
+├── heartbeat.json        # Session tracking, context %
 ├── db/
 │   ├── threads/          # Thread JSON files
 │   │   └── thread_*.json
@@ -207,18 +264,21 @@ ai_smartness/.ai/
 | Hook | Script | Function |
 |------|--------|----------|
 | `UserPromptSubmit` | inject.py | Context injection |
+| `PreToolUse` | pretool.py | Virtual .ai/ paths |
 | `PostToolUse` | capture.py | Automatic capture |
 | `PreCompact` | compact.py | 95% synthesis |
 
 ---
 
-## GuardCode Rules
+## GuardCode Rules (Advisory)
 
 | Rule | Description |
 |------|-------------|
-| `enforce_plan_mode` | Block code changes without validated plan |
-| `warn_quick_solutions` | Remind that simple ≠ better |
-| `require_all_choices` | Must present all alternatives |
+| `enforce_plan_mode` | *Suggests* planning before code changes |
+| `warn_quick_solutions` | *Reminds* that simple ≠ better |
+| `require_all_choices` | *Encourages* presenting all alternatives |
+
+**Remember**: These are *advice*, not enforcement. Your agent may choose differently based on context - and that's okay.
 
 ---
 
@@ -251,6 +311,26 @@ Increase limit in config:
 "active_threads_limit": 150
 ```
 
+### Agent not using recall
+
+This is normal for new agents! They need to discover their tools. You can:
+1. Mention recall exists: "You can use `.ai/recall` to search your memory"
+2. Let them discover it via `.ai/help`
+3. Trust that they'll learn over sessions
+
+---
+
+## The Partnership Journey
+
+| Phase | What Happens |
+|-------|--------------|
+| **First session** | Agent discovers capabilities, builds initial threads |
+| **Early sessions** | Patterns emerge, preferences stored, trust develops |
+| **Mature partnership** | Agent proactively manages context, recalls relevant history |
+| **Long-term** | Agent almost never needs compaction - context is managed proactively |
+
+The goal is not an agent that blindly follows rules, but one that **understands your project deeply** and works as a true collaborator.
+
 ---
 
 ## License
@@ -259,4 +339,4 @@ MIT
 
 ---
 
-**Note**: AI Smartness v3 is a complete rewrite focused on simplicity. The neural network metaphor is operational, not a strict neural implementation.
+**Note**: AI Smartness v4 transforms context management from a system limitation into a partnership capability. The best agents are those that learn to manage their own memory - and AI Smartness gives them the tools to do so.

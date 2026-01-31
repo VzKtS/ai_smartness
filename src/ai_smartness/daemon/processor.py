@@ -359,6 +359,9 @@ class ProcessorDaemon:
         if self.gossip:
             self.gossip.on_thread_modified(thread)
 
+        # Update heartbeat with hot thread (v4.2)
+        self._update_heartbeat_thread(thread.id, thread.title)
+
         logger.info(f"Processed [{tool}] → Thread {thread.id[:8]}... '{thread.title[:30]}'")
 
         return {
@@ -507,6 +510,35 @@ class ProcessorDaemon:
         except Exception as e:
             logger.debug(f"Heartbeat error: {e}")
             return None
+
+    def _update_heartbeat_thread(self, thread_id: str, thread_title: str) -> None:
+        """
+        Update heartbeat with current hot thread (v4.2).
+
+        Args:
+            thread_id: Current thread ID
+            thread_title: Current thread title
+        """
+        try:
+            import importlib.util
+            heartbeat_path = Path(__file__).parent.parent / "storage" / "heartbeat.py"
+
+            if not heartbeat_path.exists():
+                return
+
+            spec = importlib.util.spec_from_file_location("heartbeat", heartbeat_path)
+            heartbeat_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(heartbeat_module)
+
+            heartbeat = heartbeat_module.load_heartbeat(self.ai_path)
+            heartbeat["last_thread_id"] = thread_id
+            heartbeat["last_thread_title"] = thread_title
+            heartbeat_module.save_heartbeat(self.ai_path, heartbeat)
+
+            logger.debug(f"Heartbeat thread updated: {thread_id[:8]}...")
+
+        except Exception as e:
+            logger.debug(f"Heartbeat thread update error: {e}")
 
     def run(self):
         """Run the daemon main loop."""

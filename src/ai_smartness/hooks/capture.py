@@ -134,12 +134,12 @@ def sanitize_unicode(text: str) -> str:
 # DATA RETRIEVAL
 # =============================================================================
 
-def get_tool_data_from_stdin() -> Tuple[str, str, Optional[str]]:
+def get_tool_data_from_stdin() -> Tuple[str, str, Optional[str], Optional[str]]:
     """
     Get tool data from stdin (Claude Code sends JSON).
 
     Returns:
-        (tool_name, tool_output, file_path)
+        (tool_name, tool_output, file_path, session_id)
     """
     try:
         if not sys.stdin.isatty():
@@ -166,13 +166,16 @@ def get_tool_data_from_stdin() -> Tuple[str, str, Optional[str]]:
                     if isinstance(tool_input, dict):
                         file_path = tool_input.get('file_path', '')
 
-                    return tool_name, tool_output, file_path
+                    # Get session_id for context tracking
+                    session_id = data.get('session_id')
+
+                    return tool_name, tool_output, file_path, session_id
                 except json.JSONDecodeError:
                     pass
     except Exception:
         pass
 
-    return '', '', None
+    return '', '', None, None
 
 
 # =============================================================================
@@ -315,6 +318,30 @@ def process_capture(tool_name: str, output: str, file_path: Optional[str] = None
         log(f"[{tool_name}] Failed to send to daemon")
 
 
+def update_context_tracking(ai_path: Path, session_id: Optional[str]):
+    """
+    Update context token tracking in heartbeat.
+
+    Args:
+        ai_path: Path to .ai directory
+        session_id: Current session ID
+    """
+    if not session_id:
+        return
+
+    try:
+        from ..storage import heartbeat as hb
+        result = hb.update_context_tokens(ai_path, session_id)
+        if result:
+            if result.get("throttled"):
+                # Throttled - don't spam logs
+                pass
+            else:
+                log(f"[CONTEXT] Updated: {result['percent']}% ({result['tokens']} tokens)")
+    except Exception as e:
+        log(f"[CONTEXT] Update failed: {e}")
+
+
 def main():
     """Main entry point for capture hook."""
 
@@ -335,8 +362,9 @@ def main():
 
         # Get data from stdin if not provided
         stdin_file_path = None
+        session_id = None
         if not args.tool:
-            stdin_tool, stdin_output, stdin_file_path = get_tool_data_from_stdin()
+            stdin_tool, stdin_output, stdin_file_path, session_id = get_tool_data_from_stdin()
             if stdin_tool:
                 args.tool = stdin_tool
             if stdin_output:
@@ -348,9 +376,16 @@ def main():
             print(json.dumps({"continue": True}))
             return
 
+        # Get AI path
+        ai_path = get_ai_path()
+
         # Process the capture
         if args.tool and args.output:
             process_capture(args.tool, args.output, stdin_file_path)
+
+        # Update context tracking (every tool call)
+        if session_id:
+            update_context_tracking(ai_path, session_id)
 
         # Always continue (hook should not block)
         print(json.dumps({"continue": True}))

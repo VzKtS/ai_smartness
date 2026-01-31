@@ -345,3 +345,220 @@ class ThreadStorage:
                 index["threads"].remove(thread_id)
                 index["last_updated"] = datetime.now().isoformat()
                 self._write_json(index_path, index)
+
+    # =========================================================================
+    # MERGE & SPLIT (v4.3)
+    # =========================================================================
+
+    def merge(self, survivor_id: str, absorbed_id: str) -> Optional[Thread]:
+        """
+        Merge two threads into one.
+
+        The survivor thread absorbs the absorbed thread:
+        - Messages from absorbed are added to survivor (sorted by timestamp)
+        - Topics/tags are merged (union)
+        - Weight = max(both) + 0.1 boost
+        - Absorbed thread is archived with tag 'merged_into:<survivor_id>'
+
+        Args:
+            survivor_id: Thread that will remain active
+            absorbed_id: Thread to be absorbed and archived
+
+        Returns:
+            The merged survivor thread, or None if failed
+        """
+        survivor = self.get(survivor_id)
+        absorbed = self.get(absorbed_id)
+
+        if not survivor or not absorbed:
+            return None
+
+        # Check split_locked - can't merge locked threads
+        if absorbed.split_locked:
+            return None
+
+        # 1. Merge messages (sorted by timestamp)
+        all_messages = survivor.messages + absorbed.messages
+        all_messages.sort(key=lambda m: m.timestamp)
+        survivor.messages = all_messages
+
+        # 2. Merge topics and tags (union, deduplicated)
+        survivor.topics = list(set(survivor.topics + absorbed.topics))
+        survivor.tags = list(set(survivor.tags + absorbed.tags))
+
+        # 3. Merge summary
+        if absorbed.summary and survivor.summary:
+            survivor.summary = f"{survivor.summary}\n---\n{absorbed.summary}"
+        elif absorbed.summary:
+            survivor.summary = absorbed.summary
+
+        # 4. Boost weight
+        survivor.weight = min(1.0, max(survivor.weight, absorbed.weight) + 0.1)
+        survivor.last_active = datetime.now()
+        survivor.activation_count += 1
+
+        # 5. Clear embedding (needs recalculation)
+        survivor.embedding = None
+
+        # 6. Archive absorbed thread with merge tag
+        absorbed.archive()
+        absorbed.tags.append(f"merged_into:{survivor_id}")
+
+        # 7. Save both
+        self.save(survivor)
+        self.save(absorbed)
+
+        return survivor
+
+    def split(
+        self,
+        thread_id: str,
+        split_config: List[dict],
+        lock_until: str = "compaction"
+    ) -> List[Thread]:
+        """
+        Split a thread into multiple new threads.
+
+        Args:
+            thread_id: Thread to split
+            split_config: List of dicts with 'title' and 'message_ids'
+                Example: [{"title": "Topic A", "message_ids": ["msg_1", "msg_2"]}]
+            lock_until: Lock mode for new threads ("compaction"|"agent_release"|"force")
+
+        Returns:
+            List of newly created threads (empty if failed)
+        """
+        parent = self.get(thread_id)
+        if not parent:
+            return []
+
+        # Validate lock_until
+        valid_locks = {"compaction", "agent_release", "force"}
+        if lock_until not in valid_locks:
+            lock_until = "compaction"
+
+        new_threads = []
+        used_message_ids = set()
+
+        for config in split_config:
+            title = config.get("title", "Split thread")
+            message_ids = set(config.get("message_ids", []))
+            topics = config.get("topics", [])
+
+            if not message_ids:
+                continue
+
+            # Extract messages for this new thread
+            extracted_messages = []
+            for msg in parent.messages:
+                if msg.id in message_ids:
+                    extracted_messages.append(msg)
+                    used_message_ids.add(msg.id)
+
+            if not extracted_messages:
+                continue
+
+            # Create new thread
+            from ..models.thread import Thread as ThreadModel, OriginType
+            new_thread = ThreadModel.create(
+                title=title,
+                origin_type=OriginType.SPLIT,
+                parent_id=thread_id
+            )
+            new_thread.messages = extracted_messages
+            new_thread.topics = topics or parent.topics.copy()
+            new_thread.weight = parent.weight * 0.8  # Inherit reduced weight
+            new_thread.split_locked = True  # Always locked
+            new_thread.split_locked_until = lock_until
+
+            # Save new thread
+            self.save(new_thread)
+            new_threads.append(new_thread)
+
+            # Update parent's child_ids
+            parent.add_child(new_thread.id)
+
+        # Remove extracted messages from parent
+        parent.messages = [m for m in parent.messages if m.id not in used_message_ids]
+
+        # Clear parent embedding (needs recalculation)
+        parent.embedding = None
+
+        # Save parent
+        self.save(parent)
+
+        return new_threads
+
+    def unlock(self, thread_id: str) -> bool:
+        """
+        Remove split_lock from a thread.
+
+        Args:
+            thread_id: Thread to unlock
+
+        Returns:
+            True if unlocked, False if not found or not locked
+        """
+        thread = self.get(thread_id)
+        if not thread:
+            return False
+
+        if not thread.split_locked:
+            return False
+
+        thread.split_locked = False
+        thread.split_locked_until = None
+        self.save(thread)
+        return True
+
+    def unlock_compacted(self) -> int:
+        """
+        Unlock all threads with split_locked_until='compaction'.
+
+        Called after a compaction event.
+
+        Returns:
+            Number of threads unlocked
+        """
+        unlocked = 0
+
+        for thread in self.get_all():
+            if thread.split_locked and thread.split_locked_until == "compaction":
+                thread.split_locked = False
+                thread.split_locked_until = None
+                self.save(thread)
+                unlocked += 1
+
+        return unlocked
+
+    def get_split_info(self, thread_id: str) -> Optional[dict]:
+        """
+        Get thread info for split workflow (step 1).
+
+        Returns thread title and list of messages with IDs.
+
+        Args:
+            thread_id: Thread ID
+
+        Returns:
+            Dict with thread info, or None if not found
+        """
+        thread = self.get(thread_id)
+        if not thread:
+            return None
+
+        messages_info = []
+        for msg in thread.messages:
+            preview = msg.content[:80].replace('\n', ' ')
+            messages_info.append({
+                "id": msg.id,
+                "source": msg.source,
+                "preview": f"{preview}..."
+            })
+
+        return {
+            "id": thread.id,
+            "title": thread.title,
+            "message_count": len(thread.messages),
+            "messages": messages_info
+        }

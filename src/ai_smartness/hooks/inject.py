@@ -33,7 +33,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 
@@ -168,16 +168,16 @@ def sanitize_unicode(text: str) -> str:
     return text
 
 
-def get_message_from_stdin() -> str:
+def get_message_from_stdin() -> Tuple[str, Optional[str]]:
     """
-    Get user message from stdin.
+    Get user message and session_id from stdin.
 
     Claude Code sends JSON with different keys depending on context:
     - VSCode extension: {"prompt": "user message", "session_id": "...", ...}
     - CLI: {"message": "user message"}
 
     Returns:
-        User message string
+        Tuple of (message, session_id)
     """
     try:
         if not sys.stdin.isatty():
@@ -188,13 +188,14 @@ def get_message_from_stdin() -> str:
                     data = json.loads(stdin_data)
                     # VSCode uses "prompt", CLI uses "message"
                     msg = data.get('prompt') or data.get('message', '')
-                    return sanitize_unicode(msg)
+                    session_id = data.get('session_id')
+                    return sanitize_unicode(msg), session_id
                 except json.JSONDecodeError:
-                    return stdin_data  # Return raw if not JSON
+                    return stdin_data, None  # Return raw if not JSON
     except Exception:
         pass
 
-    return ''
+    return '', None
 
 
 # =============================================================================
@@ -229,12 +230,13 @@ def get_heartbeat_context(ai_path: Path) -> dict:
         return {}
 
 
-def record_heartbeat_interaction(ai_path: Path) -> None:
+def record_heartbeat_interaction(ai_path: Path, session_id: Optional[str] = None) -> None:
     """
     Record that an interaction occurred at current beat.
 
     Args:
         ai_path: Path to .ai directory
+        session_id: Current session ID from Claude Code
     """
     try:
         heartbeat_file = ai_path / "heartbeat.json"
@@ -244,6 +246,9 @@ def record_heartbeat_interaction(ai_path: Path) -> None:
         data = json.loads(heartbeat_file.read_text(encoding='utf-8'))
         data["last_interaction_at"] = datetime.now().isoformat()
         data["last_interaction_beat"] = data.get("beat", 0)
+
+        if session_id:
+            data["last_session_id"] = session_id
 
         heartbeat_file.write_text(
             json.dumps(data, indent=2),
@@ -689,6 +694,214 @@ def get_memory_context(message: str, db_path: Path) -> str:
 
 
 # =============================================================================
+# NEW SESSION CONTEXT (v4.2)
+# =============================================================================
+
+def get_hot_thread(ai_path: Path) -> Optional[dict]:
+    """
+    Get last active thread (hot thread) from heartbeat.
+
+    Args:
+        ai_path: Path to .ai directory
+
+    Returns:
+        Thread data dict if found, None otherwise
+    """
+    try:
+        heartbeat_file = ai_path / "heartbeat.json"
+        if not heartbeat_file.exists():
+            return None
+
+        data = json.loads(heartbeat_file.read_text(encoding='utf-8'))
+        last_thread_id = data.get("last_thread_id")
+
+        if not last_thread_id:
+            return None
+
+        thread_path = ai_path / "db" / "threads" / f"{last_thread_id}.json"
+        if thread_path.exists():
+            return json.loads(thread_path.read_text(encoding='utf-8'))
+
+    except Exception:
+        pass
+
+    return None
+
+
+def suggest_recall(user_message: str, ai_path: Path) -> Optional[str]:
+    """
+    Suggest recall if user message matches known topics.
+
+    Args:
+        user_message: User's message
+        ai_path: Path to .ai directory
+
+    Returns:
+        Topic string to suggest, or None
+    """
+    try:
+        words = set(user_message.lower().split())
+        threads_dir = ai_path / "db" / "threads"
+
+        if not threads_dir.exists():
+            return None
+
+        matching_topics = []
+
+        for tf in list(threads_dir.glob("*.json"))[:50]:  # Limit for performance
+            try:
+                thread = json.loads(tf.read_text(encoding='utf-8'))
+                topics = [t.lower() for t in thread.get("topics", [])]
+                matches = words & set(topics)
+                matching_topics.extend(matches)
+            except Exception:
+                pass
+
+        if matching_topics:
+            # Return the most frequent match
+            return max(set(matching_topics), key=matching_topics.count)
+
+    except Exception:
+        pass
+
+    return None
+
+
+def format_elapsed(delta: timedelta) -> str:
+    """
+    Format timedelta to human readable string.
+
+    Args:
+        delta: Time difference
+
+    Returns:
+        Human readable string (e.g., "2h 15min")
+    """
+    secs = delta.total_seconds()
+
+    if secs < 60:
+        return "quelques secondes"
+    elif secs < 3600:
+        return f"{int(secs // 60)}min"
+    elif secs < 86400:
+        hours = int(secs // 3600)
+        minutes = int((secs % 3600) // 60)
+        return f"{hours}h {minutes}min"
+    else:
+        days = int(secs // 86400)
+        return f"{days} jour(s)"
+
+
+def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -> Optional[str]:
+    """
+    Get unified new session context for injection.
+
+    Only returns context if this is a new session (session_id changed).
+    Includes: capabilities, session info, hot thread, recall suggestion.
+
+    Args:
+        session_id: Current session ID from Claude Code
+        user_message: User's first message
+        ai_path: Path to .ai directory
+
+    Returns:
+        New session context string, or None if same session
+    """
+    try:
+        # Import session detection from heartbeat
+        package_root = get_package_root()
+        sys.path.insert(0, str(package_root.parent))
+
+        from ai_smartness.storage.heartbeat import is_new_session, get_time_since_last, get_context_info
+
+        if not session_id or not is_new_session(session_id, ai_path):
+            return None
+
+        lines = ["🧠 AI SMARTNESS", ""]
+
+        # 0. Context window info (if available)
+        ctx_info = get_context_info(ai_path)
+        if ctx_info and ctx_info.get("percent", 0) > 0:
+            pct = ctx_info["percent"]
+            threshold = ctx_info.get("compact_threshold", 95)
+            lines.append(f"Contexte: {pct}% utilisé (auto-compact à {threshold}%)")
+            lines.append("")
+
+        # 1. Capabilities (exhaustive)
+        lines.extend([
+            "Capabilities:",
+            "",
+            "📖 RECALL - Recherche sémantique dans ta mémoire:",
+            "  Read(\".ai/recall/<query>\")     - Recherche par mot-clé/sujet",
+            "  Read(\".ai/recall/thread_xxx\")  - Rappel d'un thread spécifique",
+            "  Exemples: .ai/recall/solana, .ai/recall/hooks, .ai/recall/authentication",
+            "",
+            "🔀 MERGE - Fusionner 2 threads (libère du contexte):",
+            "  Read(\".ai/merge/<survivor_id>/<absorbed_id>\")",
+            "  → Le survivor absorbe les messages, topics, tags du absorbed",
+            "  → Le absorbed est archivé avec tag 'merged_into:survivor_id'",
+            "  → Note: threads split_locked ne peuvent pas être absorbés",
+            "",
+            "✂️ SPLIT - Séparer un thread qui a drifté (workflow 2 étapes):",
+            "  Étape 1: Read(\".ai/split/<thread_id>\")  → Liste les messages avec IDs",
+            "  Étape 2: Read(\".ai/split/<id>/confirm?titles=T1,T2&msgs_0=m1,m2&msgs_1=m3,m4&lock=compaction\")",
+            "  → Les nouveaux threads sont split_locked (protection anti-merge auto)",
+            "  → lock: compaction (défaut) | agent_release | force",
+            "",
+            "🔓 UNLOCK - Déverrouiller un thread split_locked:",
+            "  Read(\".ai/unlock/<thread_id>\")",
+            "  → Permet le merge après un split intentionnel",
+            "",
+            "❓ HELP - Rappel de toutes les capabilities:",
+            "  Read(\".ai/help\")  → Documentation complète à tout moment",
+            "",
+            "⚙️ AUTO: Contexte injecté selon pertinence, threads persistés entre sessions",
+            ""
+        ])
+
+        # 2. Session info
+        time_elapsed = get_time_since_last(ai_path)
+        if time_elapsed:
+            lines.append(f"Session: Nouvelle ({format_elapsed(time_elapsed)} depuis dernière interaction)")
+        else:
+            lines.append("Session: Première utilisation")
+
+        # 3. Hot thread (if exists)
+        hot_thread = get_hot_thread(ai_path)
+        if hot_thread:
+            title = hot_thread.get("title", "Sans titre")[:50]
+            topics = ", ".join(hot_thread.get("topics", [])[:4])
+            summary = hot_thread.get("summary", "")[:100]
+
+            lines.append(f"Hot thread: \"{title}\"")
+            if topics:
+                lines.append(f"Topics: {topics}")
+            if summary:
+                lines.append(f"Résumé: {summary}")
+
+        lines.append("")
+
+        # 4. Recall suggestion (if message matches known topic)
+        if user_message:
+            topic = suggest_recall(user_message, ai_path)
+            if topic:
+                lines.extend([
+                    f"💡 Ton message mentionne \"{topic}\" - mémoire disponible:",
+                    f"→ Read(\".ai/recall/{topic}\")"
+                ])
+
+        log(f"[NEW_SESSION] Injecting new session context for session_id={session_id[:8]}...")
+        return "\n".join(lines)
+
+    except ImportError as e:
+        log(f"[NEW_SESSION] Import error: {e}")
+        return None
+    except Exception as e:
+        log(f"[NEW_SESSION] Error: {e}")
+        return None
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -698,15 +911,15 @@ def main():
     # ANTI-AUTOHOOK GUARD
     if not check_hook_guard():
         # Already in a hook, pass through unchanged
-        message = get_message_from_stdin()
+        message, _ = get_message_from_stdin()
         print(message)  # Raw text output
         return
 
     set_hook_guard()
 
     try:
-        # Get user message
-        message = get_message_from_stdin()
+        # Get user message AND session_id (v4.2)
+        message, session_id = get_message_from_stdin()
 
         if not message:
             # No message, pass through unchanged
@@ -767,6 +980,12 @@ def main():
         # Combine injections
         injections = []
 
+        # NEW SESSION CONTEXT (v4.2) - Inject first if new session
+        if session_id:
+            new_session_ctx = get_new_session_context(session_id, message, ai_path)
+            if new_session_ctx:
+                injections.append(f"<system-reminder>\n{new_session_ctx}\n</system-reminder>")
+
         if memory_context:
             injections.append(f"<system-reminder>\n{memory_context}\n</system-reminder>")
 
@@ -786,8 +1005,8 @@ def main():
             # No injection needed
             print(message)  # Raw text output
 
-        # Record this interaction for heartbeat (v4.1)
-        record_heartbeat_interaction(ai_path)
+        # Record this interaction for heartbeat (v4.1/v4.2 with session_id)
+        record_heartbeat_interaction(ai_path, session_id=session_id)
 
     except Exception as e:
         # Log error but don't crash - pass through original
