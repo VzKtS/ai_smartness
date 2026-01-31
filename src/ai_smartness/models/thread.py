@@ -8,7 +8,7 @@ Threads can be active, suspended, or archived.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import ClassVar, Dict, List, Optional
 import uuid
 
 
@@ -86,13 +86,13 @@ class Thread:
     - suspended threads can be reactivated when relevant
     - threads are NEVER deleted (unlike bridges)
     """
-    # Decay constants (class-level)
-    HALF_LIFE_DAYS: float = 7.0       # Weight halves every 7 days without use
-    SUSPEND_THRESHOLD: float = 0.1    # Auto-suspend below this weight
-    USE_BOOST: float = 0.1            # Weight boost per activation
+    # Decay constants (class-level, not instance fields)
+    HALF_LIFE_DAYS: ClassVar[float] = 7.0       # Weight halves every 7 days without use
+    SUSPEND_THRESHOLD: ClassVar[float] = 0.1    # Auto-suspend below this weight
+    USE_BOOST: ClassVar[float] = 0.1            # Weight boost per activation
 
-    # Mode quotas (class-level)
-    MODE_QUOTAS = {
+    # Mode quotas (class-level, not instance fields)
+    MODE_QUOTAS: ClassVar[Dict[str, int]] = {
         "light": 15,
         "normal": 50,
         "heavy": 100,

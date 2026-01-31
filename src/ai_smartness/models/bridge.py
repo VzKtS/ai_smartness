@@ -11,7 +11,7 @@ ThinkBridges are created by LLM reasoning and propagate via gossip pattern.
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import ClassVar, List, Optional
 import uuid
 
 
@@ -46,10 +46,10 @@ class ThinkBridge:
     - usage reinforces weight (Hebbian learning)
     - bridge dies when weight < DEATH_THRESHOLD
     """
-    # Decay constants (class-level)
-    HALF_LIFE_DAYS: float = 3.0      # Weight halves every 3 days without use
-    DEATH_THRESHOLD: float = 0.05    # Bridge dies below this weight
-    USE_BOOST: float = 0.1           # Weight boost per use
+    # Decay constants (class-level, not instance fields)
+    HALF_LIFE_DAYS: ClassVar[float] = 3.0      # Weight halves every 3 days without use
+    DEATH_THRESHOLD: ClassVar[float] = 0.05    # Bridge dies below this weight
+    USE_BOOST: ClassVar[float] = 0.1           # Weight boost per use
 
     id: str
     source_id: str

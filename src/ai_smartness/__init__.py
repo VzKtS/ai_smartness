@@ -18,7 +18,7 @@ Usage:
     gossip = GossipPropagator(storage)
 """
 
-__version__ = "3.0.4"
+__version__ = "3.0.5"
 __author__ = "AI Smartness Team"
 
 # Models
