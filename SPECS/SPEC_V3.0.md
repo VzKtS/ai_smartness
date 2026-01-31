@@ -19,7 +19,7 @@
 
 ### 1.1 Objectif
 
-AI Smartness v2 est une **couche de méta-cognition** pour agents LLM qui fournit :
+AI Smartness est une **couche de méta-cognition** pour agents LLM qui fournit :
 - **Mémoire persistante** : Reprendre un projet après des semaines comme si l'utilisateur était parti boire un café
 - **Cohérence sémantique** : Naviguer dans des projets complexes sans drift ni hallucinations
 - **Relations automatiques** : Découverte et propagation de liens entre sujets (gossip)
@@ -626,7 +626,7 @@ def _prune_timer_loop(self):
 
 ### 7.5 Anti-Loop Guard
 
-Variable d'environnement `AI_SMARTNESS_V2_HOOK_RUNNING=1` :
+Variable d'environnement `AI_SMARTNESS_HOOK_RUNNING=1` :
 - Définie pendant les appels LLM internes
 - Empêche les hooks de se déclencher sur les extractions
 

@@ -307,7 +307,7 @@ class LLMExtractor:
         Falls back to default model if specified model not found.
         Falls back to heuristic extraction if CLI not available.
 
-        CRITICAL: Sets AI_SMARTNESS_V2_HOOK_RUNNING env var to prevent
+        CRITICAL: Sets AI_SMARTNESS_HOOK_RUNNING env var to prevent
         infinite loop when claude CLI triggers UserPromptSubmit hooks.
         """
         import logging
@@ -317,7 +317,7 @@ class LLMExtractor:
         # CRITICAL: Propagate hook guard to subprocess to prevent infinite loop
         # Without this, claude --print triggers hooks which call the extractor again
         env = os.environ.copy()
-        env["AI_SMARTNESS_V2_HOOK_RUNNING"] = "1"
+        env["AI_SMARTNESS_HOOK_RUNNING"] = "1"
 
         try:
             # Build command - include model if specified

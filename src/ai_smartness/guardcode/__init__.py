@@ -1,4 +1,4 @@
-"""GuardCode layer for AI Smartness v2."""
+"""GuardCode layer for AI Smartness."""
 
 from .enforcer import (
     GuardCodeEnforcer,

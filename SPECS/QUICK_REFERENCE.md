@@ -123,7 +123,7 @@ CONTEXT_TOOLS = {"Glob", "Grep"}
 
 ```python
 # Set pendant appels LLM internes
-os.environ["AI_SMARTNESS_V2_HOOK_RUNNING"] = "1"
+os.environ["AI_SMARTNESS_HOOK_RUNNING"] = "1"
 ```
 
 ## Bridge Weight Decay (Pruning Synaptique)

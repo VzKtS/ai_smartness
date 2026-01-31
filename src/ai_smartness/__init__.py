@@ -1,5 +1,5 @@
 """
-AI Smartness v2 - Meta-cognition layer for LLM agents.
+AI Smartness - Meta-cognition layer for LLM agents.
 
 Architecture:
 - Thread: Work unit (topic/subject)

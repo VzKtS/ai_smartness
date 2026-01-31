@@ -1,4 +1,4 @@
-# AI Smartness v2
+# AI Smartness
 
 **Meta-cognition layer for Claude Code agents.**
 
@@ -10,7 +10,7 @@ Compatible with VS Code & Claude Code CLI.
 
 ## Vision
 
-AI Smartness v2 is a **neural-inspired working memory**:
+AI Smartness v3 is a **neural-inspired working memory**:
 
 - **Threads** = Neurons (active reasoning streams)
 - **ThinkBridges** = Synapses (semantic connections between threads)
@@ -259,4 +259,4 @@ MIT
 
 ---
 
-**Note**: AI Smartness v2 is a complete rewrite focused on simplicity. The neural network metaphor is operational, not a strict neural implementation.
+**Note**: AI Smartness v3 is a complete rewrite focused on simplicity. The neural network metaphor is operational, not a strict neural implementation.

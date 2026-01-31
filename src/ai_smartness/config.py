@@ -1,5 +1,5 @@
 """
-Configuration for AI Smartness v2.
+Configuration for AI Smartness.
 
 Handles loading/saving config and provides typed access to settings.
 """
@@ -34,7 +34,7 @@ DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 @dataclass
 class Config:
     """
-    AI Smartness v2 configuration.
+    AI Smartness configuration.
 
     Loaded from .ai/config.json, provides typed access.
     """

@@ -1,4 +1,4 @@
-"""Data models for AI Smartness v2."""
+"""Data models for AI Smartness."""
 
 from .thread import Thread, Message, ThreadStatus
 from .bridge import ThinkBridge, BridgeType

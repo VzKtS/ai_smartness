@@ -12,7 +12,7 @@ Compatible with VS Code & Claude Code CLI.
 
 ## Vision
 
-AI Smartness v2 is a **neural-inspired working memory**:
+AI Smartness is a **neural-inspired working memory**:
 
 - **Threads** = Neurons (active reasoning streams)
 - **ThinkBridges** = Synapses (semantic connections between threads)
@@ -375,4 +375,4 @@ MIT
 
 ---
 
-**Note**: AI Smartness v2 is designed to be invisible. The best indication it's working is that your agent "remembers" context across sessions without you doing anything special.
+**Note**: AI Smartness is designed to be invisible. The best indication it's working is that your agent "remembers" context across sessions without you doing anything special.

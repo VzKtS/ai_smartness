@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI Smartness v2 CLI - Main entry point.
+AI Smartness CLI - Main entry point.
 
 Usage:
     ai status              Show memory status
@@ -39,7 +39,7 @@ def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         prog="ai",
-        description="AI Smartness v2 - Memory visualization and management"
+        description="AI Smartness - Memory visualization and management"
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")

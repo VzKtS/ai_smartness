@@ -1,4 +1,4 @@
-"""Intelligence layer for AI Smartness v2."""
+"""Intelligence layer for AI Smartness."""
 
 from .thread_manager import ThreadManager, ThreadAction, ThreadDecision
 from .gossip import GossipPropagator, BridgeProposal

@@ -12,7 +12,7 @@ Compatible con VS Code & Claude Code CLI.
 
 ## Visión
 
-AI Smartness v2 es una **memoria de trabajo inspirada en redes neuronales**:
+AI Smartness es una **memoria de trabajo inspirada en redes neuronales**:
 
 - **Threads** = Neuronas (flujos de razonamiento activos)
 - **ThinkBridges** = Sinapsis (conexiones semánticas entre threads)
@@ -302,4 +302,4 @@ MIT
 
 ---
 
-**Nota**: AI Smartness v2 está diseñado para ser invisible. La mejor indicación de que funciona es que tu agente "recuerda" el contexto entre sesiones sin que hagas nada especial.
+**Nota**: AI Smartness está diseñado para ser invisible. La mejor indicación de que funciona es que tu agente "recuerda" el contexto entre sesiones sin que hagas nada especial.

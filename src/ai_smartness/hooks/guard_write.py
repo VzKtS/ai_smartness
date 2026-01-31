@@ -23,7 +23,7 @@ from typing import Optional
 # ANTI-AUTOHOOK GUARD
 # =============================================================================
 
-HOOK_GUARD_ENV = "AI_SMARTNESS_V2_HOOK_RUNNING"
+HOOK_GUARD_ENV = "AI_SMARTNESS_HOOK_RUNNING"
 
 
 def check_hook_guard() -> bool:

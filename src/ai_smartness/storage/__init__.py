@@ -1,4 +1,4 @@
-"""Storage layer for AI Smartness v2."""
+"""Storage layer for AI Smartness."""
 
 from .manager import StorageManager
 from .threads import ThreadStorage

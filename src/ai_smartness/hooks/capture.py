@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Capture hook for AI Smartness v2.
+Capture hook for AI Smartness.
 
 Called by PostToolUse to capture tool results.
 Includes anti-autohook guard to prevent infinite loops.
@@ -23,7 +23,7 @@ from typing import Tuple, Optional
 # ANTI-AUTOHOOK GUARD
 # =============================================================================
 
-HOOK_GUARD_ENV = "AI_SMARTNESS_V2_HOOK_RUNNING"
+HOOK_GUARD_ENV = "AI_SMARTNESS_HOOK_RUNNING"
 
 
 def check_hook_guard() -> bool:

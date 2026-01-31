@@ -1,5 +1,5 @@
 """
-CLI Package for AI Smartness v2.
+CLI Package for AI Smartness.
 
 Provides command-line interface for viewing and managing memory.
 """

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Processor Daemon - Background thread processing for AI Smartness v2.
+Processor Daemon - Background thread processing for AI Smartness.
 
 This daemon:
 1. Loads heavy modules once at startup

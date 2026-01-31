@@ -1,5 +1,5 @@
 """
-Daemon module for AI Smartness v2.
+Daemon module for AI Smartness.
 
 Provides a persistent background processor for thread management.
 Uses Unix socket for fast, lightweight communication from hooks.

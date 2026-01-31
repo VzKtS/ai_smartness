@@ -1,5 +1,5 @@
 """
-Thread model - Core entity for AI Smartness v2.
+Thread model - Core entity for AI Smartness.
 
 A Thread represents a work stream (subject/topic), not a temporal session.
 Threads can be active, suspended, or archived.

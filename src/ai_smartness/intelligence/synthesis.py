@@ -223,7 +223,7 @@ Formato JSON:
 
             # CRITICAL: Set guard to prevent hook loops
             env = os.environ.copy()
-            env["AI_SMARTNESS_V2_HOOK_RUNNING"] = "1"
+            env["AI_SMARTNESS_HOOK_RUNNING"] = "1"
 
             result = subprocess.run(
                 cmd,

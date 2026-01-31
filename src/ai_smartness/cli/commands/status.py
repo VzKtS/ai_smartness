@@ -77,7 +77,7 @@ def run_status(ai_path: Path) -> int:
     width = 48
     print()
     print("+" + "-" * (width - 2) + "+")
-    print(f"| {'AI Smartness v2 - Memory Status':^{width-4}} |")
+    print(f"| {'AI Smartness - Memory Status':^{width-4}} |")
     print("+" + "-" * (width - 2) + "+")
     print(f"| Project: {project_name:<{width-13}} |")
     print(f"| Mode:    {thread_mode:<{width-13}} |")

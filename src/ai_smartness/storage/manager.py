@@ -1,5 +1,5 @@
 """
-StorageManager - Central storage coordinator for AI Smartness v2.
+StorageManager - Central storage coordinator for AI Smartness.
 
 Manages the database structure and provides access to specialized storage classes.
 """

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compact hook for AI Smartness v2.
+Compact hook for AI Smartness.
 
 Called by PreCompact when context reaches 95% capacity.
 Triggers synthesis generation and saves session state.
@@ -28,7 +28,7 @@ from typing import Optional
 # ANTI-AUTOHOOK GUARD
 # =============================================================================
 
-HOOK_GUARD_ENV = "AI_SMARTNESS_V2_HOOK_RUNNING"
+HOOK_GUARD_ENV = "AI_SMARTNESS_HOOK_RUNNING"
 
 
 def check_hook_guard() -> bool:
@@ -295,7 +295,7 @@ def call_llm_synthesis(prompt: str, config: dict) -> Optional[str]:
 
         # CRITICAL: Set guard to prevent hook loops
         env = os.environ.copy()
-        env["AI_SMARTNESS_V2_HOOK_RUNNING"] = "1"
+        env["AI_SMARTNESS_HOOK_RUNNING"] = "1"
 
         result = subprocess.run(
             cmd,
