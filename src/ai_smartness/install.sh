@@ -247,12 +247,26 @@ if [ -d "$LEGACY_DIR" ]; then
 
         if [ "$THREAD_COUNT" -gt 0 ] || [ "$BRIDGE_COUNT" -gt 0 ]; then
             echo "   📊 Legacy data found: Threads: $THREAD_COUNT, Bridges: $BRIDGE_COUNT"
-            KEEP_DATA="yes"
-            # Backup legacy data
-            BACKUP_DIR="/tmp/ai_smartness_migration_$$"
-            cp -r "$LEGACY_DIR/.ai" "$BACKUP_DIR"
-            echo "   ✓ Legacy data backed up for migration"
+            read -p "   ${MSG_KEEP_DB[$LANG]}" -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[KkCcGg]$ ]]; then
+                KEEP_DATA="yes"
+                # Backup legacy data
+                BACKUP_DIR="/tmp/ai_smartness_migration_$$"
+                cp -r "$LEGACY_DIR/.ai" "$BACKUP_DIR"
+                echo "   ✓ Legacy data backed up for migration"
+            else
+                echo "   ✓ Legacy data will be reset"
+            fi
         fi
+    fi
+
+    # Ask for confirmation before migration
+    read -p "   ${MSG_CONTINUE[$LANG]}" -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[YyOoSs]$ ]]; then
+        echo "Cancelled."
+        exit 0
     fi
 
     # Remove legacy installation
