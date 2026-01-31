@@ -827,33 +827,28 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
             lines.append(f"Contexte: {pct}% utilisé (auto-compact à {threshold}%)")
             lines.append("")
 
-        # 1. Capabilities (exhaustive)
+        # 1. Capabilities - MCP Tools (v4.4)
         lines.extend([
-            "Capabilities:",
+            "MCP Tools disponibles:",
             "",
-            "📖 RECALL - Recherche sémantique dans ta mémoire:",
-            "  Read(\".ai/recall/<query>\")     - Recherche par mot-clé/sujet",
-            "  Read(\".ai/recall/thread_xxx\")  - Rappel d'un thread spécifique",
-            "  Exemples: .ai/recall/solana, .ai/recall/hooks, .ai/recall/authentication",
+            "📖 ai_recall(query) - Recherche sémantique dans ta mémoire",
+            "   Exemples: ai_recall('solana'), ai_recall('hooks'), ai_recall('authentication')",
             "",
-            "🔀 MERGE - Fusionner 2 threads (libère du contexte):",
-            "  Read(\".ai/merge/<survivor_id>/<absorbed_id>\")",
-            "  → Le survivor absorbe les messages, topics, tags du absorbed",
-            "  → Le absorbed est archivé avec tag 'merged_into:survivor_id'",
-            "  → Note: threads split_locked ne peuvent pas être absorbés",
+            "🔀 ai_merge(survivor_id, absorbed_id) - Fusionner 2 threads",
+            "   → Le survivor absorbe messages, topics, tags du absorbed",
+            "   → Le absorbed est archivé avec tag 'merged_into:survivor_id'",
+            "   → Note: threads split_locked ne peuvent pas être absorbés",
             "",
-            "✂️ SPLIT - Séparer un thread qui a drifté (workflow 2 étapes):",
-            "  Étape 1: Read(\".ai/split/<thread_id>\")  → Liste les messages avec IDs",
-            "  Étape 2: Read(\".ai/split/<id>/confirm?titles=T1,T2&msgs_0=m1,m2&msgs_1=m3,m4&lock=compaction\")",
-            "  → Les nouveaux threads sont split_locked (protection anti-merge auto)",
-            "  → lock: compaction (défaut) | agent_release | force",
+            "✂️ ai_split(thread_id, ...) - Séparer un thread qui a drifté",
+            "   Étape 1: ai_split(thread_id) → Liste les messages avec IDs",
+            "   Étape 2: ai_split(thread_id, confirm=True, titles=[...], message_groups=[[...]])",
+            "   → lock_mode: 'compaction' (défaut) | 'agent_release' | 'force'",
             "",
-            "🔓 UNLOCK - Déverrouiller un thread split_locked:",
-            "  Read(\".ai/unlock/<thread_id>\")",
-            "  → Permet le merge après un split intentionnel",
+            "🔓 ai_unlock(thread_id) - Déverrouiller un thread split_locked",
             "",
-            "❓ HELP - Rappel de toutes les capabilities:",
-            "  Read(\".ai/help\")  → Documentation complète à tout moment",
+            "❓ ai_help() - Documentation complète à tout moment",
+            "",
+            "📊 ai_status() - Status mémoire (threads, bridges, contexte)",
             "",
             "⚙️ AUTO: Contexte injecté selon pertinence, threads persistés entre sessions",
             ""
@@ -887,7 +882,7 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
             if topic:
                 lines.extend([
                     f"💡 Ton message mentionne \"{topic}\" - mémoire disponible:",
-                    f"→ Read(\".ai/recall/{topic}\")"
+                    f"→ ai_recall('{topic}')"
                 ])
 
         log(f"[NEW_SESSION] Injecting new session context for session_id={session_id[:8]}...")

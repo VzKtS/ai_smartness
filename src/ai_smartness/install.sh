@@ -75,9 +75,9 @@ export AI_SMARTNESS_LANG="$LANG"
 
 # Localized messages
 declare -A MSG_BANNER_TITLE=(
-    ["en"]="AI Smartness v4.0"
-    ["fr"]="AI Smartness v4.0"
-    ["es"]="AI Smartness v4.0"
+    ["en"]="AI Smartness v4.4"
+    ["fr"]="AI Smartness v4.4"
+    ["es"]="AI Smartness v4.4"
 )
 declare -A MSG_BANNER_SUB=(
     ["en"]="Persistent Memory for Claude Agents"
@@ -385,6 +385,26 @@ else
 fi
 
 # ============================================================================
+# INSTALL MCP PACKAGE
+# ============================================================================
+
+echo "🔌 Checking MCP package..."
+
+if python3 -c "import mcp" 2>/dev/null; then
+    echo "   ✓ mcp already installed"
+else
+    echo "   📦 Installing mcp (required for AI Smartness tools)..."
+    if pip3 install --user mcp --quiet 2>/dev/null; then
+        echo "   ✓ mcp installed successfully"
+    elif pip install --user mcp --quiet 2>/dev/null; then
+        echo "   ✓ mcp installed successfully"
+    else
+        echo "   ⚠️  Could not install mcp automatically"
+        echo "   Please install manually: pip install mcp"
+    fi
+fi
+
+# ============================================================================
 # INSTALL SENTENCE-TRANSFORMERS
 # ============================================================================
 
@@ -598,8 +618,21 @@ for hook_type, hook_list in ai_hooks.items():
         settings['hooks'][hook_type] = []
     settings['hooks'][hook_type].extend(hook_list)
 
+# MCP Server configuration (v4.4)
+if 'mcpServers' not in settings:
+    settings['mcpServers'] = {}
+
+settings['mcpServers']['ai-smartness'] = {
+    "command": "python3",
+    "args": [f"{ai_path}/mcp/server.py"],
+    "env": {
+        "PYTHONPATH": str(Path(ai_path).parent)
+    }
+}
+
 settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
 print("   ✓ Hooks configured (PreToolUse, UserPromptSubmit, PostToolUse, PreCompact)")
+print("   ✓ MCP server configured (ai-smartness)")
 print(f"   ✓ Using absolute path: {ai_path}")
 EOF
 
@@ -613,7 +646,6 @@ GITIGNORE="$TARGET_DIR/.gitignore"
 GITIGNORE_ENTRIES="
 # AI Smartness
 ai_smartness/
-.ai/
 "
 
 if [ -f "$GITIGNORE" ]; then
@@ -646,25 +678,6 @@ else
     echo "$CLAUDEIGNORE_ENTRIES" > "$CLAUDEIGNORE"
 fi
 echo "   ✓ .claudeignore configured"
-
-# ============================================================================
-# CREATE .ai SYMLINK AT PROJECT ROOT
-# ============================================================================
-
-echo "🔗 Creating .ai symlink..."
-
-# Remove existing symlink or directory if present
-if [ -L "$TARGET_DIR/.ai" ]; then
-    rm -f "$TARGET_DIR/.ai"
-elif [ -d "$TARGET_DIR/.ai" ]; then
-    echo "   ⚠️  .ai directory exists at project root, skipping symlink"
-fi
-
-# Create symlink from project root to ai_smartness/.ai
-if [ ! -e "$TARGET_DIR/.ai" ]; then
-    ln -sf "$AI_SMARTNESS_DIR/.ai" "$TARGET_DIR/.ai"
-    echo "   ✓ Symlink created: $TARGET_DIR/.ai -> ai_smartness/.ai"
-fi
 
 # ============================================================================
 # INSTALL CLI
@@ -830,7 +843,13 @@ echo "   ai daemon      - Daemon control (start/stop/status)"
 echo "   ai mode        - View/change mode (light/normal/heavy/max)"
 echo "   ai help        - Show help"
 echo ""
-echo "💡 v4.0.0: Agent can use Read('.ai/recall/<query>') for memory!"
+echo "🔧 MCP Tools (v4.4):"
+echo "   ai_recall(query)     - Semantic memory search"
+echo "   ai_merge(s, a)       - Merge threads"
+echo "   ai_split(id)         - Split thread"
+echo "   ai_unlock(id)        - Unlock thread"
+echo "   ai_help()            - Documentation"
+echo "   ai_status()          - Memory status"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""

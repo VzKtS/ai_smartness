@@ -33,13 +33,13 @@ The system maintains a **thought network** where concepts remain connected and a
 
 ---
 
-## Key Features v4.3
+## Key Features v4.4
 
 | Feature | Description |
 |---------|-------------|
 | **Threads** | Semantic work units with auto-generated titles |
 | **ThinkBridges** | Automatic connections between related threads |
-| **Active Recall** | `Read(".ai/recall/<query>")` - on-demand memory |
+| **MCP Tools** | Native agent tools: `ai_recall()`, `ai_merge()`, `ai_split()` |
 | **Merge/Split** | Agent-controlled memory topology |
 | **Context Tracking** | Real-time context % with adaptive throttle |
 | **New Session Context** | Automatic orientation on session start |
@@ -52,45 +52,92 @@ The system maintains a **thought network** where concepts remain connected and a
 
 ---
 
-## Agent Commands (v4.3)
+## Agent MCP Tools (v4.4)
 
-Your agent can manage its own memory:
+Your agent has access to native MCP tools:
 
+### Memory Recall
 ```
-Read(".ai/help")                              # Self-documentation
-Read(".ai/recall/<query>")                    # Search memory
-Read(".ai/merge/<survivor>/<absorbed>")       # Merge threads
-Read(".ai/split/<thread_id>")                 # Get split info
-Read(".ai/split/<id>/confirm?...")            # Execute split
-Read(".ai/unlock/<thread_id>")                # Unlock thread
+ai_recall(query="authentication")   # Search by keyword/topic
+ai_recall(query="thread_xxx")       # Recall specific thread
+```
+
+### Thread Management
+```
+ai_merge(survivor_id="t1", absorbed_id="t2")   # Merge two threads
+ai_split(thread_id="t1")                        # Get split info (step 1)
+ai_split(thread_id="t1", confirm=True, ...)    # Execute split (step 2)
+ai_unlock(thread_id="t1")                       # Unlock split-locked thread
+```
+
+### Status & Help
+```
+ai_help()     # Agent self-documentation
+ai_status()   # Memory status (threads, bridges, context %)
 ```
 
 ---
 
 ## Installation
 
+**Platform:** Linux / macOS / Windows (via WSL only)
+
+> Hooks require absolute Unix paths. Windows native paths are not supported.
+
+### Prerequisites (Recommended)
+
+**sentence-transformers** requires PyTorch. We recommend installing **before** running the install script to choose your variant:
+
 ```bash
-# Clone or copy ai_smartness-DEV to your machine
-# Then run install in your target project:
+# CPU only (lighter)
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install sentence-transformers
+
+# OR with CUDA (faster with NVIDIA GPU)
+pip install torch && pip install sentence-transformers
+```
+
+### Run Installer
+
+```bash
 /path/to/ai_smartness-DEV/install.sh /path/to/your/project
 ```
 
 ### What the Installer Does
 
-1. **Language selection**: English, French, or Spanish
-2. **Mode selection**: Heavy, Normal, or Light
-3. **Installs sentence-transformers** (if needed)
-4. **Detects Claude CLI** path
-5. **Copies files** to `your_project/ai_smartness/`
-6. **Configures hooks** with absolute paths
-7. **Initializes database**
-8. **Installs CLI** to `~/.local/bin/ai`
+| Step | Action |
+|------|--------|
+| 1 | **Language selection** (en/fr/es) |
+| 2 | **Mode selection** (MAX/Heavy/Normal/Light → thread limits) |
+| 3 | **Migration** from legacy `ai_smartness_v2` if present |
+| 4 | **Copy files** to `project/ai_smartness/` |
+| 5 | **Initialize database** (threads, bridges, synthesis dirs) |
+| 6 | **Initialize heartbeat.json** (session tracking) |
+| 7 | **Check sentence-transformers** (auto-install if missing) |
+| 8 | **Detect Claude CLI** path |
+| 9 | **Create config.json** |
+| 10 | **Configure hooks** (4 hooks with absolute paths) |
+| 11 | **Configure MCP server** (ai-smartness MCP tools) |
+| 12 | **Configure .gitignore/.claudeignore** |
+| 13 | **Install CLI** to `~/.local/bin/ai` |
+| 14 | **Start daemon** (background processor) |
+
+### The Daemon
+
+A background daemon handles:
+- Asynchronous capture processing
+- LLM extraction for thread decisions
+- Auto-pruning every 5 minutes
+
+```bash
+ai daemon status/start/stop
+```
 
 ### Requirements
 
 - Python 3.10+
 - Claude Code (CLI or VS Code extension)
-- pip (for automatic sentence-transformers install)
+- sentence-transformers (auto-installed or pre-installed)
 
 ---
 
@@ -152,9 +199,9 @@ Claude: [Shows memory status]
 - **FORK**: Sub-topic
 - **REACTIVATE**: Old topic returns (similarity > 0.50)
 
-### 3. Active Recall (v4.0)
+### 3. Active Recall (v4.4)
 ```
-Read(".ai/recall/authentication")
+ai_recall(query="authentication")
 → Returns threads, summaries, bridges
 ```
 
@@ -242,8 +289,8 @@ ai daemon start
 
 ### Agent doesn't use recall
 Normal for new agents. They need to discover tools:
-1. Mention `.ai/recall` exists
-2. Point to `.ai/help`
+1. Mention `ai_recall()` exists
+2. Point to `ai_help()`
 3. Trust the learning process
 
 ### Low similarity scores

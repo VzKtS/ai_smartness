@@ -1,20 +1,81 @@
-# AI Smartness v3 - Guide Utilisateur
+# AI Smartness v4 - Guide Utilisateur
 
 ## Démarrage Rapide
 
-1. **Installez** dans votre projet :
-   ```bash
-   /chemin/vers/ai_smartness-DEV/install.sh /chemin/vers/votre/projet
-   ```
+**Plateforme :** Linux / macOS / Windows (WSL requis)
 
-2. **Travaillez normalement** - le système capture tout automatiquement
+> Le système de hooks nécessite des chemins Unix absolus. Sur Windows, utilisez WSL (Windows Subsystem for Linux).
 
-3. **Vérifiez le status** à tout moment :
-   ```bash
-   ai status
-   ```
+### 1. Pré-installer les Dépendances (Recommandé)
+
+sentence-transformers nécessite PyTorch. Installez **avant** le script d'installation pour choisir CPU ou GPU :
+
+```bash
+# CPU uniquement (pas de GPU requis, plus léger)
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install sentence-transformers
+
+# OU avec support CUDA (plus rapide avec GPU NVIDIA)
+pip install torch && pip install sentence-transformers
+```
+
+Si vous sautez cette étape, l'installateur installera automatiquement la version par défaut (CPU).
+
+### 2. Lancer l'Installation
+
+```bash
+/chemin/vers/ai_smartness-DEV/install.sh /chemin/vers/votre/projet
+```
+
+L'installateur va :
+- Demander la langue (en/fr/es) et le mode (MAX/Heavy/Normal/Light)
+- Copier les fichiers, configurer les hooks, démarrer le daemon en arrière-plan
+- Installer la commande CLI `ai`
+
+### 3. Travaillez Normalement
+
+Le système capture tout automatiquement. Vérifiez le status à tout moment :
+```bash
+ai status
+```
+Ou tapez `ai status` directement dans votre prompt !
 
 C'est tout. Le système est 100% transparent.
+
+---
+
+## Comprendre le Modèle de Partenariat
+
+AI Smartness n'est pas un "système de contrôle" pour votre agent - c'est une **couche d'amélioration cognitive** qui permet un vrai partenariat.
+
+### Qu'est-ce qu'un Bon Partenariat ?
+
+| Approche Traditionnelle | Approche Partenariat |
+|------------------------|---------------------|
+| Règles rigides imposées | Guidelines comprises |
+| Prévenir toutes les erreurs | Apprendre du contexte |
+| Contrôler le comportement | Activer les capacités |
+| Méfiance par défaut | Confiance par l'expérience |
+
+### Votre Rôle en tant qu'Utilisateur
+
+Vous n'êtes pas un "superviseur" corrigeant un système peu fiable. Vous êtes un **partenaire** travaillant avec un agent intelligent qui :
+
+- A son propre système de mémoire
+- Peut gérer son propre contexte
+- Apprend vos préférences au fil du temps
+- Fait des choix basés sur le contexte
+
+### Premières Sessions avec un Nouvel Agent
+
+Les premières sessions sont cruciales. Pendant ce temps :
+
+1. **Laissez l'agent explorer** - Ne restreignez pas immédiatement
+2. **Exprimez vos préférences naturellement** - "Je préfère X" plutôt que "Tu dois toujours X"
+3. **Observez ce qui émerge** - L'agent peut développer des habitudes utiles
+4. **Guidez en douceur** - Redirigez plutôt qu'interdire
+
+L'objectif est un agent qui *comprend* les bonnes pratiques, pas un qui suit aveuglément des règles.
 
 ---
 
@@ -63,6 +124,99 @@ Ces règles sont stockées de façon permanente et injectées dans chaque prompt
 
 ---
 
+## Outils MCP Agent (v4.4)
+
+Votre agent a accès aux outils MCP natifs pour la gestion de la mémoire :
+
+### Recall Actif
+
+```
+ai_recall(query="authentification")
+```
+
+Recherche dans la mémoire par mot-clé ou sujet. Retourne les threads correspondants avec résumés, topics et bridges liés.
+
+**Exemples :**
+- `ai_recall(query="solana")` - Tout ce qui concerne Solana
+- `ai_recall(query="hooks")` - Mémoire sur les hooks
+- `ai_recall(query="authentification")` - Travaux liés à l'auth
+- `ai_recall(query="thread_abc123")` - Thread spécifique par ID
+
+### Fusionner des Threads
+
+```
+ai_merge(survivor_id="t1", absorbed_id="t2")
+```
+
+Combine deux threads liés pour libérer du contexte. Le survivor absorbe :
+- Tous les messages (triés par timestamp)
+- Topics et tags (union)
+- Boost de weight (+0.1)
+
+Le thread absorbé est archivé avec le tag `merged_into:<survivor_id>`.
+
+**Note :** Les threads split-locked ne peuvent pas être absorbés.
+
+### Diviser des Threads
+
+Workflow en deux étapes quand un thread a dérivé vers plusieurs sujets :
+
+**Étape 1 - Obtenir les infos du thread :**
+```
+ai_split(thread_id="abc")
+```
+Retourne la liste des messages avec leurs IDs.
+
+**Étape 2 - Confirmer le split :**
+```
+ai_split(thread_id="abc", confirm=True, titles=["T1", "T2"], message_groups=[["m1", "m2"], ["m3", "m4"]])
+```
+
+**Modes de verrouillage :**
+| Mode | Description |
+|------|-------------|
+| `compaction` | Auto-déverrouillage au prochain compactage (défaut) |
+| `agent_release` | Déverrouillage manuel via `ai_unlock()` |
+| `force` | Jamais de déverrouillage automatique |
+
+### Déverrouiller des Threads
+
+```
+ai_unlock(thread_id="abc")
+```
+
+Retire la protection split-lock, permettant au thread d'être fusionné.
+
+### Aide & Status
+
+```
+ai_help()    # Documentation complète de l'agent
+ai_status()  # Status mémoire (threads, bridges, % contexte)
+```
+
+Utile quand l'agent doit se rappeler ses capacités ou vérifier l'état actuel de la mémoire.
+
+---
+
+## CLI dans le Prompt (v3.0.0+)
+
+Tapez les commandes CLI directement dans votre prompt et elles seront exécutées automatiquement :
+
+```
+Vous: ai status
+Claude: [Affiche le status mémoire depuis le CLI]
+
+Vous: ai threads
+Claude: [Liste les threads actifs]
+
+Vous: ai search authentication
+Claude: [Affiche les résultats de recherche pour "authentication"]
+```
+
+**Commandes supportées :** `ai status`, `ai threads`, `ai thread <id>`, `ai bridges`, `ai search <query>`, `ai health`, `ai daemon`, `ai mode`, `ai help`
+
+---
+
 ## Référence CLI
 
 ### `ai status`
@@ -92,6 +246,7 @@ ai threads --status active    # Actifs uniquement
 ai threads --status suspended # Suspendus uniquement
 ai threads --status all       # Tous les threads
 ai threads --limit 20         # Limiter à 20 résultats
+ai threads --prune            # Appliquer decay et suspendre les threads faibles
 ```
 
 ### `ai thread <id>`
@@ -108,6 +263,7 @@ Liste les connexions sémantiques :
 ai bridges                    # Tous les bridges
 ai bridges --thread abc123    # Bridges pour un thread spécifique
 ai bridges --limit 50         # Limiter les résultats
+ai bridges --prune            # Appliquer decay et supprimer bridges morts
 ```
 
 ### `ai search`
@@ -125,34 +281,6 @@ Vérification de santé du système :
 ai health
 ```
 
-Sortie :
-```
-=== AI Smartness Health ===
-Threads: 158 (100 active, 58 suspended)
-Bridges: 3374
-Continuation rate: 23.4%
-Embedding coverage: 100.0%
-Daemon: Running (PID 12345)
-```
-
-**Métriques clés :**
-- **Continuation rate** : % de threads avec >1 message (plus c'est haut, mieux c'est)
-- **Embedding coverage** : % de threads avec embeddings valides (devrait être 100%)
-- **Daemon** : Devrait être "Running"
-
-### `ai reindex`
-
-Recalcule tous les embeddings :
-```bash
-ai reindex           # Standard
-ai reindex --verbose # Avec détails de progression
-```
-
-À utiliser après :
-- Installation de sentence-transformers
-- Mise à jour d'AI Smartness
-- Si l'embedding coverage est < 100%
-
 ### `ai daemon`
 
 Contrôle du daemon en arrière-plan :
@@ -161,6 +289,17 @@ ai daemon           # Affiche le status (défaut)
 ai daemon status    # Affiche le status
 ai daemon start     # Démarre le daemon
 ai daemon stop      # Arrête le daemon
+```
+
+### `ai mode`
+
+Voir ou changer le mode de fonctionnement :
+```bash
+ai mode             # Affiche le mode actuel
+ai mode light       # Passe en mode light (15 threads)
+ai mode normal      # Passe en mode normal (50 threads)
+ai mode heavy       # Passe en mode heavy (100 threads)
+ai mode max         # Passe en mode max (200 threads)
 ```
 
 ---
@@ -190,19 +329,32 @@ Vous tapez un message
          ↓
 Le hook UserPromptSubmit se déclenche
          ↓
-Memory Retriever trouve les threads pertinents (par similarité)
+Vérification : Est-ce une nouvelle session ?
          ↓
-Réactivation automatique des threads suspendus si pertinents
+Si NOUVELLE SESSION :
+  - Injecter vue d'ensemble des capacités
+  - Afficher le dernier thread actif ("hot thread")
+  - Suggérer recall si le message correspond aux topics
          ↓
-Chaîne de contexte construite :
-  - Titre + résumé du thread courant
-  - Threads liés (via bridges)
-  - Règles utilisateur
+Toujours :
+  - Memory Retriever trouve les threads pertinents (par similarité)
+  - Réactivation auto des threads suspendus si pertinents
          ↓
-Injecté comme <system-reminder> invisible
+Chaîne de contexte construite et injectée
          ↓
 Claude reçoit votre message + contexte
 ```
+
+### Suivi de Contexte (v4.3)
+
+Monitoring du contexte en temps réel avec throttle adaptatif :
+
+| Contexte % | Comportement |
+|------------|--------------|
+| < 70% | Mise à jour toutes les 30 secondes |
+| ≥ 70% | Mise à jour uniquement sur delta de 5% |
+
+Cela évite les appels API inutiles tout en gardant l'agent conscient de la pression sur le contexte.
 
 ### Réactivation Automatique des Threads
 
@@ -214,39 +366,18 @@ Quand vous mentionnez un sujet lié à un thread suspendu, le système peut auto
 | 0.15 - 0.35 | LLM Haiku décide (zone borderline) |
 | < 0.15 | Pas de réactivation |
 
-**Exemple :** Si vous avez travaillé sur "système de mémoire IA" hier (maintenant suspendu), et aujourd'hui vous demandez :
-> "parle-moi de la couche de meta cognition"
+### Système de Decay Neural
 
-Le système :
-1. Calcule la similarité avec "système de mémoire IA" (borderline: 0.28)
-2. Consulte Haiku : "Ce message concerne-t-il ce thread ?"
-3. Haiku confirme la relation sémantique
-4. Réactive le thread
-5. Injecte le contexte dans votre conversation
+Les threads et bridges utilisent un système de poids inspiré des réseaux neuronaux (apprentissage Hebbien) :
 
-**Libération de Slots :** Si vous êtes au maximum de threads actifs (ex: 100/100), le système suspend automatiquement le thread actif le moins important pour faire de la place au thread réactivé.
-
-### Ce qui est Injecté
-
-Exemple d'injection (invisible pour vous) :
-```xml
-<system-reminder>
-AI Smartness Memory Context:
-
-Current thread: "Authentification JWT"
-Summary: Implémentation de rotation de refresh tokens avec stockage Redis.
-
-Related threads:
-- "Schéma Base de Données" - Tables utilisateurs et sessions
-- "Audit Sécurité" - Politiques d'expiration des tokens
-
-User rules:
-- toujours faire un plan avant l'implémentation
-- utiliser le mode strict TypeScript
-</system-reminder>
-
-Votre message réel ici...
-```
+| Action | Effet sur le Weight |
+|--------|---------------------|
+| Nouveau thread | Démarre à 1.0 |
+| Fork thread | Hérite du weight du parent |
+| Chaque utilisation (message) | +0.1 boost (max 1.0) |
+| Decay temporel | Divise par 2 tous les 7 jours |
+| En-dessous de 0.1 | Thread auto-suspendu |
+| En-dessous de 0.05 | Bridge auto-supprimé |
 
 ---
 
@@ -259,31 +390,42 @@ N'essayez pas d'"aider" le système :
 - Le système capture tout automatiquement
 - Les threads se forment naturellement selon votre travail
 
-### Exprimez vos Préférences
+### Exprimez vos Préférences Naturellement
 
-Dites à l'agent vos règles :
-- "rappelle-toi : je préfère la programmation fonctionnelle"
-- "règle : toujours ajouter des tests pour les nouvelles fonctions"
-- "jamais utiliser any comme type"
+Au lieu de règles rigides, exprimez des préférences :
+- "Je préfère la programmation fonctionnelle"
+- "On ajoute toujours des tests pour les nouvelles fonctions"
+- "Je n'aime pas utiliser any comme type"
 
-Elles sont stockées et appliquées à toutes les sessions futures.
+Elles sont stockées et appliquées naturellement.
 
-### Vérifiez la Santé Régulièrement
+### Faites Confiance au Processus d'Apprentissage
 
-```bash
-ai health
-```
+Les premières sessions enseignent les fondamentaux. Avec le temps :
+- L'agent apprend vos patterns
+- La gestion du contexte s'améliore
+- Le partenariat s'approfondit
 
-- Taux de continuation < 10% ? Vérifiez les embeddings
-- Daemon arrêté ? Lancez `ai daemon start`
-- Couverture embeddings < 100% ? Lancez `ai reindex`
+### À Propos de GuardCode
 
-### Reprise de Session
+GuardCode est un **conseiller**, pas un exécuteur. Il :
+- Suggère de planifier avant l'implémentation
+- Rappelle les bonnes pratiques
+- Encourage à présenter les options
 
-Quand vous démarrez une nouvelle session :
-1. La mémoire est injectée automatiquement
-2. Vérifiez le status : `ai status`
-3. Votre agent "se souvient" du contexte précédent
+Il ne fait **pas** :
+- Garantir un comportement spécifique
+- Prévenir toutes les erreurs
+- Outrepasser le jugement de l'agent
+
+Si votre agent fait un choix avec lequel vous n'êtes pas d'accord, discutez-en. C'est comme ça que les partenariats fonctionnent.
+
+### Gestion Proactive du Contexte
+
+Un agent mature devrait rarement atteindre le compactage. Encouragez cela en :
+1. Enseignant merge/split tôt
+2. Appréciant quand l'agent gère le contexte
+3. Faisant confiance aux décisions de l'agent sur ce qu'il faut garder/archiver
 
 ---
 
@@ -318,11 +460,6 @@ Quand vous démarrez une nouvelle session :
 | normal | 50 | Projets moyens |
 | light | 15 | Petits scripts, tâches rapides |
 
-Le mode **MAX** est recommandé pour :
-- Projets avec de nombreux composants interdépendants
-- Sessions de travail très longues (15+ heures)
-- Cas où la perte de mémoire serait critique
-
 ---
 
 ## Dépannage
@@ -338,25 +475,19 @@ Si échec, vérifiez les logs :
 cat ai_smartness/.ai/daemon_stderr.log
 ```
 
-### "Heuristic fallback" dans les titres
+### L'agent n'utilise pas recall
 
-CLI Claude non trouvé. Vérifiez :
-```bash
-which claude
-```
+C'est normal pour les nouveaux agents. Ils doivent découvrir leurs outils :
+1. Vous pouvez le mentionner : "Tu peux utiliser `ai_recall()` pour chercher dans ta mémoire"
+2. Pointez vers `ai_help()`
+3. Faites confiance au processus d'apprentissage
 
-Mettez à jour le chemin dans config si nécessaire.
+### L'agent compacte trop
 
-### Taux de continuation bas
-
-Les threads ne se consolident pas ? Vérifiez :
-1. sentence-transformers est-il installé ?
-   ```bash
-   python3 -c "import sentence_transformers; print('OK')"
-   ```
-2. Si non : `pip install sentence-transformers`
-3. Redémarrez le daemon : `ai daemon stop && ai daemon start`
-4. Réindexez : `ai reindex`
+L'agent devrait apprendre à gérer le contexte proactivement. Si le compactage arrive fréquemment :
+1. Discutez de la gestion du contexte avec l'agent
+2. Encouragez l'utilisation de merge/split
+3. Vérifiez si le mode est approprié (peut-être passer à MAX)
 
 ### Mémoire non injectée
 
@@ -384,6 +515,7 @@ Vérifiez `.claude/settings.json` :
 |---------|-----|
 | `.ai/config.json` | Configuration |
 | `.ai/user_rules.json` | Vos règles stockées |
+| `.ai/heartbeat.json` | Suivi session, % contexte |
 | `.ai/processor.pid` | ID du processus daemon |
 | `.ai/processor.sock` | Socket du daemon |
 | `.ai/processor.log` | Logs du daemon |
@@ -394,15 +526,29 @@ Vérifiez `.claude/settings.json` :
 
 ---
 
+## Le Voyage du Partenariat
+
+| Phase | À Quoi S'attendre |
+|-------|-------------------|
+| **Sessions 1-3** | L'agent découvre ses outils, construit sa mémoire initiale |
+| **Sessions 4-10** | Des patterns émergent, les préférences se solidifient |
+| **Sessions 10+** | Partenariat mature, gestion proactive du contexte |
+| **Long terme** | L'agent compacte rarement, gère la mémoire expertement |
+
+La meilleure indication qu'AI Smartness fonctionne n'est pas que rien ne va mal - c'est que votre agent devient un meilleur collaborateur au fil du temps.
+
+---
+
 ## Ce qu'AI Smartness NE FAIT PAS
 
 | Fonctionnalité | Pourquoi Non |
 |----------------|--------------|
+| Garantir le comportement | Consultatif, pas imposé |
 | Requiert une action utilisateur | 100% transparent |
 | Stocke le contenu du code | Uniquement la sémantique, pas le code complet |
 | Envoie des données à l'extérieur | 100% local |
 | Modifie votre code | Système de mémoire en lecture seule |
-| Requiert une configuration | Fonctionne out of the box |
+| Remplace votre jugement | Partenariat, pas remplacement |
 
 ---
 
@@ -413,3 +559,5 @@ Si vous rencontrez des problèmes :
 2. Vérifiez les logs dans `ai_smartness/.ai/`
 3. Vérifiez les hooks dans `.claude/settings.json`
 4. Essayez `ai daemon stop && ai daemon start`
+
+Rappelez-vous : Beaucoup de "problèmes" sont en fait l'agent en train d'apprendre. Laissez-lui du temps avant de troubleshooter.

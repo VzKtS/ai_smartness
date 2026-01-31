@@ -2,18 +2,43 @@
 
 ## Quick Start
 
-1. **Install** in your project:
-   ```bash
-   /path/to/ai_smartness-DEV/install.sh /path/to/your/project
-   ```
+**Platform:** Linux / macOS / Windows (WSL required)
 
-2. **Work normally** - the system captures everything automatically
+> The hook system requires Unix-style absolute paths. On Windows, use WSL (Windows Subsystem for Linux).
 
-3. **Check status** anytime:
-   ```bash
-   ai status
-   ```
-   Or type `ai status` directly in your prompt! (v3.0.0+)
+### 1. Pre-install Dependencies (Recommended)
+
+sentence-transformers requires PyTorch. Install **before** running the installer to choose CPU or GPU:
+
+```bash
+# CPU only (no GPU required, lighter)
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install sentence-transformers
+
+# OR with CUDA support (faster if you have NVIDIA GPU)
+pip install torch && pip install sentence-transformers
+```
+
+If you skip this, the installer will auto-install the default (CPU) version.
+
+### 2. Run Installer
+
+```bash
+/path/to/ai_smartness-DEV/install.sh /path/to/your/project
+```
+
+The installer will:
+- Ask for language (en/fr/es) and mode (MAX/Heavy/Normal/Light)
+- Copy files, configure hooks, start the background daemon
+- Install the `ai` CLI command
+
+### 3. Work Normally
+
+The system captures everything automatically. Check status anytime:
+```bash
+ai status
+```
+Or type `ai status` directly in your prompt!
 
 That's it. The system is 100% transparent.
 
@@ -99,28 +124,28 @@ These rules are stored permanently and injected into every prompt.
 
 ---
 
-## Agent Commands (v4.3)
+## Agent MCP Tools (v4.4)
 
-Your agent has powerful tools to manage its own memory:
+Your agent has access to native MCP tools for memory management:
 
 ### Active Recall
 
 ```
-Read(".ai/recall/<query>")
+ai_recall(query="authentication")
 ```
 
 Search memory by keyword or topic. Returns matching threads with summaries, topics, and related bridges.
 
 **Examples:**
-- `.ai/recall/solana` - Everything about Solana
-- `.ai/recall/hooks` - Memory about hooks
-- `.ai/recall/authentication` - Auth-related work
-- `.ai/recall/thread_abc123` - Specific thread by ID
+- `ai_recall(query="solana")` - Everything about Solana
+- `ai_recall(query="hooks")` - Memory about hooks
+- `ai_recall(query="authentication")` - Auth-related work
+- `ai_recall(query="thread_abc123")` - Specific thread by ID
 
 ### Merge Threads
 
 ```
-Read(".ai/merge/<survivor_id>/<absorbed_id>")
+ai_merge(survivor_id="t1", absorbed_id="t2")
 ```
 
 Combine two related threads to free context. The survivor absorbs:
@@ -138,37 +163,38 @@ Two-step workflow for when a thread has drifted into multiple topics:
 
 **Step 1 - Get thread info:**
 ```
-Read(".ai/split/<thread_id>")
+ai_split(thread_id="abc")
 ```
 Returns list of messages with IDs.
 
 **Step 2 - Confirm split:**
 ```
-Read(".ai/split/<id>/confirm?titles=T1,T2&msgs_0=m1,m2&msgs_1=m3,m4&lock=compaction")
+ai_split(thread_id="abc", confirm=True, titles=["T1", "T2"], message_groups=[["m1", "m2"], ["m3", "m4"]])
 ```
 
 **Lock modes:**
 | Mode | Description |
 |------|-------------|
 | `compaction` | Auto-unlock at next compaction (default) |
-| `agent_release` | Manual unlock via `.ai/unlock/` |
+| `agent_release` | Manual unlock via `ai_unlock()` |
 | `force` | Never auto-unlock |
 
 ### Unlock Threads
 
 ```
-Read(".ai/unlock/<thread_id>")
+ai_unlock(thread_id="abc")
 ```
 
 Remove split-lock protection, allowing the thread to be merged.
 
-### Help
+### Help & Status
 
 ```
-Read(".ai/help")
+ai_help()    # Full agent documentation
+ai_status()  # Memory status (threads, bridges, context %)
 ```
 
-Full agent documentation with current context stats. Useful when agent needs to remember its capabilities.
+Useful when agent needs to remember its capabilities or check current memory state.
 
 ---
 
@@ -452,8 +478,8 @@ cat ai_smartness/.ai/daemon_stderr.log
 ### Agent doesn't use recall
 
 This is normal for new agents. They need to discover their tools:
-1. You can mention it: "You can use `.ai/recall` to search your memory"
-2. Point them to `.ai/help`
+1. You can mention it: "You can use `ai_recall()` to search your memory"
+2. Point them to `ai_help()`
 3. Trust they'll learn over sessions
 
 ### Agent over-compacts

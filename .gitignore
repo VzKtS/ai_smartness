@@ -27,3 +27,8 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# AI Smartness
+ai_smartness/
+.ai/
+

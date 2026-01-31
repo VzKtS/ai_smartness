@@ -1,4 +1,4 @@
-# AI Smartness v3
+# AI Smartness v4
 
 **Capa de meta-cognición para agentes Claude Code.**
 
@@ -6,71 +6,141 @@ Un sistema de memoria persistente que transforma Claude Code en un agente capaz 
 
 Compatible con VS Code & Claude Code CLI.
 
-**Nuevo en v3.0.0**: ¡Comandos CLI directamente en el prompt! Escribe `ai status`, `ai threads`, etc. en tu prompt y obtén los resultados inyectados automáticamente.
+---
+
+## Filosofía: Asociación, no Control
+
+AI Smartness permite una **asociación** entre tú y tu agente. Proporciona herramientas cognitivas - no restricciones.
+
+- **GuardCode es consultivo**: Sugerencias, no imposición
+- **Los primeros contactos importan**: Deja que los conceptos emerjan naturalmente con nuevos agentes
+- **La confianza se desarrolla con el tiempo**: El agente aprende tus preferencias a través de la colaboración
+
+Ver el [README principal](../../README.md) para la discusión completa sobre filosofía.
 
 ---
 
 ## Visión
 
-AI Smartness es una **memoria de trabajo inspirada en redes neuronales**:
+AI Smartness v4 es una **memoria de trabajo inspirada en redes neuronales** con **recall activo**:
 
 - **Threads** = Neuronas (flujos de razonamiento activos)
 - **ThinkBridges** = Sinapsis (conexiones semánticas entre threads)
-- **Gossip** = Propagación de señal a través de la red
+- **Recall** = Recuperación activa de memoria bajo demanda
 - **Inyección de Memoria** = Restauración del contexto en cada prompt
 
-El sistema mantiene una **red de pensamientos** donde los conceptos permanecen conectados y accesibles, evitando la pérdida de contexto típica de las interacciones LLM clásicas.
+El sistema mantiene una **red de pensamientos** donde los conceptos permanecen conectados y accesibles.
 
 ---
 
-## Características Principales
+## Características Clave v4.4
 
 | Característica | Descripción |
 |----------------|-------------|
 | **Threads** | Unidades de trabajo semánticas con títulos auto-generados |
 | **ThinkBridges** | Conexiones automáticas entre threads relacionados |
-| **Propagación Gossip** | Los bridges se propagan cuando los conceptos evolucionan |
-| **Inyección de Memoria** | Contexto relevante inyectado en cada prompt |
-| **Reglas de Usuario** | Detección y persistencia automática de tus preferencias |
-| **GuardCode** | Aplicación del modo plan, protección contra deriva |
-| **Síntesis 95%** | Preservación automática del contexto antes del compactado |
-| **Arquitectura Daemon** | Procesamiento en segundo plano para respuesta rápida |
-| **100% Transparente** | Cero acción del usuario requerida |
+| **Herramientas MCP** | Herramientas nativas: `ai_recall()`, `ai_merge()`, `ai_split()` |
+| **Merge/Split** | Topología de memoria controlada por el agente |
+| **Seguimiento Contexto** | % contexto en tiempo real con throttle adaptativo |
+| **Contexto Nueva Sesión** | Orientación automática al iniciar sesión |
+| **CLI en el Prompt** | `ai status` directamente en el prompt |
+| **Reglas Usuario** | Detección y persistencia automática de preferencias |
+| **GuardCode** | Sistema consultivo para buenas prácticas |
+| **Síntesis 95%** | Preservación automática del contexto antes de compactación |
+| **100% Transparente** | Ninguna acción del usuario requerida |
+
+---
+
+## Herramientas MCP del Agente (v4.4)
+
+Tu agente tiene acceso a herramientas MCP nativas:
+
+### Recall de Memoria
+```
+ai_recall(query="autenticacion")   # Búsqueda por palabra clave/tema
+ai_recall(query="thread_xxx")      # Recall de thread específico
+```
+
+### Gestión de Threads
+```
+ai_merge(survivor_id="t1", absorbed_id="t2")   # Fusionar dos threads
+ai_split(thread_id="t1")                        # Info split (paso 1)
+ai_split(thread_id="t1", confirm=True, ...)    # Ejecutar split (paso 2)
+ai_unlock(thread_id="t1")                       # Desbloquear thread
+```
+
+### Estado y Ayuda
+```
+ai_help()     # Auto-documentación del agente
+ai_status()   # Estado de memoria (threads, bridges, % contexto)
+```
 
 ---
 
 ## Instalación
 
+**Plataforma:** Linux / macOS / Windows (solo vía WSL)
+
+> Los hooks requieren rutas Unix absolutas. Las rutas nativas de Windows no son compatibles.
+
+### Pre-requisitos (Recomendado)
+
+**sentence-transformers** requiere PyTorch. Recomendamos la instalación **antes** del script de instalación para elegir tu variante:
+
 ```bash
-# Clona o copia ai_smartness-DEV en tu máquina
-# Luego ejecuta la instalación en tu proyecto destino:
+# Solo CPU (más ligero)
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install sentence-transformers
+
+# O con CUDA (más rápido con GPU NVIDIA)
+pip install torch && pip install sentence-transformers
+```
+
+### Ejecutar la Instalación
+
+```bash
 /ruta/a/ai_smartness-DEV/install.sh /ruta/a/tu/proyecto
 ```
 
-### Qué hace el instalador
+### Qué hace el Instalador
 
-1. **Selección de idioma**: Inglés, Francés o Español
-2. **Selección de modo**: Heavy, Normal o Light (afecta límites de threads)
-3. **Instala sentence-transformers** (si no está instalado)
-4. **Detecta el CLI Claude** para extracción LLM
-5. **Copia los archivos** a `tu_proyecto/ai_smartness/`
-6. **Configura los hooks** con rutas absolutas en `.claude/settings.json`
-7. **Inicializa la base de datos** en `ai_smartness/.ai/db/`
-8. **Instala el CLI** en `~/.local/bin/ai`
+| Paso | Acción |
+|------|--------|
+| 1 | **Selección idioma** (en/fr/es) |
+| 2 | **Selección modo** (MAX/Heavy/Normal/Light → límites threads) |
+| 3 | **Migración** desde `ai_smartness_v2` si presente |
+| 4 | **Copia archivos** a `proyecto/ai_smartness/` |
+| 5 | **Inicializa base de datos** (threads, bridges, synthesis) |
+| 6 | **Inicializa heartbeat.json** (seguimiento de sesión) |
+| 7 | **Verifica sentence-transformers** (auto-install si ausente) |
+| 8 | **Detecta Claude CLI** |
+| 9 | **Crea config.json** |
+| 10 | **Configura hooks** (4 hooks con rutas absolutas) |
+| 11 | **Configura servidor MCP** (herramientas ai-smartness) |
+| 12 | **Configura .gitignore/.claudeignore** |
+| 13 | **Instala CLI** en `~/.local/bin/ai` |
+| 14 | **Inicia daemon** (procesador en segundo plano) |
+
+### El Daemon
+
+Un daemon en segundo plano gestiona:
+- Procesamiento asíncrono de capturas
+- Extracción LLM para decisiones de threads
+- Auto-pruning cada 5 minutos
+
+```bash
+ai daemon status/start/stop
+```
 
 ### Requisitos
 
 - Python 3.10+
 - Claude Code (CLI o extensión VS Code)
-- pip (para instalación automática de sentence-transformers)
-
-El instalador gestiona las dependencias automáticamente. Si sentence-transformers falla, el sistema usa TF-IDF (funcional pero menos preciso).
+- sentence-transformers (auto-instalado o pre-instalado)
 
 ---
 
 ## Comandos CLI
-
-Después de la instalación, usa el comando `ai` desde tu directorio del proyecto:
 
 ```bash
 # Vista general
@@ -79,8 +149,7 @@ ai status
 # Listar threads
 ai threads
 ai threads --status active
-ai threads --status suspended
-ai threads --limit 20
+ai threads --prune
 
 # Ver thread específico
 ai thread <thread_id>
@@ -92,189 +161,93 @@ ai bridges --thread <thread_id>
 # Búsqueda semántica
 ai search "autenticación"
 
-# Verificación de salud
+# Salud del sistema
 ai health
 
 # Recalcular embeddings
 ai reindex
 
-# Control del daemon
-ai daemon           # Mostrar estado
-ai daemon status    # Mostrar estado
-ai daemon start     # Iniciar daemon
-ai daemon stop      # Detener daemon
+# Control daemon
+ai daemon start
+ai daemon stop
+
+# Gestión modo
+ai mode heavy
+```
+
+### En el Prompt (v3.0.0+)
+
+Escribe los comandos CLI directamente:
+```
+Tú: ai status
+Claude: [Muestra el estado de la memoria]
 ```
 
 ---
 
-## Cómo Funciona
+## Funcionamiento
 
 ### 1. Captura (hook PostToolUse)
-
-Cada resultado de herramienta (Read, Write, Task, etc.) se envía al daemon:
 ```
-[Resultado Herramienta] → [Daemon] → [Filtro Ruido] → [Extracción LLM] → [Decisión Thread]
+[Resultado Herramienta] → [Daemon] → [Extracción LLM] → [Decisión Thread]
 ```
 
 ### 2. Gestión de Threads
+- **NEW_THREAD**: Tema diferente
+- **CONTINUE**: Mismo tema (similitud > 0.35)
+- **FORK**: Sub-tema
+- **REACTIVATE**: Tema antiguo vuelve (similitud > 0.50)
 
-El sistema decide para cada entrada:
-- **NEW_THREAD**: Tema diferente → crear nuevo thread
-- **CONTINUE**: Mismo tema → añadir al thread activo (similitud > 0.35)
-- **FORK**: Sub-tema → crear thread hijo
-- **REACTIVATE**: Tema antiguo vuelve → despertar thread suspendido (similitud > 0.50)
-
-### 3. Propagación Gossip
-
-Cuando un thread cambia:
+### 3. Recall Activo (v4.4)
 ```
-Thread A modificado → Recalcular embedding
-                    → Para cada thread B conectado
-                    → Si similitud alta → propagar bridges
+ai_recall(query="autenticación")
+→ Devuelve threads, resúmenes, bridges
 ```
 
-### 4. Inyección de Memoria (hook UserPromptSubmit)
+### 4. Inyección de Memoria (UserPromptSubmit)
 
-Antes de cada prompt del usuario, se inyecta el contexto relevante:
-```xml
-<system-reminder>
-AI Smartness Memory Context:
+Nuevas sesiones reciben:
+- Vista general de capabilities
+- Último thread activo ("hot thread")
+- Sugerencias de recall
 
-Current thread: "Sistema de Autenticación"
-Summary: Implementando auth JWT con refresh tokens...
+Cada mensaje recibe:
+- Threads relevantes por similitud
+- Reglas de usuario
 
-Related threads:
-- "Esquema Base de Datos" - Diseño tablas usuarios
-- "Endpoints API" - Rutas de autenticación
+### 5. Seguimiento de Contexto (v4.3)
+- <70%: Actualización cada 30s
+- ≥70%: Actualización solo con delta 5%
 
-User rules:
-- siempre hacer un plan antes de implementar
-</system-reminder>
-```
-
-El usuario no ve nada - es invisible para ti pero visible para el agente.
-
-### 5. Detección de Reglas de Usuario
-
-El sistema detecta y almacena automáticamente tus preferencias:
-- "recuerda: siempre usar TypeScript"
-- "regla: sin console.log en producción"
-- "siempre hacer un plan antes de implementar"
-- "nunca commit directo a main"
-
-Las reglas se almacenan en `ai_smartness/.ai/user_rules.json` y se inyectan en cada prompt.
-
-### 6. Síntesis (hook PreCompact)
-
-Al 95% de la ventana de contexto:
-- El LLM genera una síntesis del estado actual
-- Decisiones, preguntas abiertas, threads activos
-- Inyectado después del compactado
-- El usuario no ve nada
+### 6. Síntesis (PreCompact, 95%)
+Síntesis de estado auto-generada antes de compactación.
 
 ---
 
 ## Configuración
 
-Config almacenada en `ai_smartness/.ai/config.json`:
-
 ```json
 {
-  "version": "2.2.0",
-  "project_name": "MiProyecto",
-  "language": "es",
+  "version": "4.3.0",
   "settings": {
     "thread_mode": "heavy",
-    "auto_capture": true,
     "active_threads_limit": 100
-  },
-  "llm": {
-    "extraction_model": "claude-3-5-haiku-20241022",
-    "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
-    "claude_cli_path": "/usr/local/bin/claude"
   },
   "guardcode": {
     "enforce_plan_mode": true,
-    "warn_quick_solutions": true,
-    "require_all_choices": true
+    "warn_quick_solutions": true
   }
 }
 ```
 
-### Diferencias entre Modos
+### Modos
 
-| Modo | Límite Threads | Caso de Uso |
-|------|----------------|-------------|
-| Light | 15 | Proyectos pequeños |
-| Normal | 50 | Proyectos medianos |
-| Heavy | 100 | Proyectos grandes y complejos |
-
-### Umbrales de Similitud
-
-| Contexto | Umbral | Descripción |
-|----------|--------|-------------|
-| Continuación thread activo | 0.35 | Mínimo para continuar un thread |
-| Reactivación thread suspendido | 0.50 | Mínimo para despertar un thread |
-| Boost de topic | +0.15 | Bonus por coincidencia exacta de topic |
-
----
-
-## Estructura Base de Datos
-
-```
-ai_smartness/.ai/
-├── config.json           # Configuración
-├── user_rules.json       # Reglas de usuario
-├── processor.pid         # PID del daemon
-├── processor.sock        # Socket del daemon
-├── processor.log         # Logs del daemon
-├── inject.log            # Logs de inyección
-└── db/
-    ├── threads/          # Archivos JSON de threads
-    ├── bridges/          # Archivos JSON de bridges
-    └── synthesis/        # Síntesis de compactado
-```
-
----
-
-## Solución de Problemas
-
-### Daemon no iniciado
-
-```bash
-ai daemon status
-# Si está detenido:
-ai daemon start
-```
-
-### Capturas no funcionan
-
-Verifica las rutas de los hooks en `.claude/settings.json` - deben ser **absolutas**.
-
-### "Heuristic fallback" en títulos
-
-CLI Claude no encontrado:
-```bash
-which claude
-# Actualiza la ruta en config.json si es necesario
-```
-
-### Scores de similitud bajos / Mala memoria
-
-sentence-transformers no instalado:
-```bash
-pip install sentence-transformers
-ai daemon stop
-ai daemon start
-ai reindex
-```
-
-### Tasa de continuación baja
-
-Verifica con `ai health`. Si < 10%:
-1. Verifica que sentence-transformers esté instalado
-2. Ejecuta `ai reindex`
-3. Revisa `ai_smartness/.ai/processor.log`
+| Modo | Límite Threads |
+|------|----------------|
+| Light | 15 |
+| Normal | 50 |
+| Heavy | 100 |
+| Max | 200 |
 
 ---
 
@@ -285,14 +258,62 @@ Verifica con `ai health`. Si < 10%:
 | Componente | Archivo | Rol |
 |------------|---------|-----|
 | Daemon | `daemon/processor.py` | Procesamiento en segundo plano |
-| Client | `daemon/client.py` | Comunicación rápida con daemon |
-| Hook Captura | `hooks/capture.py` | Captura PostToolUse |
-| Hook Inyección | `hooks/inject.py` | Inyección UserPromptSubmit |
+| Client | `daemon/client.py` | Comunicación rápida |
+| Hook Captura | `hooks/capture.py` | PostToolUse |
+| Hook Inyección | `hooks/inject.py` | UserPromptSubmit |
+| Hook PreTool | `hooks/pretool.py` | Rutas virtuales .ai/ |
+| Handler Recall | `hooks/recall.py` | Recall memoria + merge/split |
 | Hook Compact | `hooks/compact.py` | Síntesis PreCompact |
-| Memory Retriever | `intelligence/memory_retriever.py` | Recuperación de contexto |
-| Thread Manager | `intelligence/thread_manager.py` | Ciclo de vida de threads |
-| Gossip | `intelligence/gossip.py` | Propagación de bridges |
-| Embeddings | `processing/embeddings.py` | Embeddings vectoriales |
+
+### Hooks
+
+| Hook | Script | Función |
+|------|--------|---------|
+| `UserPromptSubmit` | inject.py | Comandos CLI + inyección memoria |
+| `PreToolUse` | pretool.py | Rutas virtuales .ai/ |
+| `PostToolUse` | capture.py | Captura threads |
+| `PreCompact` | compact.py | Generación síntesis |
+
+---
+
+## Solución de Problemas
+
+### Daemon no iniciado
+```bash
+ai daemon start
+```
+
+### El agente no usa recall
+Normal para nuevos agentes. Necesitan descubrir sus herramientas:
+1. Menciona que `ai_recall()` existe
+2. Apunta a `ai_help()`
+3. Confía en el proceso de aprendizaje
+
+### Scores de similitud bajos
+```bash
+pip install sentence-transformers
+ai daemon stop && ai daemon start
+ai reindex
+```
+
+---
+
+## Estructura Base de Datos
+
+```
+ai_smartness/.ai/
+├── config.json
+├── heartbeat.json        # Seguimiento sesión, % contexto
+├── user_rules.json
+├── processor.pid
+├── processor.sock
+├── processor.log
+├── inject.log
+└── db/
+    ├── threads/
+    ├── bridges/
+    └── synthesis/
+```
 
 ---
 
@@ -302,4 +323,4 @@ MIT
 
 ---
 
-**Nota**: AI Smartness está diseñado para ser invisible. La mejor indicación de que funciona es que tu agente "recuerda" el contexto entre sesiones sin que hagas nada especial.
+**Nota**: AI Smartness está diseñado para ser invisible. La mejor indicación de que funciona es que tu agente se convierte en un mejor colaborador con el tiempo - no que nunca ocurra nada malo.

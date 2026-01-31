@@ -62,13 +62,13 @@ The system maintains a **thought network** where concepts remain connected and a
 
 ---
 
-## Key Features v4.3
+## Key Features v4.4
 
 | Feature | Description |
 |---------|-------------|
 | **Threads** | Semantic work units with auto-generated titles |
 | **ThinkBridges** | Automatic connections between related threads |
-| **Active Recall** | Agent can query memory: `Read(".ai/recall/topic")` |
+| **MCP Tools** | Native agent tools: `ai_recall()`, `ai_merge()`, `ai_split()` |
 | **Merge/Split** | Agent manages its own memory topology |
 | **Context Tracking** | Real-time context % with adaptive throttle |
 | **New Session Context** | Automatic orientation on session start |
@@ -78,55 +78,117 @@ The system maintains a **thought network** where concepts remain connected and a
 
 ---
 
-## Agent Commands (v4.3)
+## Agent MCP Tools (v4.4)
 
-Your agent has access to these virtual file commands:
+Your agent has access to these native MCP tools:
 
 ### Memory Recall
 ```
-Read(".ai/recall/<query>")     # Search by keyword/topic
-Read(".ai/recall/thread_xxx")  # Recall specific thread
+ai_recall(query="authentication")   # Search by keyword/topic
+ai_recall(query="thread_xxx")       # Recall specific thread
 ```
 
 ### Thread Management
 ```
-Read(".ai/merge/<survivor>/<absorbed>")  # Merge two threads
-Read(".ai/split/<thread_id>")            # Get split info (step 1)
-Read(".ai/split/<id>/confirm?...")       # Execute split (step 2)
-Read(".ai/unlock/<thread_id>")           # Unlock split-locked thread
+ai_merge(survivor_id="t1", absorbed_id="t2")   # Merge two threads
+ai_split(thread_id="t1")                        # Get split info (step 1)
+ai_split(thread_id="t1", confirm=True, ...)    # Execute split (step 2)
+ai_unlock(thread_id="t1")                       # Unlock split-locked thread
 ```
 
-### Help
+### Status & Help
 ```
-Read(".ai/help")  # Agent self-documentation
+ai_help()     # Agent self-documentation
+ai_status()   # Memory status (threads, bridges, context %)
 ```
 
-These commands let the agent **proactively manage its own context** - the mark of a mature AI partnership.
+These native tools let the agent **proactively manage its own context** - the mark of a mature AI partnership.
 
 ---
 
 ## Installation
 
+**Platform compatibility:**
+- **Linux / macOS**: Native support via `install.sh`
+- **Windows**: Requires **WSL** (Windows Subsystem for Linux)
+
+> **Why WSL?** The hooks in `.claude/settings.json` require **absolute paths** (e.g., `/home/user/project/ai_smartness/hooks/inject.py`). Windows paths (`C:\Users\...`) are not compatible with the hook system. WSL provides a Linux environment where the installer works natively.
+
 ```bash
-# In your target project
+# In your target project (Linux/macOS/WSL)
 /path/to/ai_smartness/install.sh .
 ```
+
+### Prerequisites (Recommended)
+
+**sentence-transformers** is required for semantic memory. The install script will try to install it automatically, but **we recommend installing it beforehand** to choose your PyTorch variant:
+
+```bash
+# CPU only (lighter, no GPU required)
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install sentence-transformers
+
+# OR with CUDA support (faster if you have NVIDIA GPU)
+pip install torch  # Automatically detects CUDA
+pip install sentence-transformers
+```
+
+If you skip this step, the installer will attempt `pip install --user sentence-transformers` which installs the default (usually CPU) version.
 
 ### Interactive Setup
 
 1. **Language**: English, French, or Spanish
-2. **Mode**: Heavy, Normal, or Light (affects thread limits)
-3. **Database**: Keep existing data or start fresh
+2. **Mode**: MAX (200), Heavy (100), Normal (50), or Light (15 threads)
+3. **Database**: Keep existing data or start fresh (if reinstalling)
 
 ### What the Script Does
 
-- Copies ai_smartness into your project
-- Configures Claude Code hooks with **absolute paths**
-- Detects Claude CLI path for LLM extraction
-- Initializes the database structure
-- Adds exclusions to .gitignore and .claudeignore
+The install script performs these actions in order:
 
-**Note**: Extraction always uses **Haiku** (economical, sufficient for semantic extraction). Your main agent can use any model (Opus, Sonnet, etc.) - they're independent.
+| Step | Action | Details |
+|------|--------|---------|
+| 1 | **Language selection** | en/fr/es - affects UI messages |
+| 2 | **Mode selection** | Determines active thread limit |
+| 3 | **Migration check** | Detects legacy `ai_smartness_v2` and migrates |
+| 4 | **Copy files** | Copies package to `project/ai_smartness/` |
+| 5 | **Initialize database** | Creates `.ai/db/threads/`, `bridges/`, `synthesis/` |
+| 6 | **Initialize heartbeat** | Creates `.ai/heartbeat.json` for session tracking |
+| 7 | **Check MCP package** | Installs `mcp` for native agent tools |
+| 8 | **Check sentence-transformers** | Detects if installed, attempts auto-install if not |
+| 9 | **Detect Claude CLI** | Finds `claude` in PATH for LLM extraction |
+| 10 | **Create config** | Writes `.ai/config.json` with settings |
+| 11 | **Configure hooks** | Adds 4 hooks to `.claude/settings.json` (absolute paths) |
+| 12 | **Configure MCP server** | Adds `ai-smartness` MCP server to settings |
+| 13 | **Configure .gitignore** | Excludes `ai_smartness/` |
+| 14 | **Configure .claudeignore** | Makes AI Smartness invisible to agent |
+| 15 | **Install CLI** | Copies `ai` command to `~/.local/bin/` |
+| 16 | **Start daemon** | Launches background processor for capture/extraction |
+
+### About the Daemon
+
+AI Smartness runs a **background daemon** that:
+- Receives tool captures asynchronously (non-blocking)
+- Performs LLM extraction for thread decisions
+- Manages thread/bridge lifecycle
+- Runs auto-pruning every 5 minutes
+
+The daemon starts automatically during installation and restarts if needed. Control it with:
+```bash
+ai daemon status   # Check if running
+ai daemon start    # Start daemon
+ai daemon stop     # Stop daemon
+```
+
+### Hooks Installed
+
+| Hook | Script | Trigger |
+|------|--------|---------|
+| `PreToolUse` | pretool.py | Before Read tool (virtual .ai/ paths) |
+| `UserPromptSubmit` | inject.py | Before each user message (memory injection) |
+| `PostToolUse` | capture.py | After each tool (capture to daemon) |
+| `PreCompact` | compact.py | At 95% context (synthesis generation) |
+
+**Note**: Extraction uses your session's model (no hardcoded version). Your main agent can use any model (Opus, Sonnet, etc.).
 
 ---
 
@@ -174,11 +236,11 @@ The LLM decides for each input:
 - **FORK**: Sub-topic → create child thread
 - **REACTIVATE**: Old topic returns → wake up archived thread
 
-### 3. Active Recall (v4.0)
+### 3. Active Recall (v4.4)
 
-Agent can actively query memory:
+Agent can actively query memory via MCP tools:
 ```
-Read(".ai/recall/authentication")
+ai_recall(query="authentication")
 → Returns matching threads, summaries, bridges
 ```
 
@@ -212,7 +274,7 @@ Config stored in `ai_smartness/.ai/config.json`:
 
 ```json
 {
-  "version": "4.3.0",
+  "version": "4.4.0",
   "project_name": "MyProject",
   "language": "en",
   "settings": {
@@ -314,8 +376,8 @@ Increase limit in config:
 ### Agent not using recall
 
 This is normal for new agents! They need to discover their tools. You can:
-1. Mention recall exists: "You can use `.ai/recall` to search your memory"
-2. Let them discover it via `.ai/help`
+1. Mention recall exists: "You can use `ai_recall()` to search your memory"
+2. Let them discover it via `ai_help()`
 3. Trust that they'll learn over sessions
 
 ---
