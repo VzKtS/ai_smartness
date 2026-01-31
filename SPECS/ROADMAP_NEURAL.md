@@ -223,7 +223,55 @@ ai health                    # Inclure stats bridges (alive/dead ratio)
 
 ---
 
-## Phase 18: Gossip Refinement
+## Phase 18: Thread Decay & Mode Management ✅ DONE (v2.9.0)
+
+### Objectif
+Implémenter le decay temporel pour les threads et la gestion dynamique des modes.
+
+### Changements Implémentés
+
+**1. Thread model** (`models/thread.py`)
+- Ajout constantes: `HALF_LIFE_DAYS = 7.0`, `SUSPEND_THRESHOLD = 0.1`, `USE_BOOST = 0.1`
+- Ajout `MODE_QUOTAS = {light: 15, normal: 50, heavy: 100, max: 200}`
+- Méthode `decay()` - applique decay, retourne True si suspension nécessaire
+- Méthode `should_suspend()` - vérifie si poids < seuil
+- Méthode `boost_weight()` - renforcement Hebbien
+
+**2. ThreadStorage** (`storage/threads.py`)
+- `prune_threads(mode_quota)` - applique decay + suspend + enforce quota
+- `get_weight_stats()` - statistiques de poids
+- `enforce_quota(quota)` - suspend les threads en excès
+
+**3. ThreadManager** (`intelligence/thread_manager.py`)
+- `get_current_mode()` - lit le mode depuis config
+- `get_mode_quota(mode)` - retourne quota pour un mode
+- `set_mode(mode)` - change le mode, suspend si nécessaire
+- `prune_threads()` - wrapper avec stats
+- `get_mode_status()` - status complet
+
+**4. CLI**
+- `ai mode status` - affiche mode actuel et stats
+- `ai mode light|normal|heavy|max` - change le mode
+- `ai threads --prune` - applique decay et suspend
+- `ai threads --show-weight` - affiche indicateurs de poids
+
+### Flow
+```
+ACTIVE ←→ SUSPENDED
+   ↓           ↓
+(decay)    (reactivation si match > 0.5)
+```
+
+### Différences vs Bridges
+| Aspect | Bridges | Threads |
+|--------|---------|---------|
+| Demi-vie | 3 jours | 7 jours |
+| Action | Suppression | Suspension |
+| Quota | Non | Oui (par mode) |
+
+---
+
+## Phase 19: Gossip Refinement
 
 ### Objectif
 Adapter la création de bridges au nouveau système.

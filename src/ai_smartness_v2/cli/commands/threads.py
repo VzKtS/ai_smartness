@@ -41,7 +41,7 @@ def load_threads(ai_path: Path, status_filter: str = "all") -> List[Dict[str, An
     return threads
 
 
-def run_threads(ai_path: Path, status_filter: str, limit: int) -> int:
+def run_threads(ai_path: Path, status_filter: str, limit: int, show_weight: bool = False) -> int:
     """
     List threads.
 
@@ -49,6 +49,7 @@ def run_threads(ai_path: Path, status_filter: str, limit: int) -> int:
         ai_path: Path to .ai directory
         status_filter: Status to filter by
         limit: Maximum number to show
+        show_weight: Show detailed weight info
 
     Returns:
         Exit code
@@ -74,14 +75,102 @@ def run_threads(ai_path: Path, status_filter: str, limit: int) -> int:
         weight = thread.get("weight", 0)
         msgs = len(thread.get("messages", []))
 
-        print(f"{thread_id:<12} | {title:<35} | {status:<10} | {weight:>5.2f} | {msgs:>4}")
+        # Weight indicator for --show-weight
+        if show_weight:
+            if weight >= 0.5:
+                weight_str = f"{weight:>5.2f}+"
+            elif weight >= 0.1:
+                weight_str = f"{weight:>5.2f} "
+            else:
+                weight_str = f"{weight:>5.2f}!"
+        else:
+            weight_str = f"{weight:>5.2f} "
+
+        print(f"{thread_id:<12} | {title:<35} | {status:<10} | {weight_str} | {msgs:>4}")
 
     total = len(threads)
     if total > limit:
         print(f"\n... and {total - limit} more. Use --limit to show more.")
 
+    # Show weight stats if requested
+    if show_weight:
+        all_threads = load_threads(ai_path, "all")
+        if all_threads:
+            weights = [t.get("weight", 0) for t in all_threads]
+            active = [t for t in all_threads if t.get("status") == "active"]
+            suspended = [t for t in all_threads if t.get("status") == "suspended"]
+            print()
+            print("Weight stats:")
+            print(f"  Min: {min(weights):.2f}, Max: {max(weights):.2f}, Avg: {sum(weights)/len(weights):.2f}")
+            print(f"  Active: {len(active)}, Suspended: {len(suspended)}")
+
     print()
     return 0
+
+
+def run_threads_prune(ai_path: Path) -> int:
+    """
+    Apply decay and suspend low-weight threads.
+
+    Args:
+        ai_path: Path to .ai directory
+
+    Returns:
+        Exit code
+    """
+    import sys
+    sys.path.insert(0, str(ai_path.parent.parent / "src"))
+
+    try:
+        from ai_smartness_v2.storage.threads import ThreadStorage
+
+        threads_path = ai_path / "db" / "threads"
+        if not threads_path.exists():
+            print("No threads directory found.")
+            return 0
+
+        storage = ThreadStorage(threads_path)
+
+        # Get stats before
+        all_threads = storage.get_all()
+        active_before = len([t for t in all_threads if t.status.value == "active"])
+
+        if active_before == 0:
+            print("No active threads to prune.")
+            return 0
+
+        # Load mode quota from config
+        config_path = ai_path / "config.json"
+        quota = 50  # default
+        mode = "normal"
+        if config_path.exists():
+            try:
+                config = json.loads(config_path.read_text())
+                mode = config.get("mode", "normal")
+                quota = config.get("settings", {}).get("active_threads_limit", 50)
+            except Exception:
+                pass
+
+        print(f"Pruning threads (mode: {mode}, quota: {quota})...")
+        print()
+
+        # Apply decay and prune
+        suspended = storage.prune_threads(mode_quota=quota)
+
+        # Get stats after
+        stats = storage.get_weight_stats()
+
+        print(f"Suspended: {suspended} thread(s)")
+        print(f"Remaining: {stats['active_count']} active, {stats['suspended_count']} suspended")
+        if stats['total'] > 0:
+            print(f"Weight range: {stats['min']:.2f} - {stats['max']:.2f} (avg: {stats['avg']:.2f})")
+        print()
+
+        return 0
+
+    except Exception as e:
+        print(f"Error during pruning: {e}")
+        return 1
 
 
 def run_thread_detail(ai_path: Path, thread_id: str) -> int:

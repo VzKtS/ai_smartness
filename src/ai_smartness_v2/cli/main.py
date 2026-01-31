@@ -11,6 +11,7 @@ Usage:
     ai reindex             Recalculate all embeddings
     ai health              System health check
     ai daemon [status|start|stop]  Manage daemon
+    ai mode [status|light|normal|heavy|max]  View/change mode
 """
 
 import argparse
@@ -58,6 +59,16 @@ def main():
         type=int,
         default=10,
         help="Number of threads to show (default: 10)"
+    )
+    threads_parser.add_argument(
+        "--show-weight", "-w",
+        action="store_true",
+        help="Show weight column"
+    )
+    threads_parser.add_argument(
+        "--prune",
+        action="store_true",
+        help="Apply decay and suspend low-weight threads"
     )
 
     # thread command (single thread detail)
@@ -118,6 +129,16 @@ def main():
         help="Action to perform (default: status)"
     )
 
+    # mode command
+    mode_parser = subparsers.add_parser("mode", help="View or change operating mode")
+    mode_parser.add_argument(
+        "action",
+        nargs="?",
+        choices=["status", "light", "normal", "heavy", "max"],
+        default="status",
+        help="Mode to set or 'status' to view current (default: status)"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -139,8 +160,10 @@ def main():
                 from .commands.status import run_status
                 return run_status(ai_path)
             elif args.command == "threads":
-                from .commands.threads import run_threads
-                return run_threads(ai_path, args.status, args.limit)
+                from .commands.threads import run_threads, run_threads_prune
+                if args.prune:
+                    return run_threads_prune(ai_path)
+                return run_threads(ai_path, args.status, args.limit, args.show_weight)
             elif args.command == "thread":
                 from .commands.threads import run_thread_detail
                 return run_thread_detail(ai_path, args.id)
@@ -166,6 +189,12 @@ def main():
                     return run_daemon_stop(ai_path)
                 else:
                     return run_daemon_status(ai_path)
+            elif args.command == "mode":
+                from .commands.mode import run_mode_status, run_mode_set
+                if args.action == "status":
+                    return run_mode_status(ai_path)
+                else:
+                    return run_mode_set(ai_path, args.action)
         except ImportError:
             # Fallback to absolute imports (when running as script)
             cli_dir = Path(__file__).parent
@@ -175,8 +204,10 @@ def main():
                 from commands.status import run_status
                 return run_status(ai_path)
             elif args.command == "threads":
-                from commands.threads import run_threads
-                return run_threads(ai_path, args.status, args.limit)
+                from commands.threads import run_threads, run_threads_prune
+                if args.prune:
+                    return run_threads_prune(ai_path)
+                return run_threads(ai_path, args.status, args.limit, args.show_weight)
             elif args.command == "thread":
                 from commands.threads import run_thread_detail
                 return run_thread_detail(ai_path, args.id)
@@ -202,6 +233,12 @@ def main():
                     return run_daemon_stop(ai_path)
                 else:
                     return run_daemon_status(ai_path)
+            elif args.command == "mode":
+                from commands.mode import run_mode_status, run_mode_set
+                if args.action == "status":
+                    return run_mode_status(ai_path)
+                else:
+                    return run_mode_set(ai_path, args.action)
 
     except ImportError as e:
         print(f"Error loading command module: {e}")

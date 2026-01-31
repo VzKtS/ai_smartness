@@ -156,6 +156,115 @@ class ThreadStorage:
                 threads.append(thread)
         return threads
 
+    def prune_threads(self, mode_quota: int = None) -> int:
+        """
+        Apply decay and suspend threads below threshold or over quota.
+
+        Unlike bridges, threads are suspended not deleted.
+
+        Args:
+            mode_quota: Optional quota to enforce (suspends excess threads)
+
+        Returns:
+            Number of threads suspended
+        """
+        from ..models.thread import Thread as ThreadModel
+
+        active_threads = self.get_active()
+        suspended_count = 0
+
+        # Apply decay to all active threads
+        for thread in active_threads:
+            should_suspend = thread.decay()
+
+            if should_suspend:
+                thread.suspend("auto_decay")
+                self.save(thread)
+                suspended_count += 1
+            else:
+                # Save updated weight
+                self.save(thread)
+
+        # Enforce quota if specified
+        if mode_quota is not None:
+            # Re-get active (some may have been suspended)
+            active_threads = self.get_active()
+
+            if len(active_threads) > mode_quota:
+                # Sort by weight (lowest first)
+                active_threads.sort(key=lambda t: t.weight)
+
+                # Suspend excess
+                excess = len(active_threads) - mode_quota
+                for thread in active_threads[:excess]:
+                    thread.suspend("quota_exceeded")
+                    self.save(thread)
+                    suspended_count += 1
+
+        return suspended_count
+
+    def get_weight_stats(self) -> dict:
+        """
+        Get weight statistics for all threads.
+
+        Returns:
+            Dict with min, max, avg, active_count, suspended_count
+        """
+        all_threads = self.get_all()
+
+        if not all_threads:
+            return {
+                "min": 0.0,
+                "max": 0.0,
+                "avg": 0.0,
+                "active_count": 0,
+                "suspended_count": 0,
+                "total": 0
+            }
+
+        weights = [t.weight for t in all_threads]
+        active = [t for t in all_threads if t.status == ThreadStatus.ACTIVE]
+        suspended = [t for t in all_threads if t.status == ThreadStatus.SUSPENDED]
+
+        return {
+            "min": min(weights),
+            "max": max(weights),
+            "avg": sum(weights) / len(weights),
+            "active_count": len(active),
+            "suspended_count": len(suspended),
+            "total": len(all_threads)
+        }
+
+    def enforce_quota(self, quota: int) -> int:
+        """
+        Enforce a specific quota on active threads.
+
+        Suspends lowest-weight threads when over quota.
+
+        Args:
+            quota: Maximum number of active threads
+
+        Returns:
+            Number of threads suspended
+        """
+        active_threads = self.get_active()
+
+        if len(active_threads) <= quota:
+            return 0
+
+        # Sort by weight (lowest first)
+        active_threads.sort(key=lambda t: t.weight)
+
+        # Suspend excess
+        suspended_count = 0
+        excess = len(active_threads) - quota
+        for thread in active_threads[:excess]:
+            thread.suspend("quota_change")
+            self.save(thread)
+            suspended_count += 1
+
+        return suspended_count
+
     def get_current(self) -> Optional[Thread]:
         """
         Get the current (most recently active) thread.

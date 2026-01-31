@@ -1,11 +1,15 @@
-# AI Smartness v2.6 - Spécification Technique Complète
+# AI Smartness v2.9 - Spécification Technique Complète
 
 ## Meta
 
-- **Version**: 2.6.0
-- **Date**: 2026-01-30
+- **Version**: 2.9.0
+- **Date**: 2026-01-31
 - **Auteur**: Claude (Opus 4.5) + User
 - **Status**: Implemented
+- **Changelog**:
+  - v2.7.0: Universal Coherence Chain (Phase 15)
+  - v2.8.0: Bridge Weight Decay (Phase 17)
+  - v2.9.0: Thread Decay & Mode Management (Phase 18)
 
 ---
 
@@ -28,6 +32,8 @@ AI Smartness v2 est une **couche de méta-cognition** pour agents LLM qui fourni
 | **Embedding** | Signal électrique | Représentation vectorielle pour similarité |
 | **Gossip** | Plasticité synaptique | Propagation automatique des connexions |
 | **GuardCode** | Inhibiteur | Règles comportementales injectées |
+| **Decay** | Atrophie synaptique | Oubli naturel par non-usage |
+| **Pruning** | Mort neuronale | Suppression bridges morts, suspension threads |
 
 ### 1.3 Architecture Système
 
@@ -92,20 +98,37 @@ class Thread:
     child_ids: List[str]             # Threads enfants
 
     # Pondération (calculée automatiquement)
-    weight: float                    # 0.0-1.0, basée sur récence + activité
+    weight: float                    # 0.0-1.0, décroit avec le temps
     last_active: datetime
     activation_count: int
 
     # Embeddings
     embedding: Optional[List[float]] # Vecteur 384-dim (sentence-transformers)
+
+    # Constantes de decay (class-level)
+    HALF_LIFE_DAYS: float = 7.0      # Poids divisé par 2 tous les 7 jours
+    SUSPEND_THRESHOLD: float = 0.1   # Auto-suspension sous ce seuil
+    USE_BOOST: float = 0.1           # Boost à chaque activation
+
+    # Quotas par mode (class-level)
+    MODE_QUOTAS = {
+        "light": 15,
+        "normal": 50,
+        "heavy": 100,
+        "max": 200
+    }
 ```
 
-**Formule de poids :**
+**Formule de decay :**
 ```
-recency = 0.5^(heures_depuis_actif / 24)    # Demi-vie de 24h
-activity = min(1.0, messages * 0.1 + activations * 0.05)
-weight = recency * 0.6 + activity * 0.4
+days_since = (now - last_active).days
+decay_factor = 0.5^(days_since / HALF_LIFE_DAYS)
+weight = weight * decay_factor
 ```
+
+**Suspension automatique :**
+- Si `weight < SUSPEND_THRESHOLD` → Thread suspendu (pas supprimé)
+- Si threads actifs > `MODE_QUOTAS[mode]` → Threads les plus légers suspendus
 
 **Message :**
 ```python
@@ -142,10 +165,28 @@ class ThinkBridge:
     propagated_from: Optional[str]  # Bridge parent si propagé
     propagation_depth: int          # 0=direct, 1+=propagé
 
-    # Métriques d'usage
+    # Métriques d'usage et decay
     use_count: int
     last_used: Optional[datetime]
+    weight: float                       # 1.0 initial, décroit avec le temps
+
+    # Constantes de decay (class-level)
+    HALF_LIFE_DAYS: float = 3.0         # Poids divisé par 2 tous les 3 jours
+    DEATH_THRESHOLD: float = 0.05       # Bridge supprimé sous ce seuil
+    USE_BOOST: float = 0.1              # Boost à chaque utilisation
 ```
+
+**Formule de decay (bridges) :**
+```
+reference = last_used if last_used else created_at
+days_since = (now - reference).days
+decay_factor = 0.5^(days_since / HALF_LIFE_DAYS)
+weight = weight * decay_factor
+```
+
+**Mort synaptique :**
+- Si `weight < DEATH_THRESHOLD` → Bridge supprimé définitivement
+- Si `weight < 0.3` → Status = WEAK
 
 **Types de relations :**
 | Type | Description | Détection |
@@ -376,16 +417,40 @@ similarity = 0.7 × embedding_sim + 0.3 × topic_overlap + topic_boost
 | 0.3-0.6 | `orphan` | Faible relation → thread indépendant |
 | < 0.3 | `forget` | Bruit → ignorer |
 
-### 4.4 Limites de Threads
+### 4.4 Mode et Quotas de Threads
 
-| Mode | Threads actifs max |
-|------|-------------------|
-| light | 15 |
-| normal | 50 |
-| heavy | 100 |
-| max | 200 |
+| Mode | Threads actifs max | Cas d'usage |
+|------|-------------------|-------------|
+| light | 15 | Petits projets, tests |
+| normal | 50 | Développement standard |
+| heavy | 100 | Gros projets, équipes |
+| max | 200 | Environnements complexes |
 
-### 4.5 Timeouts
+**Changement de mode :**
+```bash
+ai mode normal    # Passe en mode normal
+ai mode heavy     # Passe en mode heavy
+ai mode status    # Affiche mode actuel
+```
+
+Si le nouveau quota est inférieur au nombre de threads actifs, les threads les plus légers sont automatiquement suspendus.
+
+### 4.5 Decay & Pruning
+
+| Entité | Half-life | Seuil mort/suspension | Action |
+|--------|-----------|----------------------|--------|
+| ThinkBridge | 3 jours | 0.05 | Suppression |
+| Thread | 7 jours | 0.1 | Suspension |
+
+**Boost à l'usage :** +0.1 (capped à 1.0)
+
+**Commandes de pruning :**
+```bash
+ai threads --prune    # Decay + suspension threads
+ai bridges --prune    # Decay + suppression bridges morts
+```
+
+### 4.6 Timeouts
 
 | Opération | Timeout |
 |-----------|---------|
@@ -394,7 +459,7 @@ similarity = 0.7 × embedding_sim + 0.3 × topic_overlap + topic_boost
 | Synthesis | 60s |
 | Socket daemon | 0.5s |
 
-### 4.6 Limites de Contenu
+### 4.7 Limites de Contenu
 
 | Élément | Limite |
 |---------|--------|
@@ -553,7 +618,7 @@ Variable d'environnement `AI_SMARTNESS_V2_HOOK_RUNNING=1` :
 {
   "project_name": "my_project",
   "language": "fr",
-  "version": "2.6.0",
+  "version": "2.9.0",
   "initialized_at": "2026-01-30T12:00:00",
   "mode": "normal",
   "settings": {
@@ -590,14 +655,19 @@ Variable d'environnement `AI_SMARTNESS_V2_HOOK_RUNNING=1` :
 ### 10.1 Commandes
 
 ```bash
-ai status                    # Vue d'ensemble
-ai threads [--status X]      # Lister threads
-ai thread <id>               # Détails thread
-ai bridges [--thread ID]     # Lister bridges
-ai search <query>            # Recherche sémantique
-ai health                    # Vérification santé
-ai reindex                   # Recalculer embeddings
-ai daemon [status|start|stop] # Gérer daemon
+ai status                       # Vue d'ensemble
+ai threads [--status X]         # Lister threads
+ai threads --show-weight        # Afficher poids avec indicateurs
+ai threads --prune              # Appliquer decay + suspension
+ai thread <id>                  # Détails thread
+ai bridges [--thread ID]        # Lister bridges
+ai bridges --show-weight        # Afficher poids bridges
+ai bridges --prune              # Appliquer decay + supprimer morts
+ai search <query>               # Recherche sémantique
+ai health                       # Vérification santé
+ai reindex                      # Recalculer embeddings
+ai daemon [status|start|stop]   # Gérer daemon
+ai mode [status|light|normal|heavy|max]  # Voir/changer mode
 ```
 
 ### 10.2 Installation CLI
@@ -723,31 +793,61 @@ ai health
 
 ---
 
-## 14. Évolutions Futures
+## 14. Fonctionnalités v2.7-v2.9
 
-### 14.1 Extensibilité Coherence
+### 14.1 Universal Coherence Chain (v2.7.0)
+
+Vérification de cohérence entre output tool et réponse agent :
+- Les outils de contexte (Glob, Grep) créent un `pending_context`
+- Le prochain contenu non-context est vérifié pour cohérence
+- Score > 0.6 → fork comme thread enfant
+- Score 0.3-0.6 → thread indépendant
+- Score < 0.3 → ignoré
+
+### 14.2 Bridge Weight Decay (v2.8.0)
+
+Synaptic pruning - les bridges inutilisés meurent :
+- Decay exponentiel avec half-life de 3 jours
+- Boost de +0.1 à chaque utilisation
+- Suppression définitive quand weight < 0.05
+- Status WEAK quand weight < 0.3
+
+### 14.3 Thread Decay & Mode Management (v2.9.0)
+
+Neuronal dormancy - les threads inactifs s'endorment :
+- Decay exponentiel avec half-life de 7 jours
+- Boost de +0.1 à chaque activation
+- Suspension (pas suppression) quand weight < 0.1
+- Quota dynamique par mode (light/normal/heavy/max)
+- Changement de mode à la volée avec `ai mode`
+
+---
+
+## 15. Évolutions Futures
+
+### 15.1 Extensibilité Coherence
 
 Le set `CONTEXT_TOOLS` peut être étendu :
 ```python
 CONTEXT_TOOLS = {"Glob", "Grep", "Read", "Task", "WebFetch"}
 ```
 
-### 14.2 Seuils Dynamiques
+### 15.2 Seuils Dynamiques
 
 Les seuils de cohérence pourront être ajustés dynamiquement par le LLM basé sur :
 - Performance passée (faux positifs/négatifs)
 - Type de projet
 - Patterns utilisateur
 
-### 14.3 Méta-cognition Avancée
+### 15.3 Méta-cognition Avancée
 
 - Auto-évaluation de la qualité des threads
 - Consolidation automatique de threads similaires
-- Oubli intelligent des threads obsolètes
+- Réactivation intelligente des threads suspendus
 
 ---
 
-## 15. Contraintes Non-Négociables
+## 16. Contraintes Non-Négociables
 
 | Règle | Justification |
 |-------|---------------|

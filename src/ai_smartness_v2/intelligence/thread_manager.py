@@ -517,3 +517,128 @@ class ThreadManager:
             for tid, sim in results
             if self.storage.threads.get(tid)
         ]
+
+    # ==================== Mode Management ====================
+
+    def get_current_mode(self) -> str:
+        """
+        Get current mode from config.
+
+        Returns:
+            Mode string (light, normal, heavy, max)
+        """
+        try:
+            config_path = self.storage.ai_path / "config.json"
+            if config_path.exists():
+                config = json.loads(config_path.read_text())
+                return config.get("mode", "normal")
+        except Exception:
+            pass
+        return "normal"
+
+    def get_mode_quota(self, mode: str = None) -> int:
+        """
+        Get thread quota for a mode.
+
+        Args:
+            mode: Mode name (uses current if None)
+
+        Returns:
+            Thread quota for the mode
+        """
+        if mode is None:
+            mode = self.get_current_mode()
+
+        return Thread.MODE_QUOTAS.get(mode, 50)
+
+    def set_mode(self, mode: str) -> dict:
+        """
+        Change the operating mode.
+
+        This may suspend threads if new quota is lower.
+
+        Args:
+            mode: New mode (light, normal, heavy, max)
+
+        Returns:
+            Dict with old_mode, new_mode, suspended_count
+        """
+        if mode not in Thread.MODE_QUOTAS:
+            raise ValueError(f"Invalid mode: {mode}. Must be one of: {list(Thread.MODE_QUOTAS.keys())}")
+
+        old_mode = self.get_current_mode()
+        old_quota = self.get_mode_quota(old_mode)
+        new_quota = Thread.MODE_QUOTAS[mode]
+
+        # Update config
+        try:
+            config_path = self.storage.ai_path / "config.json"
+            config = {}
+            if config_path.exists():
+                config = json.loads(config_path.read_text())
+
+            config["mode"] = mode
+            config["settings"] = config.get("settings", {})
+            config["settings"]["active_threads_limit"] = new_quota
+
+            config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False))
+        except Exception as e:
+            logger.error(f"Failed to update config: {e}")
+
+        # Update internal limit
+        self.active_threads_limit = new_quota
+
+        # Enforce new quota (may suspend threads)
+        suspended_count = 0
+        if new_quota < old_quota:
+            suspended_count = self.storage.threads.enforce_quota(new_quota)
+
+        return {
+            "old_mode": old_mode,
+            "new_mode": mode,
+            "old_quota": old_quota,
+            "new_quota": new_quota,
+            "suspended_count": suspended_count
+        }
+
+    def prune_threads(self) -> dict:
+        """
+        Apply decay and suspend threads below threshold.
+
+        Also enforces current mode quota.
+
+        Returns:
+            Dict with stats
+        """
+        mode = self.get_current_mode()
+        quota = self.get_mode_quota(mode)
+
+        suspended_count = self.storage.threads.prune_threads(mode_quota=quota)
+        stats = self.storage.threads.get_weight_stats()
+
+        return {
+            "mode": mode,
+            "quota": quota,
+            "suspended_count": suspended_count,
+            "stats": stats
+        }
+
+    def get_mode_status(self) -> dict:
+        """
+        Get current mode status.
+
+        Returns:
+            Dict with mode, quota, active, suspended, available
+        """
+        mode = self.get_current_mode()
+        quota = self.get_mode_quota(mode)
+        stats = self.storage.threads.get_weight_stats()
+
+        return {
+            "mode": mode,
+            "quota": quota,
+            "active": stats["active_count"],
+            "suspended": stats["suspended_count"],
+            "available": max(0, quota - stats["active_count"]),
+            "all_modes": Thread.MODE_QUOTAS
+        }

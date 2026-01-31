@@ -79,7 +79,26 @@ class Thread:
     Core entity in the neural network metaphor:
     - Thread = Neuron
     - ThinkBridge = Synapse
+
+    Weight decay (neuronal dormancy):
+    - weight decays over time based on last_active
+    - threads below SUSPEND_THRESHOLD are auto-suspended
+    - suspended threads can be reactivated when relevant
+    - threads are NEVER deleted (unlike bridges)
     """
+    # Decay constants (class-level)
+    HALF_LIFE_DAYS: float = 7.0       # Weight halves every 7 days without use
+    SUSPEND_THRESHOLD: float = 0.1    # Auto-suspend below this weight
+    USE_BOOST: float = 0.1            # Weight boost per activation
+
+    # Mode quotas (class-level)
+    MODE_QUOTAS = {
+        "light": 15,
+        "normal": 50,
+        "heavy": 100,
+        "max": 200
+    }
+
     id: str
     title: str
     status: ThreadStatus
@@ -186,6 +205,39 @@ class Thread:
 
         # Combined weight (normalized 0-1)
         self.weight = (recency * 0.6 + activity * 0.4)
+
+    def decay(self) -> bool:
+        """
+        Apply temporal decay to weight.
+
+        Uses exponential decay with half-life.
+        Unlike bridges, threads are suspended not deleted.
+
+        Returns:
+            True if thread should be suspended (weight < threshold)
+        """
+        now = datetime.now()
+        hours_since = (now - self.last_active).total_seconds() / 3600
+        days_since = hours_since / 24
+
+        # Exponential decay: weight = weight * 0.5^(days/half_life)
+        decay_factor = 0.5 ** (days_since / self.HALF_LIFE_DAYS)
+        self.weight *= decay_factor
+
+        # Check if should be suspended
+        if self.weight < self.SUSPEND_THRESHOLD and self.status == ThreadStatus.ACTIVE:
+            return True  # Should suspend
+
+        return False  # Still active
+
+    def should_suspend(self) -> bool:
+        """Check if thread should be suspended based on weight."""
+        return self.weight < self.SUSPEND_THRESHOLD and self.status == ThreadStatus.ACTIVE
+
+    def boost_weight(self):
+        """Boost weight when thread is used (Hebbian reinforcement)."""
+        self.weight = min(1.0, self.weight + self.USE_BOOST)
+        self.last_active = datetime.now()
 
     def to_dict(self) -> dict:
         """Serialize to dictionary for JSON storage."""

@@ -125,6 +125,42 @@ ai bridges --show-weight  # Show weight column
 ai bridges --prune        # Apply decay and remove dead bridges
 ```
 
+## Thread Decay (Neuronal Dormancy)
+
+```python
+HALF_LIFE_DAYS = 7.0      # Weight halves every 7 days
+SUSPEND_THRESHOLD = 0.1   # Auto-suspend below this
+USE_BOOST = 0.1           # Weight boost per activation
+```
+
+**Différence vs Bridges:** Threads are SUSPENDED, not deleted.
+
+**CLI:**
+```bash
+ai threads --show-weight  # Show weight indicators
+ai threads --prune        # Apply decay and suspend low-weight threads
+```
+
+## Mode Management
+
+| Mode | Threads max |
+|------|-------------|
+| light | 15 |
+| normal | 50 |
+| heavy | 100 |
+| max | 200 |
+
+**CLI:**
+```bash
+ai mode status            # Show current mode and stats
+ai mode light             # Switch to light mode
+ai mode normal            # Switch to normal mode
+ai mode heavy             # Switch to heavy mode
+ai mode max               # Switch to max mode
+```
+
+**Note:** Changing to a lower quota will auto-suspend excess threads.
+
 ## Timeouts
 
 | Op | Timeout |
