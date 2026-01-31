@@ -199,6 +199,68 @@ class BridgeStorage:
         """Get all active (non-invalid) bridges."""
         return [b for b in self.get_all() if b.is_valid()]
 
+    def get_alive(self) -> List[ThinkBridge]:
+        """Get all alive bridges (weight above death threshold)."""
+        return [b for b in self.get_all() if b.is_alive()]
+
+    def prune_dead_bridges(self) -> int:
+        """
+        Apply decay and remove dead bridges.
+
+        This implements synaptic pruning: bridges that haven't been
+        used decay over time and eventually die.
+
+        Returns:
+            Number of bridges pruned (deleted)
+        """
+        all_bridges = self.get_all()
+        pruned_count = 0
+
+        for bridge in all_bridges:
+            # Apply decay and check if should die
+            should_die = bridge.decay()
+
+            if should_die:
+                # Bridge is dead, delete it
+                self.delete(bridge.id)
+                pruned_count += 1
+            else:
+                # Bridge survived, save updated weight
+                self.save(bridge)
+
+        return pruned_count
+
+    def get_weight_stats(self) -> Dict[str, float]:
+        """
+        Get weight statistics for all bridges.
+
+        Returns:
+            Dict with min, max, avg, alive_count, dead_count
+        """
+        all_bridges = self.get_all()
+
+        if not all_bridges:
+            return {
+                "min": 0.0,
+                "max": 0.0,
+                "avg": 0.0,
+                "alive_count": 0,
+                "dead_count": 0,
+                "total": 0
+            }
+
+        weights = [b.weight for b in all_bridges]
+        alive = [b for b in all_bridges if b.is_alive()]
+
+        return {
+            "min": min(weights),
+            "max": max(weights),
+            "avg": sum(weights) / len(weights),
+            "alive_count": len(alive),
+            "dead_count": len(all_bridges) - len(alive),
+            "total": len(all_bridges)
+        }
+
     def _update_index(self, bridge: ThinkBridge):
         """Update index after bridge change."""
         index = self._read_json(self._index_path) or {

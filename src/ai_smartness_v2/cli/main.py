@@ -76,6 +76,16 @@ def main():
         default=20,
         help="Number of bridges to show (default: 20)"
     )
+    bridges_parser.add_argument(
+        "--show-weight", "-w",
+        action="store_true",
+        help="Show weight column (decay status)"
+    )
+    bridges_parser.add_argument(
+        "--prune",
+        action="store_true",
+        help="Apply decay and remove dead bridges"
+    )
 
     # search command
     search_parser = subparsers.add_parser("search", help="Search threads")
@@ -135,8 +145,10 @@ def main():
                 from .commands.threads import run_thread_detail
                 return run_thread_detail(ai_path, args.id)
             elif args.command == "bridges":
-                from .commands.bridges import run_bridges
-                return run_bridges(ai_path, args.thread, args.limit)
+                from .commands.bridges import run_bridges, run_prune
+                if args.prune:
+                    return run_prune(ai_path)
+                return run_bridges(ai_path, args.thread, args.limit, args.show_weight)
             elif args.command == "search":
                 from .commands.search import run_search
                 return run_search(ai_path, args.query, args.limit)
@@ -169,8 +181,10 @@ def main():
                 from commands.threads import run_thread_detail
                 return run_thread_detail(ai_path, args.id)
             elif args.command == "bridges":
-                from commands.bridges import run_bridges
-                return run_bridges(ai_path, args.thread, args.limit)
+                from commands.bridges import run_bridges, run_prune
+                if args.prune:
+                    return run_prune(ai_path)
+                return run_bridges(ai_path, args.thread, args.limit, args.show_weight)
             elif args.command == "search":
                 from commands.search import run_search
                 return run_search(ai_path, args.query, args.limit)

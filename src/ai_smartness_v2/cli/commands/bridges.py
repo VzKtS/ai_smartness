@@ -71,7 +71,7 @@ def get_thread_title(ai_path: Path, thread_id: str) -> str:
     return thread_id[:20] + ".."
 
 
-def run_bridges(ai_path: Path, thread_filter: Optional[str], limit: int) -> int:
+def run_bridges(ai_path: Path, thread_filter: Optional[str], limit: int, show_weight: bool = False) -> int:
     """
     List bridges.
 
@@ -79,6 +79,7 @@ def run_bridges(ai_path: Path, thread_filter: Optional[str], limit: int) -> int:
         ai_path: Path to .ai directory
         thread_filter: Optional thread ID to filter by
         limit: Maximum number to show
+        show_weight: Show weight column
 
     Returns:
         Exit code
@@ -94,8 +95,12 @@ def run_bridges(ai_path: Path, thread_filter: Optional[str], limit: int) -> int:
 
     # Print header
     print()
-    print(f"{'Source':<25} | {'Type':<12} | {'Target':<25} | {'Conf':<5}")
-    print("-" * 25 + "-+-" + "-" * 12 + "-+-" + "-" * 25 + "-+-" + "-" * 5)
+    if show_weight:
+        print(f"{'Source':<25} | {'Type':<12} | {'Target':<25} | {'Conf':<5} | {'Weight':<6}")
+        print("-" * 25 + "-+-" + "-" * 12 + "-+-" + "-" * 25 + "-+-" + "-" * 5 + "-+-" + "-" * 6)
+    else:
+        print(f"{'Source':<25} | {'Type':<12} | {'Target':<25} | {'Conf':<5}")
+        print("-" * 25 + "-+-" + "-" * 12 + "-+-" + "-" * 25 + "-+-" + "-" * 5)
 
     # Print bridges
     for bridge in bridges[:limit]:
@@ -103,12 +108,23 @@ def run_bridges(ai_path: Path, thread_filter: Optional[str], limit: int) -> int:
         target_id = bridge.get("target_id", "")
         relation = bridge.get("relation_type", "unknown")
         confidence = bridge.get("confidence", 0)
+        weight = bridge.get("weight", 0.5)  # Default for old bridges
 
         # Get titles for readability
         source_title = get_thread_title(ai_path, source_id)[:23]
         target_title = get_thread_title(ai_path, target_id)[:23]
 
-        print(f"{source_title:<25} | {relation:<12} | {target_title:<25} | {confidence:>4.2f}")
+        if show_weight:
+            # Color indicator for weight
+            if weight >= 0.7:
+                weight_indicator = f"{weight:>5.2f}+"
+            elif weight >= 0.3:
+                weight_indicator = f"{weight:>5.2f} "
+            else:
+                weight_indicator = f"{weight:>5.2f}!"
+            print(f"{source_title:<25} | {relation:<12} | {target_title:<25} | {confidence:>4.2f} | {weight_indicator}")
+        else:
+            print(f"{source_title:<25} | {relation:<12} | {target_title:<25} | {confidence:>4.2f}")
 
     total = len(bridges)
     if total > limit:
@@ -124,5 +140,66 @@ def run_bridges(ai_path: Path, thread_filter: Optional[str], limit: int) -> int:
     for rel, count in sorted(type_counts.items(), key=lambda x: -x[1]):
         print(f"  {rel}: {count}")
 
+    # Show weight stats if requested
+    if show_weight:
+        weights = [b.get("weight", 0.5) for b in bridges]
+        alive = [w for w in weights if w >= 0.05]
+        print()
+        print("Weight stats:")
+        print(f"  Min: {min(weights):.2f}, Max: {max(weights):.2f}, Avg: {sum(weights)/len(weights):.2f}")
+        print(f"  Alive: {len(alive)}/{len(bridges)} ({len(alive)/len(bridges)*100:.0f}%)")
+
     print()
     return 0
+
+
+def run_prune(ai_path: Path) -> int:
+    """
+    Apply decay and prune dead bridges.
+
+    Args:
+        ai_path: Path to .ai directory
+
+    Returns:
+        Exit code
+    """
+    import sys
+    sys.path.insert(0, str(ai_path.parent.parent / "src"))
+
+    try:
+        from ai_smartness_v2.storage.bridges import BridgeStorage
+
+        bridges_path = ai_path / "db" / "bridges"
+        if not bridges_path.exists():
+            print("No bridges directory found.")
+            return 0
+
+        storage = BridgeStorage(bridges_path)
+
+        # Get stats before
+        all_bridges = storage.get_all()
+        total_before = len(all_bridges)
+
+        if total_before == 0:
+            print("No bridges to prune.")
+            return 0
+
+        print(f"Pruning {total_before} bridges...")
+        print()
+
+        # Apply decay and prune
+        pruned = storage.prune_dead_bridges()
+
+        # Get stats after
+        stats = storage.get_weight_stats()
+
+        print(f"Pruned: {pruned} bridges")
+        print(f"Remaining: {stats['alive_count']} alive, {stats['dead_count']} weak")
+        print(f"Weight range: {stats['min']:.2f} - {stats['max']:.2f} (avg: {stats['avg']:.2f})")
+        print()
+
+        return 0
+
+    except Exception as e:
+        print(f"Error during pruning: {e}")
+        return 1

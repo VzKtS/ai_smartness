@@ -1,13 +1,16 @@
 """
 Coherence Analyzer - Fast LLM-based coherence checking.
 
-Uses haiku for quick coherence scoring between context (glob/grep)
-and subsequent content (response).
+Uses haiku for quick coherence scoring between consecutive tool outputs.
+Every tool output is compared to the previous one to determine relationship.
 
 Three-tier decision:
-- > 0.6: child thread (strong relationship)
-- 0.3-0.6: orphan thread (let gossip handle it)
-- < 0.3: forget (noise)
+- > 0.6: child thread (strong relationship → parent-child link)
+- 0.3-0.6: orphan thread (weak relationship → new root, gossip handles)
+- < 0.3: forget (noise → skip thread creation)
+
+This creates a natural chain of semantically-linked threads,
+mimicking neural network synaptic connections.
 """
 
 import subprocess
@@ -22,14 +25,14 @@ logger = logging.getLogger(__name__)
 # Coherence prompt - designed for fast, binary-ish decisions
 COHERENCE_PROMPT = """Compare ces deux contenus et évalue leur cohérence thématique.
 
-CONTEXTE (résultat d'une recherche/listing):
+CONTEXTE (contenu précédent):
 {context}
 
-CONTENU (réponse/analyse qui suit):
+CONTENU (contenu suivant):
 {content}
 
 Évalue la cohérence sur une échelle de 0.0 à 1.0:
-- 1.0 = Le contenu est une analyse/discussion DIRECTE du contexte
+- 1.0 = Le contenu est une continuation/analyse DIRECTE du contexte
 - 0.7 = Le contenu traite du même sujet que le contexte
 - 0.4 = Le contenu est vaguement lié au contexte
 - 0.1 = Le contenu n'a aucun rapport avec le contexte
@@ -133,10 +136,14 @@ def decide_thread_action(coherence: float) -> str:
         return "forget"
 
 
-# Context tools that trigger coherence checking
-CONTEXT_TOOLS = {"Glob", "Grep"}
+# DEPRECATED: All tools now trigger coherence checking
+# Kept for backwards compatibility only
+CONTEXT_TOOLS = None  # All tools are context tools
 
 
 def is_context_tool(tool_name: str) -> bool:
-    """Check if a tool is a context-setting tool."""
-    return tool_name in CONTEXT_TOOLS
+    """
+    DEPRECATED: All tools are now context-setting tools.
+    Always returns True for backwards compatibility.
+    """
+    return True

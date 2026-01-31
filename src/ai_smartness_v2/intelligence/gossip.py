@@ -304,19 +304,52 @@ class GossipPropagator:
 
     def weaken_unused_bridges(self, days_threshold: int = 7):
         """
+        DEPRECATED: Use prune_dead_bridges() instead.
+
         Weaken bridges that haven't been used recently.
-
-        Args:
-            days_threshold: Days without use before weakening
+        Kept for backward compatibility.
         """
-        from datetime import datetime, timedelta
+        # Just call the new decay-based pruning
+        self.prune_dead_bridges()
 
-        cutoff = datetime.now() - timedelta(days=days_threshold)
+    def prune_dead_bridges(self) -> int:
+        """
+        Apply decay and prune dead bridges.
 
-        for bridge in self.storage.bridges.get_active():
-            if bridge.last_used and bridge.last_used < cutoff:
-                bridge.weaken()
-                self.storage.bridges.save(bridge)
-            elif not bridge.last_used and bridge.created_at < cutoff:
-                bridge.weaken()
-                self.storage.bridges.save(bridge)
+        Implements synaptic pruning: bridges decay over time
+        based on their half-life. Bridges that fall below the
+        death threshold are deleted.
+
+        Returns:
+            Number of bridges pruned
+        """
+        return self.storage.bridges.prune_dead_bridges()
+
+    def get_bridge_health(self) -> dict:
+        """
+        Get health statistics for the bridge network.
+
+        Returns:
+            Dict with weight stats and network metrics
+        """
+        stats = self.storage.bridges.get_weight_stats()
+        all_bridges = self.storage.bridges.get_all()
+
+        # Count by relation type
+        by_type = {}
+        for bridge in all_bridges:
+            type_name = bridge.relation_type.value
+            by_type[type_name] = by_type.get(type_name, 0) + 1
+
+        # Count by status
+        by_status = {}
+        for bridge in all_bridges:
+            status_name = bridge.status.value
+            by_status[status_name] = by_status.get(status_name, 0) + 1
+
+        return {
+            "weight_stats": stats,
+            "by_type": by_type,
+            "by_status": by_status,
+            "half_life_days": 3.0  # From ThinkBridge.HALF_LIFE_DAYS
+        }

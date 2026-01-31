@@ -87,7 +87,8 @@ class ProcessorDaemon:
         self.gossip = None
 
         # Pending context for coherence-based child linking
-        # Set when Glob/Grep creates a thread, cleared after use or timeout
+        # Set after every thread creation, checked before next capture
+        # Creates natural parent-child chains based on semantic coherence
         self.pending_context: Optional[Dict[str, Any]] = None
         self.pending_context_lock = threading.Lock()
 
@@ -258,19 +259,19 @@ class ProcessorDaemon:
             logger.error(f"Error processing capture: {e}")
             return {"status": "error", "error": str(e)}
 
-    # Context tools that trigger coherence-based child linking
-    CONTEXT_TOOLS = {"Glob", "Grep"}
-
     def _process_capture(self, tool: str, content: str, file_path: Optional[str]) -> dict:
         """
         Process a capture through ThreadManager.
 
-        Includes coherence-based child linking for context tools (Glob/Grep):
-        - Context tool creates thread + sets pending_context
-        - Next content checks coherence with pending_context
+        Universal coherence-based child linking:
+        - Every tool creates thread + sets pending_context
+        - Next capture checks coherence with pending_context
         - High coherence (>0.6) → child thread
-        - Medium coherence (0.3-0.6) → orphan thread
-        - Low coherence (<0.3) → forget (skip)
+        - Medium coherence (0.3-0.6) → orphan thread (new root)
+        - Low coherence (<0.3) → forget (skip capture)
+
+        This creates a natural chain of parent-child threads where
+        the coherence score determines the relationship strength.
 
         Args:
             tool: Tool name (Read, Write, Task, etc.)
@@ -320,9 +321,10 @@ class ProcessorDaemon:
         source_type = self.SOURCE_MAP.get(tool, "prompt")
 
         # Check for pending context (coherence-based child linking)
+        # Every capture checks coherence with the previous one
         parent_thread_id = None
         with self.pending_context_lock:
-            if self.pending_context and tool not in self.CONTEXT_TOOLS:
+            if self.pending_context:
                 # Check coherence with pending context
                 parent_thread_id = self._check_coherence_and_decide(cleaned_content)
 
@@ -339,16 +341,15 @@ class ProcessorDaemon:
             parent_hint=parent_thread_id  # Pass parent hint for child linking
         )
 
-        # If this is a context tool, set pending_context for next capture
-        if tool in self.CONTEXT_TOOLS:
-            with self.pending_context_lock:
-                self.pending_context = {
-                    "thread_id": thread.id,
-                    "content": cleaned_content,
-                    "tool": tool,
-                    "timestamp": datetime.now()
-                }
-                logger.info(f"Set pending_context from [{tool}] → {thread.id[:8]}...")
+        # Set pending_context for next capture (universal coherence chain)
+        with self.pending_context_lock:
+            self.pending_context = {
+                "thread_id": thread.id,
+                "content": cleaned_content,
+                "tool": tool,
+                "timestamp": datetime.now()
+            }
+            logger.info(f"Set pending_context from [{tool}] → {thread.id[:8]}...")
 
         # Trigger gossip propagation
         if self.gossip:
@@ -407,15 +408,17 @@ class ProcessorDaemon:
 
             logger.info(f"Coherence with [{context_tool}]: {coherence_score:.2f} → {action} ({reason})")
 
-            # Clear pending context after use
-            self.pending_context = None
-
             if action == "child":
+                # Clear context - new thread will set its own
+                self.pending_context = None
                 return context_thread_id
             elif action == "forget":
-                # Return special marker to skip thread creation
+                # KEEP pending_context - next tool should try with same context
+                # This preserves the chain even when we skip noise
                 return "__FORGET__"
             else:  # orphan
+                # Clear context - new root thread will set its own
+                self.pending_context = None
                 return None
 
         except Exception as e:

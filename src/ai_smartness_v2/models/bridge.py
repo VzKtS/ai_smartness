@@ -39,7 +39,18 @@ class ThinkBridge:
 
     Created by LLM reasoning, not hardcoded thresholds.
     Propagates via gossip pattern.
+
+    Weight decay (synaptic pruning):
+    - weight starts at confidence value
+    - decays exponentially over time (half-life)
+    - usage reinforces weight (Hebbian learning)
+    - bridge dies when weight < DEATH_THRESHOLD
     """
+    # Decay constants (class-level)
+    HALF_LIFE_DAYS: float = 3.0      # Weight halves every 3 days without use
+    DEATH_THRESHOLD: float = 0.05    # Bridge dies below this weight
+    USE_BOOST: float = 0.1           # Weight boost per use
+
     id: str
     source_id: str
     target_id: str
@@ -52,6 +63,9 @@ class ThinkBridge:
     # Confidence (from LLM or embedding similarity)
     confidence: float = 0.8
     status: BridgeStatus = BridgeStatus.ACTIVE
+
+    # Weight for decay/pruning (separate from confidence)
+    weight: float = 1.0  # Starts at 1.0, decays over time
 
     # Propagation tracking
     propagated_from: Optional[str] = None  # Parent bridge ID if propagated
@@ -75,7 +89,7 @@ class ThinkBridge:
         created_by: str = "llm",
         propagated_from: Optional[str] = None
     ) -> "ThinkBridge":
-        """Create a new bridge."""
+        """Create a new bridge with weight initialized from confidence."""
         now = datetime.now()
         return cls(
             id=f"bridge_{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}",
@@ -85,6 +99,7 @@ class ThinkBridge:
             reason=reason,
             confidence=confidence,
             shared_concepts=shared_concepts or [],
+            weight=confidence,  # Initialize weight from confidence
             created_at=now,
             created_by=created_by,
             propagated_from=propagated_from,
@@ -92,9 +107,51 @@ class ThinkBridge:
         )
 
     def record_use(self):
-        """Record that this bridge was used for context retrieval."""
+        """
+        Record that this bridge was used for context retrieval.
+
+        Hebbian learning: usage reinforces the connection.
+        """
         self.last_used = datetime.now()
         self.use_count += 1
+        # Boost weight (capped at 1.0)
+        self.weight = min(1.0, self.weight + self.USE_BOOST)
+        # Ensure active status if previously weak
+        if self.status == BridgeStatus.WEAK:
+            self.status = BridgeStatus.ACTIVE
+
+    def decay(self) -> bool:
+        """
+        Apply temporal decay to weight.
+
+        Uses exponential decay with half-life.
+
+        Returns:
+            True if bridge should die (weight < threshold)
+        """
+        # Reference time: last_used or created_at
+        reference = self.last_used if self.last_used else self.created_at
+
+        # Calculate time since last activity
+        hours_since = (datetime.now() - reference).total_seconds() / 3600
+        days_since = hours_since / 24
+
+        # Exponential decay: weight = weight * 0.5^(days/half_life)
+        decay_factor = 0.5 ** (days_since / self.HALF_LIFE_DAYS)
+        self.weight *= decay_factor
+
+        # Update status based on weight
+        if self.weight < self.DEATH_THRESHOLD:
+            self.status = BridgeStatus.INVALID
+            return True  # Should die
+        elif self.weight < 0.3:
+            self.status = BridgeStatus.WEAK
+
+        return False  # Still alive
+
+    def is_alive(self) -> bool:
+        """Check if bridge is still alive (weight above threshold)."""
+        return self.weight >= self.DEATH_THRESHOLD and self.status != BridgeStatus.INVALID
 
     def weaken(self):
         """Mark bridge as weak (low confidence)."""
@@ -130,6 +187,7 @@ class ThinkBridge:
             "reason": self.reason,
             "shared_concepts": self.shared_concepts,
             "confidence": self.confidence,
+            "weight": self.weight,
             "status": self.status.value,
             "propagated_from": self.propagated_from,
             "propagation_depth": self.propagation_depth,
@@ -141,7 +199,10 @@ class ThinkBridge:
 
     @classmethod
     def from_dict(cls, data: dict) -> "ThinkBridge":
-        """Deserialize from dictionary."""
+        """Deserialize from dictionary with backward compatibility."""
+        confidence = data.get("confidence", 0.8)
+        # Backward compat: old bridges without weight get 0.5 (neutral)
+        weight = data.get("weight", 0.5)
         return cls(
             id=data["id"],
             source_id=data["source_id"],
@@ -149,7 +210,8 @@ class ThinkBridge:
             relation_type=BridgeType(data["relation_type"]),
             reason=data["reason"],
             shared_concepts=data.get("shared_concepts", []),
-            confidence=data.get("confidence", 0.8),
+            confidence=confidence,
+            weight=weight,
             status=BridgeStatus(data.get("status", "active")),
             propagated_from=data.get("propagated_from"),
             propagation_depth=data.get("propagation_depth", 0),
