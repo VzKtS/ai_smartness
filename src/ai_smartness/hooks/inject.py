@@ -72,7 +72,7 @@ def clear_hook_guard():
 # =============================================================================
 
 def get_package_root() -> Path:
-    """Get the ai_smartness_v2 package root."""
+    """Get the ai_smartness package root."""
     return Path(__file__).parent.parent
 
 
@@ -459,7 +459,7 @@ def send_prompt_to_daemon(message: str, ai_path: Path) -> bool:
         package_root = get_package_root()
         sys.path.insert(0, str(package_root.parent))
 
-        from ai_smartness_v2.daemon.client import send_capture_with_retry
+        from ai_smartness.daemon.client import send_capture_with_retry
 
         # Send with tool="UserPrompt" (processor defaults to source_type="prompt")
         return send_capture_with_retry(ai_path, {
@@ -606,7 +606,7 @@ def get_memory_context(message: str, db_path: Path) -> str:
         package_root = get_package_root()
         sys.path.insert(0, str(package_root.parent))
 
-        from ai_smartness_v2.intelligence.memory_retriever import MemoryRetriever
+        from ai_smartness.intelligence.memory_retriever import MemoryRetriever
 
         ai_path = db_path.parent
         retriever = MemoryRetriever(db_path)

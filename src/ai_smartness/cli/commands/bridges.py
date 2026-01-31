@@ -167,7 +167,7 @@ def run_prune(ai_path: Path) -> int:
     sys.path.insert(0, str(ai_path.parent.parent / "src"))
 
     try:
-        from ai_smartness_v2.storage.bridges import BridgeStorage
+        from ai_smartness.storage.bridges import BridgeStorage
 
         bridges_path = ai_path / "db" / "bridges"
         if not bridges_path.exists():

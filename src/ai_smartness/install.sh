@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# AI Smartness v2 Installation Script
+# AI Smartness Installation Script (v3.0+)
 # Simplified architecture with absolute paths
+# Includes migration from ai_smartness_v2 to ai_smartness
 #
 # Supports: English (en), French (fr), Spanish (es)
 # Usage: ./install.sh [project_path] [--lang=en|fr|es]
@@ -73,9 +74,9 @@ export AI_SMARTNESS_LANG="$LANG"
 
 # Localized messages
 declare -A MSG_BANNER_TITLE=(
-    ["en"]="AI Smartness v2.0"
-    ["fr"]="AI Smartness v2.0"
-    ["es"]="AI Smartness v2.0"
+    ["en"]="AI Smartness v3.0"
+    ["fr"]="AI Smartness v3.0"
+    ["es"]="AI Smartness v3.0"
 )
 declare -A MSG_BANNER_SUB=(
     ["en"]="Persistent Memory for Claude Agents"
@@ -225,29 +226,68 @@ TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 echo "📁 Target: $TARGET_DIR"
 
 # ============================================================================
-# CHECK EXISTING INSTALLATION
+# CHECK EXISTING INSTALLATION (v2 migration + update)
 # ============================================================================
 
 KEEP_DATA="no"
-AI_SMARTNESS_DIR="$TARGET_DIR/ai_smartness_v2"
+BACKUP_DIR=""
+AI_SMARTNESS_DIR="$TARGET_DIR/ai_smartness"
+LEGACY_DIR="$TARGET_DIR/ai_smartness_v2"
 
+# Check for legacy v2 installation first
+if [ -d "$LEGACY_DIR" ]; then
+    echo ""
+    echo "🔄 Found legacy ai_smartness_v2 installation - migrating to ai_smartness..."
+
+    # Check for data in legacy installation
+    LEGACY_DB="$LEGACY_DIR/.ai/db"
+    if [ -d "$LEGACY_DB" ]; then
+        THREAD_COUNT=$(find "$LEGACY_DB/threads" -name "*.json" 2>/dev/null | wc -l)
+        BRIDGE_COUNT=$(find "$LEGACY_DB/bridges" -name "*.json" 2>/dev/null | wc -l)
+
+        if [ "$THREAD_COUNT" -gt 0 ] || [ "$BRIDGE_COUNT" -gt 0 ]; then
+            echo "   📊 Legacy data found: Threads: $THREAD_COUNT, Bridges: $BRIDGE_COUNT"
+            KEEP_DATA="yes"
+            # Backup legacy data
+            BACKUP_DIR="/tmp/ai_smartness_migration_$$"
+            cp -r "$LEGACY_DIR/.ai" "$BACKUP_DIR"
+            echo "   ✓ Legacy data backed up for migration"
+        fi
+    fi
+
+    # Remove legacy installation
+    rm -rf "$LEGACY_DIR"
+    echo "   ✓ Legacy ai_smartness_v2 removed"
+
+    # Also remove legacy entry from .claude/settings.json hooks
+    CLAUDE_SETTINGS="$TARGET_DIR/.claude/settings.json"
+    if [ -f "$CLAUDE_SETTINGS" ]; then
+        # Replace ai_smartness_v2 with ai_smartness in hooks
+        sed -i 's/ai_smartness_v2/ai_smartness/g' "$CLAUDE_SETTINGS" 2>/dev/null || true
+        echo "   ✓ Updated .claude/settings.json hooks paths"
+    fi
+fi
+
+# Check for current installation
 if [ -d "$AI_SMARTNESS_DIR" ]; then
     echo ""
     echo "⚠️  ${MSG_ALREADY_INSTALLED[$LANG]}"
 
-    # Check for existing data
-    DB_DIR="$AI_SMARTNESS_DIR/.ai/db"
-    if [ -d "$DB_DIR" ]; then
-        THREAD_COUNT=$(find "$DB_DIR/threads" -name "*.json" 2>/dev/null | wc -l)
-        BRIDGE_COUNT=$(find "$DB_DIR/bridges" -name "*.json" 2>/dev/null | wc -l)
+    # Check for existing data (if not already from legacy)
+    if [ "$KEEP_DATA" != "yes" ]; then
+        DB_DIR="$AI_SMARTNESS_DIR/.ai/db"
+        if [ -d "$DB_DIR" ]; then
+            THREAD_COUNT=$(find "$DB_DIR/threads" -name "*.json" 2>/dev/null | wc -l)
+            BRIDGE_COUNT=$(find "$DB_DIR/bridges" -name "*.json" 2>/dev/null | wc -l)
 
-        if [ "$THREAD_COUNT" -gt 0 ] || [ "$BRIDGE_COUNT" -gt 0 ]; then
-            echo "   📊 Threads: $THREAD_COUNT, Bridges: $BRIDGE_COUNT"
-            read -p "   ${MSG_KEEP_DB[$LANG]}" -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[KkCcGg]$ ]]; then
-                KEEP_DATA="yes"
-                echo "   ✓ Data will be preserved"
+            if [ "$THREAD_COUNT" -gt 0 ] || [ "$BRIDGE_COUNT" -gt 0 ]; then
+                echo "   📊 Threads: $THREAD_COUNT, Bridges: $BRIDGE_COUNT"
+                read -p "   ${MSG_KEEP_DB[$LANG]}" -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[KkCcGg]$ ]]; then
+                    KEEP_DATA="yes"
+                    echo "   ✓ Data will be preserved"
+                fi
             fi
         fi
     fi
@@ -259,10 +299,13 @@ if [ -d "$AI_SMARTNESS_DIR" ]; then
         exit 0
     fi
 
-    # Backup if keeping data
-    if [ "$KEEP_DATA" = "yes" ] && [ -d "$DB_DIR" ]; then
-        BACKUP_DIR="/tmp/ai_smartness_v2_backup_$$"
-        cp -r "$AI_SMARTNESS_DIR/.ai" "$BACKUP_DIR"
+    # Backup if keeping data (and not already backed up from legacy)
+    if [ "$KEEP_DATA" = "yes" ] && [ -z "$BACKUP_DIR" ]; then
+        DB_DIR="$AI_SMARTNESS_DIR/.ai/db"
+        if [ -d "$DB_DIR" ]; then
+            BACKUP_DIR="/tmp/ai_smartness_backup_$$"
+            cp -r "$AI_SMARTNESS_DIR/.ai" "$BACKUP_DIR"
+        fi
     fi
 
     rm -rf "$AI_SMARTNESS_DIR"
@@ -519,13 +562,13 @@ echo "📝 Configuring .gitignore..."
 GITIGNORE="$TARGET_DIR/.gitignore"
 
 GITIGNORE_ENTRIES="
-# AI Smartness v2
-ai_smartness_v2/
+# AI Smartness
+ai_smartness/
 .ai/
 "
 
 if [ -f "$GITIGNORE" ]; then
-    if ! grep -q "^ai_smartness_v2/$" "$GITIGNORE" 2>/dev/null; then
+    if ! grep -q "^ai_smartness/$" "$GITIGNORE" 2>/dev/null; then
         echo "$GITIGNORE_ENTRIES" >> "$GITIGNORE"
         echo "   ✓ Entries added"
     else
@@ -541,12 +584,12 @@ fi
 # ============================================================================
 
 CLAUDEIGNORE="$TARGET_DIR/.claudeignore"
-CLAUDEIGNORE_ENTRIES="# AI Smartness v2 - invisible to agent
-ai_smartness_v2/
+CLAUDEIGNORE_ENTRIES="# AI Smartness - invisible to agent
+ai_smartness/
 .claude/"
 
 if [ -f "$CLAUDEIGNORE" ]; then
-    if ! grep -q "^ai_smartness_v2/$" "$CLAUDEIGNORE" 2>/dev/null; then
+    if ! grep -q "^ai_smartness/$" "$CLAUDEIGNORE" 2>/dev/null; then
         echo "" >> "$CLAUDEIGNORE"
         echo "$CLAUDEIGNORE_ENTRIES" >> "$CLAUDEIGNORE"
     fi
@@ -568,15 +611,15 @@ mkdir -p "$AI_SMARTNESS_DIR/bin"
 cat > "$AI_SMARTNESS_DIR/bin/ai" << 'AIEOF'
 #!/bin/bash
 #
-# AI Smartness v2 CLI
+# AI Smartness CLI
 #
 
-# Find the ai_smartness_v2 directory
+# Find the ai_smartness directory
 find_ai_smartness() {
     local dir="$PWD"
     while [ "$dir" != "/" ]; do
-        if [ -d "$dir/ai_smartness_v2" ]; then
-            echo "$dir/ai_smartness_v2"
+        if [ -d "$dir/ai_smartness" ]; then
+            echo "$dir/ai_smartness"
             return 0
         fi
         dir="$(dirname "$dir")"
@@ -587,7 +630,7 @@ find_ai_smartness() {
 AI_SMARTNESS_PATH=$(find_ai_smartness)
 
 if [ -z "$AI_SMARTNESS_PATH" ]; then
-    echo "Error: Could not find ai_smartness_v2 directory"
+    echo "Error: Could not find ai_smartness directory"
     exit 1
 fi
 
@@ -631,8 +674,8 @@ SOCKET_FILE="$AI_SMARTNESS_DIR/.ai/processor.sock"
 
 # Kill ALL existing daemons for this project (including zombies)
 echo "   Cleaning up existing daemons..."
-pkill -9 -f "ai_smartness_v2.daemon.processor.*$TARGET_DIR" 2>/dev/null || true
-pkill -9 -f "ai_smartness_v2/daemon/processor.py.*$AI_SMARTNESS_DIR" 2>/dev/null || true
+pkill -9 -f "ai_smartness.daemon.processor.*$TARGET_DIR" 2>/dev/null || true
+pkill -9 -f "ai_smartness/daemon/processor.py.*$AI_SMARTNESS_DIR" 2>/dev/null || true
 
 # Also kill by PID file if exists
 if [ -f "$PID_FILE" ]; then
@@ -652,7 +695,7 @@ export PYTHONPATH="$TARGET_DIR:$PYTHONPATH"
 python3 -c "
 import sys
 sys.path.insert(0, '$TARGET_DIR')
-from ai_smartness_v2.daemon.client import ensure_daemon_running
+from ai_smartness.daemon.client import ensure_daemon_running
 from pathlib import Path
 ai_path = Path('$AI_SMARTNESS_DIR/.ai')
 ensure_daemon_running(ai_path)
@@ -677,7 +720,7 @@ else
     echo "   ❌ ${MSG_DAEMON_MANUAL[$LANG]}"
     echo ""
     echo "   ⚠️  ${MSG_DAEMON_HELP[$LANG]}"
-    echo "      cd $TARGET_DIR && python3 -m ai_smartness_v2.daemon.processor --db-path $AI_SMARTNESS_DIR/.ai/db"
+    echo "      cd $TARGET_DIR && python3 -m ai_smartness.daemon.processor --db-path $AI_SMARTNESS_DIR/.ai/db"
 fi
 
 # ============================================================================

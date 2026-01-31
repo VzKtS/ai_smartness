@@ -30,7 +30,7 @@ def run_reindex(ai_path: Path, verbose: bool = False) -> int:
         sys.path.insert(0, str(package_dir))
 
     try:
-        from ai_smartness_v2.processing.embeddings import EmbeddingManager
+        from ai_smartness.processing.embeddings import EmbeddingManager
     except ImportError:
         print("ERROR: Could not import EmbeddingManager")
         return 1

@@ -44,9 +44,9 @@ The system maintains a **thought network** where concepts remain connected and a
 ## Installation
 
 ```bash
-# Clone or copy ai_smartness_v2-DEV to your machine
+# Clone or copy ai_smartness-DEV to your machine
 # Then run install in your target project:
-/path/to/ai_smartness_v2-DEV/install.sh /path/to/your/project
+/path/to/ai_smartness-DEV/install.sh /path/to/your/project
 ```
 
 ### What the Installer Does
@@ -55,9 +55,9 @@ The system maintains a **thought network** where concepts remain connected and a
 2. **Mode selection**: Heavy, Normal, or Light (affects thread limits)
 3. **Installs sentence-transformers** (if not already installed)
 4. **Detects Claude CLI** path for LLM extraction
-5. **Copies files** to `your_project/ai_smartness_v2/`
+5. **Copies files** to `your_project/ai_smartness/`
 6. **Configures hooks** with absolute paths in `.claude/settings.json`
-7. **Initializes database** in `ai_smartness_v2/.ai/db/`
+7. **Initializes database** in `ai_smartness/.ai/db/`
 8. **Installs CLI** to `~/.local/bin/ai`
 
 ### Requirements
@@ -191,7 +191,7 @@ The system automatically detects and stores user preferences:
 - "always make a plan before implementation"
 - "never commit directly to main"
 
-Rules are stored in `ai_smartness_v2/.ai/user_rules.json` and injected into every prompt.
+Rules are stored in `ai_smartness/.ai/user_rules.json` and injected into every prompt.
 
 ### 6. Synthesis (PreCompact hook)
 
@@ -205,7 +205,7 @@ At 95% context window:
 
 ## Configuration
 
-Config stored in `ai_smartness_v2/.ai/config.json`:
+Config stored in `ai_smartness/.ai/config.json`:
 
 ```json
 {
@@ -287,7 +287,7 @@ ai bridges --prune
 ## Database Structure
 
 ```
-ai_smartness_v2/.ai/
+ai_smartness/.ai/
 ├── config.json           # Configuration
 ├── user_rules.json       # User-defined rules
 ├── processor.pid         # Daemon PID
@@ -321,7 +321,7 @@ Check hook paths in `.claude/settings.json` - they must be **absolute paths**.
 Claude CLI not found or not responding:
 ```bash
 which claude
-# Update path in ai_smartness_v2/.ai/config.json if needed
+# Update path in ai_smartness/.ai/config.json if needed
 ```
 
 ### Low similarity scores / Poor memory
@@ -339,7 +339,7 @@ ai reindex
 Check with `ai health`. If below 10%:
 1. Verify sentence-transformers is installed
 2. Run `ai reindex` to recalculate embeddings
-3. Check `ai_smartness_v2/.ai/processor.log` for errors
+3. Check `ai_smartness/.ai/processor.log` for errors
 
 ---
 

@@ -4,7 +4,7 @@
 
 1. **Installez** dans votre projet :
    ```bash
-   /chemin/vers/ai_smartness_v2-DEV/install.sh /chemin/vers/votre/projet
+   /chemin/vers/ai_smartness-DEV/install.sh /chemin/vers/votre/projet
    ```
 
 2. **Travaillez normalement** - le système capture tout automatiquement
@@ -291,7 +291,7 @@ Quand vous démarrez une nouvelle session :
 
 ### Emplacement
 
-`ai_smartness_v2/.ai/config.json`
+`ai_smartness/.ai/config.json`
 
 ### Paramètres Clés
 
@@ -335,7 +335,7 @@ ai daemon start
 
 Si échec, vérifiez les logs :
 ```bash
-cat ai_smartness_v2/.ai/daemon_stderr.log
+cat ai_smartness/.ai/daemon_stderr.log
 ```
 
 ### "Heuristic fallback" dans les titres
@@ -362,7 +362,7 @@ Les threads ne se consolident pas ? Vérifiez :
 
 Vérifiez les logs d'injection :
 ```bash
-tail -20 ai_smartness_v2/.ai/inject.log
+tail -20 ai_smartness/.ai/inject.log
 ```
 
 Devrait afficher des lignes comme :
@@ -410,6 +410,6 @@ Vérifiez `.claude/settings.json` :
 
 Si vous rencontrez des problèmes :
 1. Lancez `ai health` pour diagnostiquer
-2. Vérifiez les logs dans `ai_smartness_v2/.ai/`
+2. Vérifiez les logs dans `ai_smartness/.ai/`
 3. Vérifiez les hooks dans `.claude/settings.json`
 4. Essayez `ai daemon stop && ai daemon start`

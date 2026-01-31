@@ -42,9 +42,9 @@ El sistema mantiene una **red de pensamientos** donde los conceptos permanecen c
 ## Instalación
 
 ```bash
-# Clona o copia ai_smartness_v2-DEV en tu máquina
+# Clona o copia ai_smartness-DEV en tu máquina
 # Luego ejecuta la instalación en tu proyecto destino:
-/ruta/a/ai_smartness_v2-DEV/install.sh /ruta/a/tu/proyecto
+/ruta/a/ai_smartness-DEV/install.sh /ruta/a/tu/proyecto
 ```
 
 ### Qué hace el instalador
@@ -53,9 +53,9 @@ El sistema mantiene una **red de pensamientos** donde los conceptos permanecen c
 2. **Selección de modo**: Heavy, Normal o Light (afecta límites de threads)
 3. **Instala sentence-transformers** (si no está instalado)
 4. **Detecta el CLI Claude** para extracción LLM
-5. **Copia los archivos** a `tu_proyecto/ai_smartness_v2/`
+5. **Copia los archivos** a `tu_proyecto/ai_smartness/`
 6. **Configura los hooks** con rutas absolutas en `.claude/settings.json`
-7. **Inicializa la base de datos** en `ai_smartness_v2/.ai/db/`
+7. **Inicializa la base de datos** en `ai_smartness/.ai/db/`
 8. **Instala el CLI** en `~/.local/bin/ai`
 
 ### Requisitos
@@ -162,7 +162,7 @@ El sistema detecta y almacena automáticamente tus preferencias:
 - "siempre hacer un plan antes de implementar"
 - "nunca commit directo a main"
 
-Las reglas se almacenan en `ai_smartness_v2/.ai/user_rules.json` y se inyectan en cada prompt.
+Las reglas se almacenan en `ai_smartness/.ai/user_rules.json` y se inyectan en cada prompt.
 
 ### 6. Síntesis (hook PreCompact)
 
@@ -176,7 +176,7 @@ Al 95% de la ventana de contexto:
 
 ## Configuración
 
-Config almacenada en `ai_smartness_v2/.ai/config.json`:
+Config almacenada en `ai_smartness/.ai/config.json`:
 
 ```json
 {
@@ -222,7 +222,7 @@ Config almacenada en `ai_smartness_v2/.ai/config.json`:
 ## Estructura Base de Datos
 
 ```
-ai_smartness_v2/.ai/
+ai_smartness/.ai/
 ├── config.json           # Configuración
 ├── user_rules.json       # Reglas de usuario
 ├── processor.pid         # PID del daemon
@@ -274,7 +274,7 @@ ai reindex
 Verifica con `ai health`. Si < 10%:
 1. Verifica que sentence-transformers esté instalado
 2. Ejecuta `ai reindex`
-3. Revisa `ai_smartness_v2/.ai/processor.log`
+3. Revisa `ai_smartness/.ai/processor.log`
 
 ---
 

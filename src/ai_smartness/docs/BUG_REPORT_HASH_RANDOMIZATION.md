@@ -3,7 +3,7 @@
 **Date**: 2026-01-29
 **Severity**: Critical
 **Status**: RESOLVED
-**Affected Versions**: ai_smartness_v2 (all versions before fix)
+**Affected Versions**: ai_smartness (all versions before fix)
 
 ---
 
@@ -94,11 +94,11 @@ for word, count in tf.items():
 ### Verification
 
 ```bash
-$ python3 -c "from ai_smartness_v2.processing.embeddings import _deterministic_hash; print(_deterministic_hash('grandpa') % 384)"
+$ python3 -c "from ai_smartness.processing.embeddings import _deterministic_hash; print(_deterministic_hash('grandpa') % 384)"
 242
-$ python3 -c "from ai_smartness_v2.processing.embeddings import _deterministic_hash; print(_deterministic_hash('grandpa') % 384)"
+$ python3 -c "from ai_smartness.processing.embeddings import _deterministic_hash; print(_deterministic_hash('grandpa') % 384)"
 242
-$ python3 -c "from ai_smartness_v2.processing.embeddings import _deterministic_hash; print(_deterministic_hash('grandpa') % 384)"
+$ python3 -c "from ai_smartness.processing.embeddings import _deterministic_hash; print(_deterministic_hash('grandpa') % 384)"
 242
 ```
 
@@ -114,7 +114,7 @@ ai reindex --verbose
 python3 << 'EOF'
 import json
 from pathlib import Path
-from ai_smartness_v2.processing.embeddings import EmbeddingManager
+from ai_smartness.processing.embeddings import EmbeddingManager
 
 em = EmbeddingManager()
 threads_dir = Path('.ai/db/threads')

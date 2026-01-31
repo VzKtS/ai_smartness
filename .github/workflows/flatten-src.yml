@@ -1,4 +1,4 @@
-name: Flatten src to ai_smartness_v2
+name: Flatten src to ai_smartness
 
 on:
   push:
@@ -22,7 +22,7 @@ jobs:
       - name: Check if src exists
         id: check_src
         run: |
-          if [ -d "src/ai_smartness_v2" ]; then
+          if [ -d "src/ai_smartness" ]; then
             echo "src_exists=true" >> $GITHUB_OUTPUT
           else
             echo "src_exists=false" >> $GITHUB_OUTPUT
@@ -31,11 +31,11 @@ jobs:
       - name: Flatten src to root
         if: steps.check_src.outputs.src_exists == 'true'
         run: |
-          # Remove existing ai_smartness_v2 at root if exists
-          rm -rf ai_smartness_v2
+          # Remove existing ai_smartness at root if exists
+          rm -rf ai_smartness
 
-          # Move src/ai_smartness_v2 to root
-          mv src/ai_smartness_v2 ai_smartness_v2
+          # Move src/ai_smartness to root
+          mv src/ai_smartness ai_smartness
 
           # Remove empty src directory
           rmdir src 2>/dev/null || true
@@ -51,6 +51,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Flatten src/ai_smartness_v2 to ai_smartness_v2 [auto-flatten] [skip ci]"
+            git commit -m "Flatten src/ai_smartness to ai_smartness [auto-flatten] [skip ci]"
             git push
           fi

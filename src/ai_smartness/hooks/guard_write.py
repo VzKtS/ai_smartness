@@ -49,7 +49,7 @@ def clear_hook_guard():
 # =============================================================================
 
 def get_package_root() -> Path:
-    """Get the ai_smartness_v2 package root."""
+    """Get the ai_smartness package root."""
     return Path(__file__).parent.parent
 
 
@@ -160,7 +160,7 @@ def is_file_in_plan(file_path: str, state: dict) -> bool:
 
     for allowed in validated_files:
         try:
-            # Pattern avec wildcard (ex: "src/ai_smartness_v2/*")
+            # Pattern avec wildcard (ex: "src/ai_smartness/*")
             if allowed.endswith("/*"):
                 prefix = allowed[:-2]
                 prefix_resolved = str(Path(prefix).resolve())

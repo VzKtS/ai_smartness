@@ -11,7 +11,7 @@ Architecture:
 - Hooks: Claude Code integration
 
 Usage:
-    from ai_smartness_v2 import StorageManager, ThreadManager, GossipPropagator
+    from ai_smartness import StorageManager, ThreadManager, GossipPropagator
 
     storage = StorageManager("/path/to/project/.ai/db")
     manager = ThreadManager(storage)

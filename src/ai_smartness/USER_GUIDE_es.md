@@ -4,7 +4,7 @@
 
 1. **Instala** en tu proyecto:
    ```bash
-   /ruta/a/ai_smartness_v2-DEV/install.sh /ruta/a/tu/proyecto
+   /ruta/a/ai_smartness-DEV/install.sh /ruta/a/tu/proyecto
    ```
 
 2. **Trabaja normalmente** - el sistema captura todo automáticamente
@@ -291,7 +291,7 @@ Cuando inicias una nueva sesión:
 
 ### Ubicación
 
-`ai_smartness_v2/.ai/config.json`
+`ai_smartness/.ai/config.json`
 
 ### Configuraciones Clave
 
@@ -335,7 +335,7 @@ ai daemon start
 
 Si falla, verifica logs:
 ```bash
-cat ai_smartness_v2/.ai/daemon_stderr.log
+cat ai_smartness/.ai/daemon_stderr.log
 ```
 
 ### "Heuristic fallback" en títulos
@@ -362,7 +362,7 @@ Actualiza la ruta en config si es necesario.
 
 Verifica logs de inyección:
 ```bash
-tail -20 ai_smartness_v2/.ai/inject.log
+tail -20 ai_smartness/.ai/inject.log
 ```
 
 Debería mostrar líneas como:
@@ -410,6 +410,6 @@ Verifica `.claude/settings.json`:
 
 Si encuentras problemas:
 1. Ejecuta `ai health` para diagnosticar
-2. Verifica logs en `ai_smartness_v2/.ai/`
+2. Verifica logs en `ai_smartness/.ai/`
 3. Verifica hooks en `.claude/settings.json`
 4. Intenta `ai daemon stop && ai daemon start`

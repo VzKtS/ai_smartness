@@ -75,7 +75,7 @@ def run_health(ai_path: Path) -> int:
 
     # Display metrics
     print("=" * 40)
-    print("AI Smartness v2 - Health Check")
+    print("AI Smartness - Health Check")
     print("=" * 40)
     print()
     print(f"Threads: {total_threads}")

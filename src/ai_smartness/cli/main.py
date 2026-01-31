@@ -24,8 +24,8 @@ def find_ai_path() -> Path:
     """Find the .ai directory by searching upward from cwd."""
     cwd = Path.cwd()
     for parent in [cwd] + list(cwd.parents):
-        # Check for ai_smartness_v2/.ai (underscore prefix folder)
-        candidate = parent / "ai_smartness_v2" / ".ai"
+        # Check for ai_smartness/.ai (underscore prefix folder)
+        candidate = parent / "ai_smartness" / ".ai"
         if candidate.exists():
             return candidate
         # Check for .ai directly

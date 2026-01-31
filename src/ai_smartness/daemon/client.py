@@ -154,13 +154,13 @@ def cleanup_zombie_daemons(ai_path: Path) -> None:
             pass
 
     # Strategy 2: Kill by pattern matching (finds zombies without PID file)
-    # Get the project path from ai_path (ai_path is .ai, parent is ai_smartness_v2, grandparent is project)
+    # Get the project path from ai_path (ai_path is .ai, parent is ai_smartness, grandparent is project)
     project_path = ai_path.parent.parent
     db_path = ai_path / "db"
 
     patterns = [
-        f"ai_smartness_v2.daemon.processor.*{project_path}",
-        f"ai_smartness_v2/daemon/processor.py.*{db_path}",
+        f"ai_smartness.daemon.processor.*{project_path}",
+        f"ai_smartness/daemon/processor.py.*{db_path}",
     ]
 
     for pattern in patterns:
@@ -209,7 +209,7 @@ def ensure_daemon_running(ai_path: Path, max_wait: float = 5.0) -> bool:
     # Start the daemon
     try:
         # Find the processor script path
-        # Use direct path since folder may be hidden (ai_smartness_v2)
+        # Use direct path since folder may be hidden (ai_smartness)
         package_dir = Path(__file__).parent.parent
         processor_path = package_dir / "daemon" / "processor.py"
 

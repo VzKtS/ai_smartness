@@ -67,7 +67,7 @@ class MemoryRetriever:
                 import sys
                 package_dir = Path(__file__).parent.parent
                 sys.path.insert(0, str(package_dir.parent))
-                from ai_smartness_v2.processing.embeddings import get_embedding_manager
+                from ai_smartness.processing.embeddings import get_embedding_manager
                 self._embeddings = get_embedding_manager()
         return self._embeddings
 

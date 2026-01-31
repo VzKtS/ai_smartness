@@ -147,7 +147,7 @@ def _enforce_quota(ai_path: Path, quota: int) -> int:
     sys.path.insert(0, str(ai_path.parent.parent / "src"))
 
     try:
-        from ai_smartness_v2.storage.threads import ThreadStorage
+        from ai_smartness.storage.threads import ThreadStorage
 
         threads_path = ai_path / "db" / "threads"
         if not threads_path.exists():

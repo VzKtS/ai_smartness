@@ -42,9 +42,9 @@ Le système maintient un **réseau de pensées** où les concepts restent connec
 ## Installation
 
 ```bash
-# Clonez ou copiez ai_smartness_v2-DEV sur votre machine
+# Clonez ou copiez ai_smartness-DEV sur votre machine
 # Puis lancez l'installation dans votre projet cible :
-/chemin/vers/ai_smartness_v2-DEV/install.sh /chemin/vers/votre/projet
+/chemin/vers/ai_smartness-DEV/install.sh /chemin/vers/votre/projet
 ```
 
 ### Ce que fait l'installateur
@@ -53,9 +53,9 @@ Le système maintient un **réseau de pensées** où les concepts restent connec
 2. **Sélection du mode** : Heavy, Normal ou Light (affecte les limites de threads)
 3. **Installe sentence-transformers** (si pas déjà installé)
 4. **Détecte le CLI Claude** pour l'extraction LLM
-5. **Copie les fichiers** dans `votre_projet/ai_smartness_v2/`
+5. **Copie les fichiers** dans `votre_projet/ai_smartness/`
 6. **Configure les hooks** avec chemins absolus dans `.claude/settings.json`
-7. **Initialise la base de données** dans `ai_smartness_v2/.ai/db/`
+7. **Initialise la base de données** dans `ai_smartness/.ai/db/`
 8. **Installe le CLI** dans `~/.local/bin/ai`
 
 ### Prérequis
@@ -162,7 +162,7 @@ Le système détecte et stocke automatiquement vos préférences :
 - "toujours faire un plan avant l'implémentation"
 - "jamais de commit direct sur main"
 
-Les règles sont stockées dans `ai_smartness_v2/.ai/user_rules.json` et injectées dans chaque prompt.
+Les règles sont stockées dans `ai_smartness/.ai/user_rules.json` et injectées dans chaque prompt.
 
 ### 6. Synthèse (hook PreCompact)
 
@@ -176,7 +176,7 @@ Les règles sont stockées dans `ai_smartness_v2/.ai/user_rules.json` et inject�
 
 ## Configuration
 
-Config stockée dans `ai_smartness_v2/.ai/config.json` :
+Config stockée dans `ai_smartness/.ai/config.json` :
 
 ```json
 {
@@ -222,7 +222,7 @@ Config stockée dans `ai_smartness_v2/.ai/config.json` :
 ## Structure Base de Données
 
 ```
-ai_smartness_v2/.ai/
+ai_smartness/.ai/
 ├── config.json           # Configuration
 ├── user_rules.json       # Règles utilisateur
 ├── processor.pid         # PID du daemon
@@ -274,7 +274,7 @@ ai reindex
 Vérifiez avec `ai health`. Si < 10% :
 1. Vérifiez que sentence-transformers est installé
 2. Lancez `ai reindex`
-3. Consultez `ai_smartness_v2/.ai/processor.log`
+3. Consultez `ai_smartness/.ai/processor.log`
 
 ---
 

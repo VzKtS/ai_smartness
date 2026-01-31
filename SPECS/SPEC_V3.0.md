@@ -742,7 +742,7 @@ ai mode [status|light|normal|heavy|max]  # Voir/changer mode
 ### 10.2 Installation CLI
 
 ```bash
-/path/to/ai_smartness_v2/install.sh /path/to/project
+/path/to/ai_smartness/install.sh /path/to/project
 ```
 
 L'installateur :

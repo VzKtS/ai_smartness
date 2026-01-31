@@ -9,7 +9,7 @@ This daemon:
 4. Runs persistently in background
 
 Usage:
-    python3 ai_smartness_v2/daemon/processor.py --db-path /path/to/.ai/db
+    python3 ai_smartness/daemon/processor.py --db-path /path/to/.ai/db
 
 Or via client (internal):
     from daemon.client import ensure_daemon_running
@@ -102,11 +102,11 @@ class ProcessorDaemon:
 
         try:
             # Add package parent to sys.path so we can import as a package
-            # ai_smartness_v2/ is in /project/ai_smartness_v2/
+            # ai_smartness/ is in /project/ai_smartness/
             # We need to add /project/ to sys.path
-            package_dir = Path(__file__).parent.parent  # ai_smartness_v2/
+            package_dir = Path(__file__).parent.parent  # ai_smartness/
             package_parent = package_dir.parent  # /project/
-            package_name = package_dir.name  # "ai_smartness_v2"
+            package_name = package_dir.name  # "ai_smartness"
 
             if str(package_parent) not in sys.path:
                 sys.path.insert(0, str(package_parent))
@@ -559,7 +559,7 @@ class ProcessorDaemon:
 
 def main():
     """Main entry point."""
-    parser = argparse.ArgumentParser(description="AI Smartness v2 Processor Daemon")
+    parser = argparse.ArgumentParser(description="AI Smartness Processor Daemon")
     parser.add_argument(
         "--db-path",
         required=True,
