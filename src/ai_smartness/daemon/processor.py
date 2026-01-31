@@ -442,10 +442,11 @@ class ProcessorDaemon:
 
     def _prune_timer_loop(self):
         """
-        Background thread that runs periodic pruning.
+        Background thread that runs periodic pruning and heartbeat.
 
         Applies decay to threads and bridges, suspending/deleting
-        those below thresholds. Runs every PRUNE_INTERVAL_SECONDS.
+        those below thresholds. Also increments heartbeat counter.
+        Runs every PRUNE_INTERVAL_SECONDS (default 5 min).
         """
         import time
         logger.info(f"Prune timer started (interval: {self.PRUNE_INTERVAL_SECONDS}s)")
@@ -457,6 +458,11 @@ class ProcessorDaemon:
                 break
 
             try:
+                # Increment heartbeat (v4.1)
+                beat = self._increment_heartbeat()
+                if beat is not None:
+                    logger.info(f"Heartbeat: {beat}")
+
                 logger.info("Running periodic prune...")
 
                 # Prune threads (suspend low-weight)
@@ -477,6 +483,30 @@ class ProcessorDaemon:
                 logger.error(f"Prune error: {e}")
 
         logger.info("Prune timer stopped")
+
+    def _increment_heartbeat(self) -> Optional[int]:
+        """
+        Increment heartbeat counter (v4.1).
+
+        Returns:
+            New beat count, or None on error
+        """
+        try:
+            import importlib.util
+            heartbeat_path = Path(__file__).parent.parent / "storage" / "heartbeat.py"
+
+            if not heartbeat_path.exists():
+                return None
+
+            spec = importlib.util.spec_from_file_location("heartbeat", heartbeat_path)
+            heartbeat_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(heartbeat_module)
+
+            return heartbeat_module.increment_beat(self.ai_path)
+
+        except Exception as e:
+            logger.debug(f"Heartbeat error: {e}")
+            return None
 
     def run(self):
         """Run the daemon main loop."""

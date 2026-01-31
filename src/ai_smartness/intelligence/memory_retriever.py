@@ -12,7 +12,7 @@ Features:
 import json
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -124,6 +124,154 @@ class MemoryRetriever:
         except Exception as e:
             logger.error(f"Error retrieving context: {e}")
             return ""
+
+    def search(
+        self,
+        query: str,
+        include_suspended: bool = False,
+        limit: int = 10
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """
+        Search threads and bridges by query or thread ID.
+
+        Used by Active Recall (v4.0) to search memory on demand.
+
+        Args:
+            query: Search query or thread ID (thread_YYYYMMDD_...)
+            include_suspended: Include suspended threads in results
+            limit: Maximum threads to return
+
+        Returns:
+            Tuple of (threads, bridges)
+        """
+        threads = []
+        bridges = []
+
+        # Check if query is a thread ID
+        if query.startswith("thread_"):
+            thread = self._get_thread_by_id(query)
+            if thread:
+                thread["_similarity"] = 1.0
+                threads = [thread]
+                bridges = self._get_bridges_for_thread(query)
+                return threads, bridges
+
+        # Search by similarity
+        if not self.threads_dir.exists():
+            return [], []
+
+        # Embed the query
+        query_embedding = self.embeddings.embed(query[:500])
+
+        # Score all threads
+        scored_threads = []
+        reactivation_threshold = 0.5  # For Recall Actif
+
+        for thread_file in self.threads_dir.glob("*.json"):
+            try:
+                thread = json.loads(thread_file.read_text(encoding='utf-8'))
+
+                # Filter by status
+                status = thread.get("status", "active")
+                if status == "archived":
+                    continue
+                if status == "suspended" and not include_suspended:
+                    continue
+
+                # Get thread embedding
+                thread_embedding = thread.get("embedding")
+                if not thread_embedding or not any(thread_embedding):
+                    thread_text = thread.get("title", "") + " " + " ".join(thread.get("topics", []))
+                    thread_embedding = self.embeddings.embed(thread_text)
+
+                # Calculate similarity
+                similarity = self.embeddings.similarity(query_embedding, thread_embedding)
+
+                # Include if above minimum threshold
+                if similarity > 0.1:
+                    thread["_similarity"] = similarity
+                    scored_threads.append({
+                        "thread": thread,
+                        "similarity": similarity,
+                        "file": thread_file
+                    })
+
+            except Exception as e:
+                logger.debug(f"Error processing thread {thread_file}: {e}")
+                continue
+
+        # Sort by similarity
+        scored_threads.sort(key=lambda x: x["similarity"], reverse=True)
+
+        # Process results and handle reactivation
+        for item in scored_threads[:limit]:
+            thread = item["thread"]
+            similarity = item["similarity"]
+            thread_file = item["file"]
+
+            # Reactivate suspended threads with high similarity (Recall Actif feature)
+            if thread.get("status") == "suspended" and similarity > reactivation_threshold:
+                self._reactivate_thread(thread)
+                thread["status"] = "active"
+                thread["_reactivated"] = True
+                logger.info(
+                    f"Recall reactivated: {thread.get('title')[:30]} (sim={similarity:.3f})"
+                )
+
+            threads.append(thread)
+
+        # Get bridges for top threads
+        if threads:
+            thread_ids = {t.get("id") for t in threads}
+            bridges = self._get_bridges_for_threads(thread_ids)
+
+        return threads, bridges
+
+    def _get_thread_by_id(self, thread_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific thread by ID."""
+        thread_file = self.threads_dir / f"{thread_id}.json"
+        if thread_file.exists():
+            try:
+                return json.loads(thread_file.read_text(encoding='utf-8'))
+            except Exception:
+                pass
+        return None
+
+    def _get_bridges_for_thread(self, thread_id: str) -> List[Dict[str, Any]]:
+        """Get all bridges involving a thread."""
+        return self._get_bridges_for_threads({thread_id})
+
+    def _get_bridges_for_threads(self, thread_ids: set) -> List[Dict[str, Any]]:
+        """Get bridges connecting any of the given threads."""
+        if not self.bridges_dir.exists():
+            return []
+
+        bridges = []
+        for bridge_file in self.bridges_dir.glob("*.json"):
+            try:
+                bridge = json.loads(bridge_file.read_text(encoding='utf-8'))
+
+                source_id = bridge.get("source_id")
+                target_id = bridge.get("target_id")
+
+                if source_id in thread_ids or target_id in thread_ids:
+                    # Add thread titles for display
+                    if source_id:
+                        source_thread = self._get_thread_by_id(source_id)
+                        if source_thread:
+                            bridge["_source_title"] = source_thread.get("title", "")[:40]
+
+                    if target_id:
+                        target_thread = self._get_thread_by_id(target_id)
+                        if target_thread:
+                            bridge["_target_title"] = target_thread.get("title", "")[:40]
+
+                    bridges.append(bridge)
+
+            except Exception:
+                continue
+
+        return bridges[:10]  # Limit bridges
 
     def _find_similar_threads(self, message: str, limit: int = 5) -> List[Dict[str, Any]]:
         """

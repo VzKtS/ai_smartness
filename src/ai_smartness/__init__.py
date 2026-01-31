@@ -18,7 +18,7 @@ Usage:
     gossip = GossipPropagator(storage)
 """
 
-__version__ = "3.0.5"
+__version__ = "4.0.0"
 __author__ = "AI Smartness Team"
 
 # Models
@@ -29,6 +29,14 @@ from .models.bridge import ThinkBridge, BridgeType, BridgeStatus
 from .storage.manager import StorageManager
 from .storage.threads import ThreadStorage
 from .storage.bridges import BridgeStorage
+from .storage.heartbeat import (
+    load_heartbeat,
+    save_heartbeat,
+    init_heartbeat,
+    increment_beat,
+    record_interaction,
+    get_temporal_context
+)
 
 # Processing
 from .processing.extractor import LLMExtractor, Extraction, extract_title_from_content
@@ -71,6 +79,13 @@ __all__ = [
     "StorageManager",
     "ThreadStorage",
     "BridgeStorage",
+    # Heartbeat (v4.1)
+    "load_heartbeat",
+    "save_heartbeat",
+    "init_heartbeat",
+    "increment_beat",
+    "record_interaction",
+    "get_temporal_context",
 
     # Processing
     "LLMExtractor",

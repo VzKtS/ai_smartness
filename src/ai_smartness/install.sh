@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# AI Smartness Installation Script (v3.0+)
+# AI Smartness Installation Script (v4.0+)
 # Simplified architecture with absolute paths
 # Includes migration from ai_smartness_v2 to ai_smartness
+# v4.0: Recall Actif + Heartbeat
 #
 # Supports: English (en), French (fr), Spanish (es)
 # Usage: ./install.sh [project_path] [--lang=en|fr|es]
@@ -74,9 +75,9 @@ export AI_SMARTNESS_LANG="$LANG"
 
 # Localized messages
 declare -A MSG_BANNER_TITLE=(
-    ["en"]="AI Smartness v3.0"
-    ["fr"]="AI Smartness v3.0"
-    ["es"]="AI Smartness v3.0"
+    ["en"]="AI Smartness v4.0"
+    ["fr"]="AI Smartness v4.0"
+    ["es"]="AI Smartness v4.0"
 )
 declare -A MSG_BANNER_SUB=(
     ["en"]="Persistent Memory for Claude Agents"
@@ -360,6 +361,29 @@ else
     mkdir -p "$AI_SMARTNESS_DIR/.ai/db/synthesis"
 fi
 
+# Initialize heartbeat (v4.0)
+HEARTBEAT_FILE="$AI_SMARTNESS_DIR/.ai/heartbeat.json"
+if [ ! -f "$HEARTBEAT_FILE" ]; then
+    python3 << HBEOF
+import json
+from datetime import datetime
+
+heartbeat = {
+    "beat": 0,
+    "started_at": datetime.now().isoformat(),
+    "last_beat_at": datetime.now().isoformat(),
+    "last_interaction_at": datetime.now().isoformat(),
+    "last_interaction_beat": 0
+}
+
+with open("$HEARTBEAT_FILE", "w") as f:
+    json.dump(heartbeat, f, indent=2)
+print("   ✓ Heartbeat initialized")
+HBEOF
+else
+    echo "   ✓ Heartbeat preserved"
+fi
+
 # ============================================================================
 # INSTALL SENTENCE-TRANSFORMERS
 # ============================================================================
@@ -438,7 +462,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "3.0.0",
+    "version": "4.0.0",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
@@ -504,9 +528,20 @@ if 'allow' not in settings['permissions']:
 if "Bash(python3:*)" not in settings['permissions']['allow']:
     settings['permissions']['allow'].append("Bash(python3:*)")
 
-# v2 Hooks - SIMPLIFIED
-# Only 3 hooks: capture (PostToolUse), inject (UserPromptSubmit), compact (PreCompact)
+# v4 Hooks
+# 4 hooks: capture (PostToolUse), inject (UserPromptSubmit), pretool (PreToolUse), compact (PreCompact)
 ai_hooks = {
+    "PreToolUse": [
+        {
+            "matcher": "Read",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": f"python3 {ai_path}/hooks/pretool.py"
+                }
+            ]
+        }
+    ],
     "UserPromptSubmit": [
         {
             "hooks": [
@@ -564,7 +599,7 @@ for hook_type, hook_list in ai_hooks.items():
     settings['hooks'][hook_type].extend(hook_list)
 
 settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
-print("   ✓ Hooks configured (UserPromptSubmit, PostToolUse, PreCompact)")
+print("   ✓ Hooks configured (PreToolUse, UserPromptSubmit, PostToolUse, PreCompact)")
 print(f"   ✓ Using absolute path: {ai_path}")
 EOF
 
@@ -611,6 +646,25 @@ else
     echo "$CLAUDEIGNORE_ENTRIES" > "$CLAUDEIGNORE"
 fi
 echo "   ✓ .claudeignore configured"
+
+# ============================================================================
+# CREATE .ai SYMLINK AT PROJECT ROOT
+# ============================================================================
+
+echo "🔗 Creating .ai symlink..."
+
+# Remove existing symlink or directory if present
+if [ -L "$TARGET_DIR/.ai" ]; then
+    rm -f "$TARGET_DIR/.ai"
+elif [ -d "$TARGET_DIR/.ai" ]; then
+    echo "   ⚠️  .ai directory exists at project root, skipping symlink"
+fi
+
+# Create symlink from project root to ai_smartness/.ai
+if [ ! -e "$TARGET_DIR/.ai" ]; then
+    ln -sf "$AI_SMARTNESS_DIR/.ai" "$TARGET_DIR/.ai"
+    echo "   ✓ Symlink created: $TARGET_DIR/.ai -> ai_smartness/.ai"
+fi
 
 # ============================================================================
 # INSTALL CLI
@@ -759,6 +813,8 @@ echo "   • ThinkBridges (Synapses)"
 echo "   • Gossip propagation"
 echo "   • GuardCode enforcement"
 echo "   • 95% context synthesis"
+echo "   • Recall Actif (v4.0)"
+echo "   • Heartbeat temporal awareness (v4.1)"
 echo ""
 echo "🖥️  CLI Commands:"
 echo "   ai status      - Show memory status"
@@ -766,13 +822,15 @@ echo "   ai threads     - List threads"
 echo "   ai thread <id> - Show thread details"
 echo "   ai bridges     - List bridges"
 echo "   ai search <q>  - Search threads"
+echo "   ai recall <q>  - Search memory (incl. suspended)"
+echo "   ai heartbeat   - Show heartbeat status"
 echo "   ai reindex     - Recalculate embeddings"
 echo "   ai health      - System health check"
 echo "   ai daemon      - Daemon control (start/stop/status)"
 echo "   ai mode        - View/change mode (light/normal/heavy/max)"
 echo "   ai help        - Show help"
 echo ""
-echo "💡 v3.0.0: Type 'ai status' directly in your prompt!"
+echo "💡 v4.0.0: Agent can use Read('.ai/recall/<query>') for memory!"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""

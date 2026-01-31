@@ -1,4 +1,30 @@
-# AI Smartness v3.0 - Quick Reference
+# AI Smartness v4.0 - Quick Reference
+
+## Recall Actif (v4.0)
+
+Agent-initiated memory queries:
+```python
+Read(".ai/recall/<query>")  # Search memory
+Read(".ai/recall/thread_xxx")  # Direct thread access
+```
+
+**Limits:** 5 threads, 100 char summary, 8000 char max context
+
+**Reactivation:** Suspended threads with sim > 0.5 auto-reactivate
+
+## Heartbeat (v4.1)
+
+Temporal awareness via beats (5min intervals):
+```json
+{"beat": 847, "since_last": 2}
+```
+
+| since_last | Meaning |
+|------------|---------|
+| 0-2 | Active conversation |
+| 3-12 | Short pause (15min-1h) |
+| 13-72 | Session interrupted |
+| 73+ | Long absence |
 
 ## Seuils Clés
 
@@ -37,8 +63,9 @@ weight = min(1.0, weight + 0.1)  # +0.1 par activation
 ```
 PostToolUse → capture.py → daemon → ThreadManager → Gossip → Storage
 UserPromptSubmit → inject.py → CLI detect → MemoryRetriever → <system-reminder>
+PreToolUse (Read) → pretool.py → Recall pattern? → additionalContext
 PreCompact (95%) → compact.py → Synthesis → db/synthesis/
-Daemon (5min) → Prune timer → decay threads/bridges
+Daemon (5min) → Prune timer → decay + heartbeat++
 ```
 
 ## Coherence Flow (Glob/Grep)
@@ -60,7 +87,9 @@ ai threads --prune # Apply decay + suspend
 ai thread <id>     # Details
 ai bridges         # Connections
 ai bridges --prune # Apply decay + delete dead
-ai search <query>  # Semantic search
+ai search <query>  # Semantic search (active only)
+ai recall <query>  # Search memory (incl. suspended) [v4.0]
+ai heartbeat       # Show heartbeat status [v4.1]
 ai health          # System check
 ai daemon start    # Start background
 ai daemon stop     # Stop
@@ -85,8 +114,10 @@ Claude: [Shows memory status from CLI]
 .ai/
 ├── config.json        # Config
 ├── user_rules.json    # User rules
+├── heartbeat.json     # Temporal awareness [v4.1]
 ├── processor.sock     # Daemon socket
 ├── processor.pid      # Daemon PID
+├── tmp/recall/        # Recall temp files [v4.0]
 └── db/
     ├── threads/*.json
     ├── bridges/*.json
@@ -181,17 +212,18 @@ ai mode max               # Switch to max mode
 
 **Note:** Changing to a lower quota will auto-suspend excess threads.
 
-## Daemon Auto-Pruning (v3.0.0)
+## Daemon Auto-Pruning (v4.0.0)
 
 ```python
 PRUNE_INTERVAL_SECONDS = 300  # Every 5 minutes
 ```
 
 **Actions:**
-1. Apply decay to all threads
-2. Suspend threads with weight < 0.1
-3. Apply decay to all bridges
-4. Delete bridges with weight < 0.05
+1. Increment heartbeat counter [v4.1]
+2. Apply decay to all threads
+3. Suspend threads with weight < 0.1
+4. Apply decay to all bridges
+5. Delete bridges with weight < 0.05
 
 ## Timeouts
 

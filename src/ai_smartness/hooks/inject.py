@@ -198,6 +198,63 @@ def get_message_from_stdin() -> str:
 
 
 # =============================================================================
+# HEARTBEAT CONTEXT (v4.1)
+# =============================================================================
+
+def get_heartbeat_context(ai_path: Path) -> dict:
+    """
+    Get heartbeat temporal context for injection.
+
+    Args:
+        ai_path: Path to .ai directory
+
+    Returns:
+        Dictionary with beat and since_last, or empty dict on error
+    """
+    try:
+        heartbeat_file = ai_path / "heartbeat.json"
+        if not heartbeat_file.exists():
+            return {}
+
+        data = json.loads(heartbeat_file.read_text(encoding='utf-8'))
+        beat = data.get("beat", 0)
+        last_interaction_beat = data.get("last_interaction_beat", 0)
+
+        return {
+            "beat": beat,
+            "since_last": beat - last_interaction_beat
+        }
+
+    except Exception:
+        return {}
+
+
+def record_heartbeat_interaction(ai_path: Path) -> None:
+    """
+    Record that an interaction occurred at current beat.
+
+    Args:
+        ai_path: Path to .ai directory
+    """
+    try:
+        heartbeat_file = ai_path / "heartbeat.json"
+        if not heartbeat_file.exists():
+            return
+
+        data = json.loads(heartbeat_file.read_text(encoding='utf-8'))
+        data["last_interaction_at"] = datetime.now().isoformat()
+        data["last_interaction_beat"] = data.get("beat", 0)
+
+        heartbeat_file.write_text(
+            json.dumps(data, indent=2),
+            encoding='utf-8'
+        )
+
+    except Exception:
+        pass
+
+
+# =============================================================================
 # CONTEXT BUILDING (Lightweight version)
 # =============================================================================
 
@@ -215,11 +272,21 @@ def build_lightweight_context(message: str, db_path: Path) -> dict:
     Returns:
         Context dictionary
     """
+    ai_path = db_path.parent
+
+    # Get heartbeat context (v4.1)
+    heartbeat = get_heartbeat_context(ai_path)
+
     context = {
         "reminders": [],
         "current_thread": None,
         "active_count": 0
     }
+
+    # Include heartbeat if available
+    if heartbeat:
+        context["beat"] = heartbeat.get("beat", 0)
+        context["since_last"] = heartbeat.get("since_last", 0)
 
     try:
         # Load config
@@ -718,6 +785,9 @@ def main():
         else:
             # No injection needed
             print(message)  # Raw text output
+
+        # Record this interaction for heartbeat (v4.1)
+        record_heartbeat_interaction(ai_path)
 
     except Exception as e:
         # Log error but don't crash - pass through original
