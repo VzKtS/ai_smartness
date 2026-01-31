@@ -632,7 +632,7 @@ def main():
     if not check_hook_guard():
         # Already in a hook, pass through unchanged
         message = get_message_from_stdin()
-        print(json.dumps({"message": message}))
+        print(json.dumps({"result": message}))
         return
 
     set_hook_guard()
@@ -668,7 +668,7 @@ def main():
             # Return the CLI response injected into a neutral prompt
             # The user's original "ai X" is replaced with context about the result
             augmented_message = f"{cli_response}\n\nThe user executed a CLI command. Summarize the result above briefly."
-            print(json.dumps({"message": augmented_message}))
+            print(json.dumps({"result": augmented_message}))
 
             log(f"[CLI] Executed: ai {command} {args} ({len(output)} chars)")
             return
@@ -713,16 +713,20 @@ def main():
             # Inject at the beginning (invisible to user)
             injection = "\n".join(injections)
             augmented_message = f"{injection}\n\n{message}"
-            print(json.dumps({"message": augmented_message}))
+            print(json.dumps({"result": augmented_message}))
         else:
             # No injection needed
-            print(json.dumps({"message": message}))
+            print(json.dumps({"result": message}))
 
     except Exception as e:
         # Log error but don't crash - pass through original
         log(f"[ERROR] {e}")
-        message = get_message_from_stdin() if 'message' not in dir() else message
-        print(json.dumps({"message": message if message else "", "continue": True}))
+        # Note: can't re-read stdin, use message if available
+        try:
+            msg = message
+        except NameError:
+            msg = ""
+        print(json.dumps({"result": msg, "continue": True}))
 
     finally:
         clear_hook_guard()
