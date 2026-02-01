@@ -60,6 +60,8 @@ def check_coherence(
         Tuple of (coherence_score, reason)
         Returns (0.0, "error") on failure
     """
+    import os
+
     # Truncate for efficiency
     context_short = context[:1500] if len(context) > 1500 else context
     content_short = content[:1500] if len(content) > 1500 else content
@@ -75,12 +77,18 @@ def check_coherence(
     else:
         claude_cmd = "claude"
 
+    # CRITICAL: Propagate hook guard to subprocess to prevent infinite loop
+    # Without this, claude CLI triggers hooks which capture the coherence prompt
+    env = os.environ.copy()
+    env["AI_SMARTNESS_HOOK_RUNNING"] = "1"
+
     try:
         result = subprocess.run(
             [claude_cmd, "-p", prompt, "--model", "haiku", "--output-format", "text"],
             capture_output=True,
             text=True,
-            timeout=timeout
+            timeout=timeout,
+            env=env
         )
 
         if result.returncode != 0:
