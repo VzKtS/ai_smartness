@@ -1,8 +1,12 @@
-# AI Smartness
-# Sources: src/ai_smartness/ (tracked)
-# Local deployed: /ai_smartness/ (ignored)
+# AI Smartness Project Structure:
+#   src/ai_smartness/  → SOURCES (MUST be tracked in git)
+#   /ai_smartness/     → LOCAL DEPLOY (ignored, created by install.sh)
+#
+# ⚠️  AGENTS: DO NOT add "ai_smartness/" without leading slash!
+#     - "/ai_smartness/" ignores only root folder (correct)
+#     - "ai_smartness/" ignores ALL folders with this name including src/ (WRONG)
 
-# Local deployed version (not sources) - slash prefix = root only
+# Local deployed version only (leading slash = root of repo only)
 /ai_smartness/
 
 # Runtime data (created when installed in projects)
