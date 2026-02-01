@@ -405,6 +405,7 @@ def handle_help(ai_path: Path) -> str:
     """
     # Get current context info if available
     context_line = ""
+    threshold = 95  # Default value
     try:
         import json
         heartbeat_path = ai_path / "heartbeat.json"
@@ -431,25 +432,25 @@ def handle_help(ai_path: Path) -> str:
 
     return f"""# 🧠 AI SMARTNESS - Agent Help
 {context_line}{stats_line}
-## Commandes disponibles
+## MCP Tools disponibles
 
-### 📖 RECALL - Recherche sémantique dans ta mémoire
+### 📖 ai_recall(query) - Recherche sémantique dans ta mémoire
 ```
-Read(".ai/recall/<query>")     - Recherche par mot-clé/sujet
-Read(".ai/recall/thread_xxx")  - Rappel d'un thread spécifique
+ai_recall(query="authentication")   # Recherche par mot-clé/sujet
+ai_recall(query="thread_xxx")       # Rappel d'un thread spécifique
 ```
 **Exemples:**
-- `.ai/recall/solana` - Tout ce qui concerne Solana
-- `.ai/recall/hooks` - Mémoire sur les hooks
-- `.ai/recall/authentication` - Travaux sur l'auth
+- `ai_recall(query="solana")` - Tout ce qui concerne Solana
+- `ai_recall(query="hooks")` - Mémoire sur les hooks
+- `ai_recall(query="authentication")` - Travaux sur l'auth
 
 **Résultat:** Threads matchants avec score, topics, résumé, bridges liés
 
 ---
 
-### 🔀 MERGE - Fusionner 2 threads (libère du contexte)
+### 🔀 ai_merge(survivor_id, absorbed_id) - Fusionner 2 threads (libère du contexte)
 ```
-Read(".ai/merge/<survivor_id>/<absorbed_id>")
+ai_merge(survivor_id="t1", absorbed_id="t2")
 ```
 **Comportement:**
 - Le survivor absorbe messages, topics, tags du absorbed
@@ -462,43 +463,41 @@ Read(".ai/merge/<survivor_id>/<absorbed_id>")
 
 ---
 
-### ✂️ SPLIT - Séparer un thread qui a drifté (workflow 2 étapes)
+### ✂️ ai_split(thread_id, ...) - Séparer un thread qui a drifté (workflow 2 étapes)
 
 **Étape 1 - Lister les messages:**
 ```
-Read(".ai/split/<thread_id>")
+ai_split(thread_id="abc")
 ```
 → Retourne la liste des messages avec leurs IDs
 
 **Étape 2 - Confirmer le split:**
 ```
-Read(".ai/split/<id>/confirm?titles=T1,T2&msgs_0=m1,m2&msgs_1=m3,m4&lock=compaction")
+ai_split(thread_id="abc", confirm=True, titles=["T1", "T2"], message_groups=[["m1", "m2"], ["m3", "m4"]])
 ```
 
 **Paramètres:**
-- `titles` - Titres des nouveaux threads (séparés par virgule)
-- `msgs_N` - IDs des messages pour le thread N (0-indexed)
-- `lock` - Mode de protection:
+- `titles` - Liste des titres des nouveaux threads
+- `message_groups` - Liste de listes d'IDs de messages
+- `lock_mode` - Mode de protection:
   - `compaction` (défaut) - Auto-unlock au prochain compactage
-  - `agent_release` - Unlock manuel via `.ai/unlock/`
+  - `agent_release` - Unlock manuel via `ai_unlock()`
   - `force` - Jamais d'auto-unlock
 
 **Résultat:** Nouveaux threads créés, tous `split_locked=True`
 
 ---
 
-### 🔓 UNLOCK - Déverrouiller un thread split_locked
+### 🔓 ai_unlock(thread_id) - Déverrouiller un thread split_locked
 ```
-Read(".ai/unlock/<thread_id>")
+ai_unlock(thread_id="abc")
 ```
 → Retire la protection split_lock, permet le merge
 
 ---
 
-### ❓ HELP - Cette documentation
-```
-Read(".ai/help")
-```
+### ❓ ai_help() - Cette documentation
+### 📊 ai_status() - Status mémoire (threads, bridges, contexte)
 
 ---
 
@@ -517,7 +516,7 @@ Read(".ai/help")
 4. **Lock strategy:** Utilise `force` si tu veux contrôler totalement le lifecycle
 
 ---
-*AI Smartness v4.3 - Meta-cognition layer for LLM agents*
+*AI Smartness v4.4 - Meta-cognition layer for LLM agents*
 """
 
 
