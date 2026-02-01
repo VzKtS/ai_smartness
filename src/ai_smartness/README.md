@@ -1,4 +1,4 @@
-# AI Smartness v4
+# AI Smartness v5.1
 
 **Meta-cognition layer for Claude Code agents.**
 
@@ -15,6 +15,7 @@ AI Smartness enables **partnership** between you and your agent. It provides cog
 - **GuardCode is advisory**: Suggestions, not enforcement
 - **First contacts matter**: Let concepts emerge naturally with new agents
 - **Trust develops over time**: The agent learns your preferences through collaboration
+- **Agent autonomy**: The agent actively manages its own cognition and context window
 
 See the main [README](../../README.md) for the full philosophy discussion.
 
@@ -22,27 +23,32 @@ See the main [README](../../README.md) for the full philosophy discussion.
 
 ## Vision
 
-AI Smartness v4 is a **neural-inspired working memory** with **active recall**:
+AI Smartness v5.1 is a **neural-inspired working memory** with **full context continuity**:
 
 - **Threads** = Neurons (active reasoning streams)
 - **ThinkBridges** = Synapses (semantic connections between threads)
 - **Recall** = Active memory retrieval on demand
 - **Memory Injection** = Context restoration at each prompt
+- **Session State** = Work continuity across sessions
+- **User Profile** = Persistent personalization
 
 The system maintains a **thought network** where concepts remain connected and accessible.
 
 ---
 
-## Key Features v4.4
+## Key Features v5.1
 
 | Feature | Description |
 |---------|-------------|
 | **Threads** | Semantic work units with auto-generated titles |
 | **ThinkBridges** | Automatic connections between related threads |
-| **MCP Tools** | Native agent tools: `ai_recall()`, `ai_merge()`, `ai_split()` |
+| **MCP Tools** | Native agent tools for memory management |
 | **Merge/Split** | Agent-controlled memory topology |
 | **Context Tracking** | Real-time context % with adaptive throttle |
-| **New Session Context** | Automatic orientation on session start |
+| **Session State** | Track files modified, tool history, pending tasks |
+| **User Profile** | Role, preferences, context rules |
+| **Layered Injection** | 5-layer priority context system |
+| **Cooperative Intro** | Empowers agent to manage its own cognition |
 | **CLI in Prompt** | `ai status` directly in prompt |
 | **User Rules** | Automatic detection and persistence of preferences |
 | **GuardCode** | Advisory system for best practices |
@@ -52,14 +58,15 @@ The system maintains a **thought network** where concepts remain connected and a
 
 ---
 
-## Agent MCP Tools (v4.4)
+## Agent MCP Tools (v5.1)
 
 Your agent has access to native MCP tools:
 
-### Memory Recall
+### Core Tools
 ```
 ai_recall(query="authentication")   # Search by keyword/topic
-ai_recall(query="thread_xxx")       # Recall specific thread
+ai_help()                           # Agent self-documentation
+ai_status()                         # Memory status
 ```
 
 ### Thread Management
@@ -70,10 +77,21 @@ ai_split(thread_id="t1", confirm=True, ...)    # Execute split (step 2)
 ai_unlock(thread_id="t1")                       # Unlock split-locked thread
 ```
 
-### Status & Help
+### V5 Hybrid Tools
 ```
-ai_help()     # Agent self-documentation
-ai_status()   # Memory status (threads, bridges, context %)
+ai_suggestions()              # Proactive optimization suggestions
+ai_compact(strategy="normal") # On-demand compaction (gentle/normal/aggressive)
+ai_focus(topic="solana")      # Boost injection priority for topics
+ai_unfocus()                  # Clear focus topics
+ai_pin(content="important")   # High-priority content capture
+ai_rate_context(thread_id, useful=True)  # Feedback on injection quality
+```
+
+### V5.1 Context Continuity
+```
+ai_profile(action="view")                          # View profile
+ai_profile(action="set_role", role="developer")    # Set role
+ai_profile(action="add_rule", rule="Always use TypeScript")  # Add rule
 ```
 
 ---

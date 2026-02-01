@@ -449,6 +449,7 @@ class ProcessorDaemon:
 
         Applies decay to threads and bridges, suspending/deleting
         those below thresholds. Also increments heartbeat counter.
+        V5.1: Also checks for session idle and updates session state.
         Runs every PRUNE_INTERVAL_SECONDS (default 5 min).
         """
         import time
@@ -465,6 +466,9 @@ class ProcessorDaemon:
                 beat = self._increment_heartbeat()
                 if beat is not None:
                     logger.info(f"Heartbeat: {beat}")
+
+                # V5.1: Check for session idle
+                self._check_session_idle()
 
                 logger.info("Running periodic prune...")
 
@@ -539,6 +543,38 @@ class ProcessorDaemon:
 
         except Exception as e:
             logger.debug(f"Heartbeat thread update error: {e}")
+
+    def _check_session_idle(self) -> None:
+        """
+        V5.1: Check if session is idle and update session state.
+
+        Marks session as idle if no activity for > 5 minutes.
+        This enables better context injection on session resume.
+        """
+        try:
+            # Import session module
+            package_dir = Path(__file__).parent.parent
+            package_parent = package_dir.parent
+            package_name = package_dir.name
+
+            if str(package_parent) not in sys.path:
+                sys.path.insert(0, str(package_parent))
+
+            import importlib
+            session_mod = importlib.import_module(f"{package_name}.models.session")
+
+            state = session_mod.load_session_state(self.ai_path)
+
+            # Check if session should be marked idle
+            minutes_since = state.get_minutes_since_activity()
+
+            if minutes_since > 5 and state.status == "active":
+                state.mark_idle()
+                session_mod.save_session_state(self.ai_path, state)
+                logger.info(f"Session marked idle (inactive for {int(minutes_since)} min)")
+
+        except Exception as e:
+            logger.debug(f"Session idle check error: {e}")
 
     def run(self):
         """Run the daemon main loop."""

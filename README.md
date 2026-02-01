@@ -51,27 +51,32 @@ The goal is an agent that *wants* to follow good practices because it understand
 
 ## Vision
 
-AI Smartness v4 is a **neural-inspired working memory** with **active recall**:
+AI Smartness v5.1 is a **neural-inspired working memory** with **full context continuity**:
 
 - **Threads** = Neurons (active reasoning streams)
 - **ThinkBridges** = Synapses (semantic connections between threads)
 - **Recall** = Active memory retrieval on demand
 - **Context Tracking** = Proactive context management
+- **Session State** = Work continuity across sessions
+- **User Profile** = Persistent personalization
 
 The system maintains a **thought network** where concepts remain connected and accessible, avoiding the context loss typical of classic LLM interactions.
 
 ---
 
-## Key Features v4.4
+## Key Features v5.1
 
 | Feature | Description |
 |---------|-------------|
 | **Threads** | Semantic work units with auto-generated titles |
 | **ThinkBridges** | Automatic connections between related threads |
-| **MCP Tools** | Native agent tools: `ai_recall()`, `ai_merge()`, `ai_split()` |
+| **MCP Tools** | Native agent tools for memory management |
 | **Merge/Split** | Agent manages its own memory topology |
 | **Context Tracking** | Real-time context % with adaptive throttle |
-| **New Session Context** | Automatic orientation on session start |
+| **Session State** | Track files modified, tool history, pending tasks |
+| **User Profile** | Role, preferences, context rules |
+| **Layered Injection** | 5-layer priority context system |
+| **Cooperative Intro** | Empowers agent to manage its own cognition |
 | **GuardCode** | Advisory system for best practices |
 | **95% Synthesis** | Automatic context preservation before compaction |
 | **100% Transparent** | Zero user action required |

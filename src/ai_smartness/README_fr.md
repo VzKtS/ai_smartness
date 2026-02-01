@@ -1,4 +1,4 @@
-# AI Smartness v4
+# AI Smartness v5.1
 
 **Couche de méta-cognition pour agents Claude Code.**
 
@@ -15,6 +15,7 @@ AI Smartness permet un **partenariat** entre vous et votre agent. Il fournit des
 - **GuardCode est consultatif** : Des suggestions, pas de l'application forcée
 - **Les premiers contacts comptent** : Laissez les concepts émerger naturellement avec les nouveaux agents
 - **La confiance se développe avec le temps** : L'agent apprend vos préférences par la collaboration
+- **Autonomie de l'agent** : L'agent gère activement sa propre cognition et sa fenêtre contextuelle
 
 Voir le [README principal](../../README.md) pour la discussion complète sur la philosophie.
 
@@ -22,27 +23,32 @@ Voir le [README principal](../../README.md) pour la discussion complète sur la 
 
 ## Vision
 
-AI Smartness v4 est une **mémoire de travail inspirée des réseaux neuronaux** avec **recall actif** :
+AI Smartness v5.1 est une **mémoire de travail inspirée des réseaux neuronaux** avec **continuité contextuelle complète** :
 
 - **Threads** = Neurones (flux de raisonnement actifs)
 - **ThinkBridges** = Synapses (connexions sémantiques entre threads)
 - **Recall** = Récupération active de la mémoire à la demande
 - **Injection Mémoire** = Restauration du contexte à chaque prompt
+- **État de Session** = Continuité du travail entre les sessions
+- **Profil Utilisateur** = Personnalisation persistante
 
 Le système maintient un **réseau de pensées** où les concepts restent connectés et accessibles.
 
 ---
 
-## Fonctionnalités Clés v4.4
+## Fonctionnalités Clés v5.1
 
 | Fonctionnalité | Description |
 |----------------|-------------|
 | **Threads** | Unités de travail sémantiques avec titres auto-générés |
 | **ThinkBridges** | Connexions automatiques entre threads liés |
-| **Outils MCP** | Outils natifs agent : `ai_recall()`, `ai_merge()`, `ai_split()` |
+| **Outils MCP** | Outils natifs agent pour la gestion mémoire |
 | **Merge/Split** | Topologie mémoire contrôlée par l'agent |
 | **Suivi Contexte** | % contexte en temps réel avec throttle adaptatif |
-| **Contexte Nouvelle Session** | Orientation automatique au démarrage de session |
+| **État de Session** | Suivi des fichiers modifiés, historique outils, tâches |
+| **Profil Utilisateur** | Rôle, préférences, règles contextuelles |
+| **Injection en Couches** | Système de contexte à 5 niveaux de priorité |
+| **Intro Coopérative** | L'agent gère activement sa cognition |
 | **CLI dans le Prompt** | `ai status` directement dans le prompt |
 | **Règles Utilisateur** | Détection et persistance automatiques des préférences |
 | **GuardCode** | Système consultatif pour les bonnes pratiques |
@@ -51,14 +57,15 @@ Le système maintient un **réseau de pensées** où les concepts restent connec
 
 ---
 
-## Outils MCP Agent (v4.4)
+## Outils MCP Agent (v5.1)
 
 Votre agent a accès aux outils MCP natifs :
 
-### Recall Mémoire
+### Outils de Base
 ```
 ai_recall(query="authentification")   # Recherche par mot-clé/sujet
-ai_recall(query="thread_xxx")         # Rappel thread spécifique
+ai_help()                             # Auto-documentation agent
+ai_status()                           # Status mémoire
 ```
 
 ### Gestion des Threads
@@ -69,10 +76,21 @@ ai_split(thread_id="t1", confirm=True, ...)    # Exécuter split (étape 2)
 ai_unlock(thread_id="t1")                       # Déverrouiller thread
 ```
 
-### Status & Aide
+### Outils V5 Hybrides
 ```
-ai_help()     # Auto-documentation agent
-ai_status()   # Status mémoire (threads, bridges, % contexte)
+ai_suggestions()              # Suggestions d'optimisation proactives
+ai_compact(strategy="normal") # Compaction à la demande (gentle/normal/aggressive)
+ai_focus(topic="solana")      # Booster priorité injection pour sujets
+ai_unfocus()                  # Effacer les topics focus
+ai_pin(content="important")   # Capture haute priorité
+ai_rate_context(thread_id, useful=True)  # Feedback sur qualité injection
+```
+
+### V5.1 Continuité Contextuelle
+```
+ai_profile(action="view")                          # Voir profil
+ai_profile(action="set_role", role="developer")    # Définir rôle
+ai_profile(action="add_rule", rule="Toujours utiliser TypeScript")  # Ajouter règle
 ```
 
 ---

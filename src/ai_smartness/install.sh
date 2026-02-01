@@ -1,9 +1,15 @@
 #!/bin/bash
 #
-# AI Smartness Installation Script (v4.0+)
+# AI Smartness Installation Script (v5.1)
 # Simplified architecture with absolute paths
 # Includes migration from ai_smartness_v2 to ai_smartness
-# v4.0: Recall Actif + Heartbeat
+#
+# v5.1: Full Context Continuity
+# - Session State tracking (files_modified, tool_history, pending_tasks)
+# - User Profile (role, preferences, context_rules)
+# - 5-Layer Injection (Session → Pins → Threads → Profile)
+# - Cooperative Introduction (agent autonomy)
+# - ai_profile() MCP tool
 #
 # Supports: English (en), French (fr), Spanish (es)
 # Usage: ./install.sh [project_path] [--lang=en|fr|es]
@@ -75,9 +81,9 @@ export AI_SMARTNESS_LANG="$LANG"
 
 # Localized messages
 declare -A MSG_BANNER_TITLE=(
-    ["en"]="AI Smartness v4.4"
-    ["fr"]="AI Smartness v4.4"
-    ["es"]="AI Smartness v4.4"
+    ["en"]="AI Smartness v5.1"
+    ["fr"]="AI Smartness v5.1"
+    ["es"]="AI Smartness v5.1"
 )
 declare -A MSG_BANNER_SUB=(
     ["en"]="Persistent Memory for Claude Agents"
@@ -482,7 +488,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "4.0.0",
+    "version": "5.1.0",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
@@ -828,6 +834,8 @@ echo "   • GuardCode enforcement"
 echo "   • 95% context synthesis"
 echo "   • Recall Actif (v4.0)"
 echo "   • Heartbeat temporal awareness (v4.1)"
+echo "   • V5 Hybrid: Focus boost, relevance scoring, proactive suggestions"
+echo "   • V5.1 Full Context Continuity: Session state, user profile, layered injection"
 echo ""
 echo "🖥️  CLI Commands:"
 echo "   ai status      - Show memory status"
@@ -843,13 +851,26 @@ echo "   ai daemon      - Daemon control (start/stop/status)"
 echo "   ai mode        - View/change mode (light/normal/heavy/max)"
 echo "   ai help        - Show help"
 echo ""
-echo "🔧 MCP Tools (v4.4):"
+echo "🔧 MCP Tools (v5.1):"
 echo "   ai_recall(query)     - Semantic memory search"
 echo "   ai_merge(s, a)       - Merge threads"
 echo "   ai_split(id)         - Split thread"
 echo "   ai_unlock(id)        - Unlock thread"
 echo "   ai_help()            - Documentation"
 echo "   ai_status()          - Memory status"
+echo ""
+echo "🆕 V5 Hybrid Tools:"
+echo "   ai_suggestions()     - Proactive memory optimization"
+echo "   ai_compact(strategy) - On-demand compaction (gentle/normal/aggressive)"
+echo "   ai_focus(topics)     - Boost injection priority for topics"
+echo "   ai_unfocus()         - Clear focus topics"
+echo "   ai_pin(content)      - High-priority content capture"
+echo "   ai_rate_context(id,useful) - Feedback on injection quality"
+echo ""
+echo "🔄 V5.1 Context Continuity:"
+echo "   ai_profile(action)   - User profile management (role, preferences, rules)"
+echo "   Session State        - Automatic work context tracking"
+echo "   Layered Injection    - 5-layer priority context system"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""

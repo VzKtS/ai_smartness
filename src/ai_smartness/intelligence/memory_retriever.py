@@ -96,20 +96,32 @@ class MemoryRetriever:
                 self._max_active_threads = DEFAULT_MAX_ACTIVE_THREADS
         return self._max_active_threads
 
-    def get_relevant_context(self, user_message: str, max_chars: int = 2000) -> str:
+    def get_relevant_context(
+        self,
+        user_message: str,
+        max_chars: int = 2000,
+        focus_data: Optional[Dict[str, Any]] = None
+    ) -> str:
         """
         Get relevant memory context for user message.
+
+        V5: Supports focus_data for focus boost and relevance_score filtering.
 
         Args:
             user_message: The user's prompt
             max_chars: Maximum characters for the context
+            focus_data: Optional focus data with active_focus list
 
         Returns:
             Formatted context string for injection
         """
         try:
-            # 1. Find similar threads
-            similar_threads = self._find_similar_threads(user_message, limit=5)
+            # 1. Find similar threads (with focus boost if provided)
+            similar_threads = self._find_similar_threads(
+                user_message,
+                limit=5,
+                focus_data=focus_data
+            )
 
             # 2. Get user rules
             user_rules = self._load_user_rules()
@@ -273,7 +285,12 @@ class MemoryRetriever:
 
         return bridges[:10]  # Limit bridges
 
-    def _find_similar_threads(self, message: str, limit: int = 5) -> List[Dict[str, Any]]:
+    def _find_similar_threads(
+        self,
+        message: str,
+        limit: int = 5,
+        focus_data: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
         """
         Find threads similar to the message.
 
@@ -282,9 +299,12 @@ class MemoryRetriever:
         - Borderline (0.15-0.35): Consult LLM
         - Low similarity (<0.15): No reactivation
 
+        V5: Applies focus boost and relevance score.
+
         Args:
             message: User message
             limit: Maximum threads to return
+            focus_data: Optional focus data for V5 focus boost
 
         Returns:
             List of thread dicts sorted by similarity
@@ -321,15 +341,29 @@ class MemoryRetriever:
                 # Calculate similarity
                 similarity = self.embeddings.similarity(message_embedding, thread_embedding)
 
+                # V5: Apply focus boost
+                focus_boost = 0.0
+                if focus_data:
+                    focus_boost = self._calculate_focus_boost(thread, focus_data)
+
+                # V5: Apply relevance score (from ratings)
+                relevance_score = thread.get("relevance_score", 1.0)
+
                 # Apply penalty for suspended threads (prefer active at equal similarity)
                 min_threshold = 0.05 if status == "active" else 0.12
                 if similarity > min_threshold:
+                    # Calculate final ranking score
+                    # Base: similarity * relevance_score + focus_boost
+                    base_score = similarity * relevance_score + focus_boost
+
                     # Slight penalty for suspended threads in ranking
-                    ranking_score = similarity if status == "active" else similarity * 0.9
+                    ranking_score = base_score if status == "active" else base_score * 0.9
                     scored_threads.append({
                         "thread": thread,
                         "similarity": similarity,
-                        "ranking_score": ranking_score
+                        "ranking_score": ranking_score,
+                        "focus_boost": focus_boost,
+                        "relevance_score": relevance_score
                     })
 
             except Exception as e:
@@ -490,6 +524,46 @@ class MemoryRetriever:
 
         except Exception as e:
             logger.error(f"Failed to reactivate thread {thread_id}: {e}")
+
+    def _calculate_focus_boost(
+        self,
+        thread: Dict[str, Any],
+        focus_data: Dict[str, Any]
+    ) -> float:
+        """
+        Calculate focus-based boost for thread relevance.
+
+        V5 feature: Threads matching focus topics get priority.
+
+        Args:
+            thread: Thread data dictionary
+            focus_data: Focus data with active_focus list
+
+        Returns:
+            Boost value (0.0 to 0.5)
+        """
+        boost = 0.0
+        thread_topics = [t.lower() for t in thread.get("topics", [])]
+        thread_title = thread.get("title", "").lower()
+        thread_id = thread.get("id", "")
+
+        for focus in focus_data.get("active_focus", []):
+            topic = focus.get("topic", "").lower()
+            weight = focus.get("weight", 0.8)
+
+            # Match by topic
+            if topic in thread_topics:
+                boost += weight * 0.3
+
+            # Match by thread_id
+            if topic == thread_id:
+                boost += weight * 0.5
+
+            # Match by title
+            if topic in thread_title:
+                boost += weight * 0.2
+
+        return min(boost, 0.5)  # Cap at 0.5
 
     def _get_connected_threads(self, thread_id: str) -> List[Dict[str, Any]]:
         """

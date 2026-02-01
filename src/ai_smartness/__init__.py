@@ -9,6 +9,20 @@ Architecture:
 - Intelligence: Thread lifecycle + Gossip propagation
 - GuardCode: Rule enforcement + Context injection
 - Hooks: Claude Code integration
+- MCP: Native agent tools via JSON-RPC
+
+V5 Hybrid Enhancements:
+- ai_suggestions(): Proactive memory optimization suggestions
+- ai_compact(): On-demand memory compaction
+- ai_focus()/ai_unfocus(): Guide hook injection priorities
+- ai_pin(): High-priority content capture
+- ai_rate_context(): Feedback loop for injection quality
+
+V5.1 Full Context Continuity:
+- Session State: Work context tracking for seamless resume
+- User Profile: Persistent personalization (role, preferences, rules)
+- Layered Injection: 5-layer priority context injection
+- ai_profile(): Profile management tool
 
 Usage:
     from ai_smartness import StorageManager, ThreadManager, GossipPropagator
@@ -18,7 +32,7 @@ Usage:
     gossip = GossipPropagator(storage)
 """
 
-__version__ = "4.3.0"
+__version__ = "5.1.0"
 __author__ = "AI Smartness Team"
 
 # Models

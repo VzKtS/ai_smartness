@@ -1,5 +1,5 @@
 """
-Recall handler for AI Smartness v4.0.
+Recall handler for AI Smartness v5.0.
 
 Handles active memory recall queries triggered by Read(".ai/recall/<query>").
 Searches threads and bridges, formats results for agent consumption.
@@ -9,6 +9,7 @@ Features:
 - Include suspended threads (with score threshold)
 - Auto-reactivate suspended threads with high relevance
 - Format with Last active timestamp for staleness evaluation
+- V5: Focus boost and relevance score integration
 """
 
 import json
@@ -501,22 +502,110 @@ ai_unlock(thread_id="abc")
 
 ---
 
-## Comportements automatiques
+## V5 Hybrid Enhancement Tools
 
-- **Contexte auto-injecté** selon pertinence de ton message
+### 💡 ai_suggestions(context?) - Suggestions proactives d'optimisation
+```
+ai_suggestions()                    # Suggestions générales
+ai_suggestions(context="auth")      # Suggestions ciblées
+```
+**Retourne:**
+- `merge_candidates` - Threads similaires à fusionner
+- `split_candidates` - Threads avec drift détecté
+- `recall_hints` - Sujets à rappeler
+- `health` - Métriques santé mémoire
+
+---
+
+### 🗜️ ai_compact(strategy?, dry_run?) - Compaction on-demand
+```
+ai_compact()                         # Compaction normale
+ai_compact(strategy="aggressive")    # Compaction agressive
+ai_compact(dry_run=True)            # Preview sans exécuter
+```
+**Stratégies:**
+- `gentle` - Merge >0.95 similarité, archive >30j
+- `normal` (défaut) - Merge >0.85, archive >14j
+- `aggressive` - Merge >0.75, archive >7j
+
+---
+
+### 🎯 ai_focus(topic, weight?) / ai_unfocus(topic?) - Guide les injections
+```
+ai_focus(topic="solana", weight=0.9)  # Priorise threads Solana
+ai_unfocus(topic="solana")            # Retire focus
+ai_unfocus()                          # Clear tout
+```
+→ Les hooks injecteront en priorité les threads matchant le focus
+
+---
+
+### 📌 ai_pin(content, title?, topics?, weight_boost?) - Capture prioritaire
+```
+ai_pin(content="Important: ...", title="User Prefs", topics=["config"])
+```
+→ Crée un thread high-weight qui bypass la cohérence normale
+
+---
+
+### 👍 ai_rate_context(thread_id, useful, reason?) - Feedback qualité
+```
+ai_rate_context(thread_id="abc", useful=True)
+ai_rate_context(thread_id="xyz", useful=False, reason="outdated")
+```
+→ Ajuste le `relevance_score` pour améliorer les futures injections
+
+---
+
+## V5.1 Full Context Continuity
+
+### 👤 ai_profile(action, key?, value?) - Gestion du profil utilisateur
+```
+ai_profile(action="view")                           # Voir le profil
+ai_profile(action="set_role", key="developer")      # Définir le rôle
+ai_profile(action="set_preference", key="language", value="fr")
+ai_profile(action="add_rule", key="Toujours vérifier les tests")
+ai_profile(action="remove_rule", key="...")
+```
+**Actions:**
+- `view` - Affiche le profil complet
+- `set_role` - Définit le rôle (developer/owner/user)
+- `set_preference` - Modifie une préférence
+- `add_rule` / `remove_rule` - Gère les règles de contexte
+
+**Préférences disponibles:** language, verbosity, emoji_usage, technical_level
+
+---
+
+## Comportements automatiques (V5.1)
+
+- **Session State** - Reprise immédiate du contexte de travail
+- **Layered Injection** - 5 couches de contexte par priorité
+- **User Profile** - Personnalisation basée sur le rôle et préférences
+- **Contexte auto-injecté** selon pertinence + focus + relevance_score
 - **Threads persistés** entre sessions
 - **Bridges** connectent les sujets liés
 - **Auto-compact** à {threshold}% du contexte
 
+## Injection Layers (V5.1)
+
+1. **Session State** - Reprise immédiate (< 1h)
+2. **Work Context** - Lien thread ↔ fichiers modifiés
+3. **Pinned Content** - Contenu prioritaire
+4. **Thread Relevance** - Mémoire thématique
+5. **User Profile** - Personnalisation (> 1h)
+
 ## Tips
 
-1. **Libérer du contexte:** Merge des threads similaires ou split pour archiver des sous-sujets
-2. **Recall proactif:** Utilise recall avant de travailler sur un sujet déjà abordé
-3. **Split tactique:** Quand un thread drift, split pour garder le focus
-4. **Lock strategy:** Utilise `force` si tu veux contrôler totalement le lifecycle
+1. **Libérer du contexte:** `ai_compact()` ou merge des threads similaires
+2. **Recall proactif:** `ai_recall()` avant de travailler sur un sujet déjà abordé
+3. **Optimisation:** `ai_suggestions()` pour voir les opportunités d'amélioration
+4. **Focus temporaire:** `ai_focus()` quand tu travailles sur un sujet précis
+5. **Feedback loop:** `ai_rate_context()` pour améliorer les injections futures
+6. **Profil:** `ai_profile()` pour personnaliser ton expérience
 
 ---
-*AI Smartness v4.4 - Meta-cognition layer for LLM agents*
+*AI Smartness v5.1 - Full Context Continuity for LLM agents*
 """
 
 

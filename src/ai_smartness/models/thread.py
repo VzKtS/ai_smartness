@@ -132,6 +132,13 @@ class Thread:
     # Embeddings (populated by processing layer)
     embedding: Optional[List[float]] = None
 
+    # V5: Context ratings (feedback on injection usefulness)
+    ratings: List[dict] = field(default_factory=list)
+    relevance_score: float = 1.0  # Computed from ratings
+
+    # V5.1: Work context (links thread to concrete work artifacts)
+    work_context: Optional[dict] = None
+
     @classmethod
     def create(
         cls,
@@ -220,6 +227,58 @@ class Thread:
         self.weight = min(1.0, self.weight + self.USE_BOOST)
         self.last_active = datetime.now()
 
+    def add_rating(self, useful: bool, reason: Optional[str] = None):
+        """
+        Add a rating for this thread's context usefulness.
+
+        Args:
+            useful: True if context was helpful
+            reason: Optional explanation
+        """
+        self.ratings.append({
+            "useful": useful,
+            "timestamp": datetime.now().isoformat(),
+            "reason": reason
+        })
+        self._update_relevance_score()
+
+    def _update_relevance_score(self):
+        """Update relevance score based on ratings (recent weighted more)."""
+        if not self.ratings:
+            self.relevance_score = 1.0
+            return
+
+        total_weight = 0.0
+        weighted_sum = 0.0
+
+        # Use last 10 ratings, weight more recent ones higher
+        for i, rating in enumerate(self.ratings[-10:]):
+            weight = 1.0 + (i * 0.1)  # More recent = higher weight
+            total_weight += weight
+            weighted_sum += weight * (1.0 if rating["useful"] else 0.0)
+
+        self.relevance_score = weighted_sum / total_weight if total_weight > 0 else 1.0
+
+    def set_work_context(self, files: List[str], actions: List[str], goal: str):
+        """
+        Set work context linking this thread to concrete work artifacts.
+
+        Args:
+            files: List of file paths recently modified
+            actions: List of recent actions (e.g., "Edit:file.py")
+            goal: Current work objective
+        """
+        self.work_context = {
+            "files": files[-10:],  # Last 10 files
+            "actions": actions[-5:],  # Last 5 actions
+            "goal": goal,
+            "updated_at": datetime.now().isoformat()
+        }
+
+    def clear_work_context(self):
+        """Clear work context when thread is no longer hot."""
+        self.work_context = None
+
     def to_dict(self) -> dict:
         """Serialize to dictionary for JSON storage."""
         return {
@@ -240,7 +299,10 @@ class Thread:
             "created_at": self.created_at.isoformat(),
             "topics": self.topics,
             "tags": self.tags,
-            "embedding": self.embedding
+            "embedding": self.embedding,
+            "ratings": self.ratings,
+            "relevance_score": self.relevance_score,
+            "work_context": self.work_context
         }
 
     @classmethod
@@ -264,8 +326,11 @@ class Thread:
             created_at=datetime.fromisoformat(data["created_at"]),
             topics=data.get("topics", []),
             tags=data.get("tags", []),
-            embedding=data.get("embedding")
+            embedding=data.get("embedding"),
+            ratings=data.get("ratings", []),
+            relevance_score=data.get("relevance_score", 1.0)
         )
+        thread.work_context = data.get("work_context")
         return thread
 
     def __repr__(self) -> str:

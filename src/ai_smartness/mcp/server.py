@@ -1,17 +1,27 @@
 #!/usr/bin/env python3
 """
-AI Smartness MCP Server
+AI Smartness MCP Server v5.1
 
 A local MCP server that exposes AI Smartness memory tools to Claude Code agents.
 Runs as a subprocess communicating via stdio (JSON-RPC).
 
-Tools:
+Core Tools:
 - ai_recall: Semantic memory search
 - ai_merge: Merge two threads
 - ai_split: Split a drifted thread
 - ai_unlock: Unlock a split-locked thread
 - ai_help: Documentation
 - ai_status: Memory status
+
+V5 Hybrid Enhancement Tools:
+- ai_suggestions: Proactive memory optimization suggestions
+- ai_compact: On-demand memory compaction (gentle/normal/aggressive)
+- ai_focus/ai_unfocus: Guide hook injection priorities
+- ai_pin: High-priority content capture
+- ai_rate_context: Feedback loop for injection quality
+
+V5.1 Full Context Continuity:
+- ai_profile: User profile management (role, preferences, rules)
 
 Usage:
     python3 -m ai_smartness.mcp.server
@@ -229,6 +239,149 @@ TOOLS = [
             "required": []
         }
     ),
+    # V5: Hybrid Enhancement Tools
+    Tool(
+        name="ai_suggestions",
+        description="Get proactive suggestions: merge candidates, split candidates, recall hints, and memory health. Use to optimize your memory state.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "context": {
+                    "type": "string",
+                    "description": "Optional current context/topic for targeted suggestions"
+                }
+            },
+            "required": []
+        }
+    ),
+    Tool(
+        name="ai_compact",
+        description="Trigger memory compaction to reduce context pressure. Merges similar threads and archives old ones.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "strategy": {
+                    "type": "string",
+                    "enum": ["gentle", "normal", "aggressive"],
+                    "description": "Compaction aggressiveness: gentle (>0.95 similarity), normal (>0.85), aggressive (>0.75)",
+                    "default": "normal"
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "description": "If true, show what would happen without executing",
+                    "default": False
+                }
+            },
+            "required": []
+        }
+    ),
+    Tool(
+        name="ai_focus",
+        description="Signal focus on a topic. Hooks will prioritize related threads in context injection.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "Topic keyword or thread_id to focus on"
+                },
+                "weight": {
+                    "type": "number",
+                    "description": "Priority weight 0.0-1.0 (default 0.8)",
+                    "default": 0.8
+                }
+            },
+            "required": ["topic"]
+        }
+    ),
+    Tool(
+        name="ai_unfocus",
+        description="Remove focus on a topic, or clear all focus if no topic specified.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "Specific topic to unfocus, or omit to clear all"
+                }
+            },
+            "required": []
+        }
+    ),
+    Tool(
+        name="ai_pin",
+        description="Pin important content with elevated priority. Creates a high-weight thread that bypasses normal coherence checking.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "description": "Content to pin (will be stored as-is)"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Optional title (auto-generated if not provided)"
+                },
+                "topics": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Optional topic tags"
+                },
+                "weight_boost": {
+                    "type": "number",
+                    "description": "Additional weight 0.0-0.5 (default 0.3)",
+                    "default": 0.3
+                }
+            },
+            "required": ["content"]
+        }
+    ),
+    Tool(
+        name="ai_rate_context",
+        description="Rate the usefulness of injected context. Affects future injection probability for this thread.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "thread_id": {
+                    "type": "string",
+                    "description": "Thread ID that was injected"
+                },
+                "useful": {
+                    "type": "boolean",
+                    "description": "True if context was helpful, False if noise"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Optional explanation"
+                }
+            },
+            "required": ["thread_id", "useful"]
+        }
+    ),
+    # V5.1: Full Context Continuity
+    Tool(
+        name="ai_profile",
+        description="View or update user profile for personalized context injection. Stores role, preferences, and context rules.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["view", "set_role", "set_preference", "add_rule", "remove_rule"],
+                    "description": "Action: view (show profile), set_role (developer/owner/user), set_preference, add_rule, remove_rule"
+                },
+                "key": {
+                    "type": "string",
+                    "description": "For set_role: role value. For set_preference: preference key. For add/remove_rule: the rule text."
+                },
+                "value": {
+                    "type": "string",
+                    "description": "For set_preference: the preference value"
+                }
+            },
+            "required": ["action"]
+        }
+    ),
 ]
 
 
@@ -342,6 +495,51 @@ async def execute_tool(name: str, arguments: dict, ai_path: Path) -> str:
     elif name == "ai_status":
         return get_status(ai_path)
 
+    # V5: Hybrid Enhancement Tools
+    elif name == "ai_suggestions":
+        context = arguments.get("context", "")
+        return get_suggestions(ai_path, context)
+
+    elif name == "ai_compact":
+        strategy = arguments.get("strategy", "normal")
+        dry_run = arguments.get("dry_run", False)
+        return do_compact(ai_path, strategy, dry_run)
+
+    elif name == "ai_focus":
+        topic = arguments.get("topic", "")
+        if not topic:
+            return "# Error\n\nMissing required parameter: topic"
+        weight = arguments.get("weight", 0.8)
+        return set_focus(ai_path, topic, weight)
+
+    elif name == "ai_unfocus":
+        topic = arguments.get("topic")
+        return clear_focus(ai_path, topic)
+
+    elif name == "ai_pin":
+        content = arguments.get("content", "")
+        if not content:
+            return "# Error\n\nMissing required parameter: content"
+        title = arguments.get("title")
+        topics = arguments.get("topics", [])
+        weight_boost = arguments.get("weight_boost", 0.3)
+        return pin_content(ai_path, content, title, topics, weight_boost)
+
+    elif name == "ai_rate_context":
+        thread_id = arguments.get("thread_id", "")
+        useful = arguments.get("useful")
+        if not thread_id or useful is None:
+            return "# Error\n\nMissing required parameters: thread_id and useful"
+        reason = arguments.get("reason")
+        return rate_context(ai_path, thread_id, useful, reason)
+
+    # V5.1: Profile management
+    elif name == "ai_profile":
+        action = arguments.get("action", "view")
+        key = arguments.get("key")
+        value = arguments.get("value")
+        return handle_profile(ai_path, action, key, value)
+
     else:
         return f"# Error\n\nUnknown tool: {name}"
 
@@ -422,6 +620,472 @@ def get_status(ai_path: Path) -> str:
         pass
 
     return "\n".join(lines)
+
+
+# =============================================================================
+# V5: HYBRID ENHANCEMENT IMPLEMENTATIONS
+# =============================================================================
+
+COMPACTION_STRATEGIES = {
+    "gentle": {
+        "merge_threshold": 0.95,
+        "archive_age_days": 30,
+        "max_active_threads": 50,
+        "weight_decay": 0.95
+    },
+    "normal": {
+        "merge_threshold": 0.85,
+        "archive_age_days": 14,
+        "max_active_threads": 30,
+        "weight_decay": 0.90
+    },
+    "aggressive": {
+        "merge_threshold": 0.75,
+        "archive_age_days": 7,
+        "max_active_threads": 15,
+        "weight_decay": 0.80
+    }
+}
+
+
+def get_suggestions(ai_path: Path, context: str = "") -> str:
+    """Get proactive suggestions for memory optimization."""
+    from ai_smartness.storage.threads import ThreadStorage
+    from ai_smartness.processing.embeddings import get_embedding_manager
+    import numpy as np
+
+    db_path = ai_path / "db"
+    storage = ThreadStorage(db_path / "threads")
+
+    suggestions = {
+        "merge_candidates": [],
+        "split_candidates": [],
+        "recall_hints": [],
+        "health": {}
+    }
+
+    threads = storage.get_active()
+
+    # 1. Find merge candidates (similarity > 0.85)
+    threads_with_embeddings = [t for t in threads if t.embedding]
+    for i, t1 in enumerate(threads_with_embeddings):
+        for t2 in threads_with_embeddings[i+1:]:
+            if t1.split_locked or t2.split_locked:
+                continue
+            # Cosine similarity
+            e1 = np.array(t1.embedding)
+            e2 = np.array(t2.embedding)
+            sim = float(np.dot(e1, e2) / (np.linalg.norm(e1) * np.linalg.norm(e2) + 1e-8))
+            if sim > 0.85:
+                common_topics = set(t1.topics) & set(t2.topics)
+                suggestions["merge_candidates"].append({
+                    "thread_a": t1.id,
+                    "title_a": t1.title[:40],
+                    "thread_b": t2.id,
+                    "title_b": t2.title[:40],
+                    "similarity": round(sim, 2),
+                    "common_topics": list(common_topics)[:3],
+                    "command": f"ai_merge(survivor_id='{t1.id}', absorbed_id='{t2.id}')"
+                })
+
+    # 2. Find split candidates (drift detected)
+    for thread in threads:
+        if len(thread.drift_history) > 3:
+            unique_origins = set(thread.drift_history[-5:])
+            if len(unique_origins) >= 3 and not thread.split_locked:
+                suggestions["split_candidates"].append({
+                    "thread_id": thread.id,
+                    "title": thread.title[:40],
+                    "message_count": len(thread.messages),
+                    "drift_count": len(unique_origins),
+                    "reason": "Multiple topic shifts detected",
+                    "command": f"ai_split(thread_id='{thread.id}')"
+                })
+
+    # 3. Recall hints based on context
+    if context:
+        try:
+            emb_manager = get_embedding_manager()
+            context_emb = emb_manager.encode(context)
+
+            for thread in threads:
+                if thread.embedding and thread.activation_count == 0:
+                    e = np.array(thread.embedding)
+                    sim = float(np.dot(context_emb, e) / (np.linalg.norm(context_emb) * np.linalg.norm(e) + 1e-8))
+                    if sim > 0.5:
+                        topic = thread.topics[0] if thread.topics else thread.title[:20]
+                        suggestions["recall_hints"].append({
+                            "topic": topic,
+                            "thread_id": thread.id,
+                            "title": thread.title[:40],
+                            "similarity": round(sim, 2),
+                            "command": f"ai_recall(query='{topic}')"
+                        })
+        except Exception:
+            pass
+
+    # 4. Health metrics
+    total_weight = sum(t.weight for t in threads)
+    context_pressure = min(1.0, total_weight / 10.0)
+
+    recommendation = "Healthy state, no action needed"
+    if context_pressure > 0.8:
+        recommendation = "High pressure - consider aggressive compaction"
+    elif context_pressure > 0.6:
+        recommendation = "Moderate pressure - consider merging similar threads"
+    elif suggestions["merge_candidates"]:
+        recommendation = f"Found {len(suggestions['merge_candidates'])} merge candidates"
+
+    suggestions["health"] = {
+        "active_threads": len(threads),
+        "total_weight": round(total_weight, 2),
+        "context_pressure": round(context_pressure, 2),
+        "recommendation": recommendation
+    }
+
+    # Limit results
+    suggestions["merge_candidates"] = suggestions["merge_candidates"][:5]
+    suggestions["split_candidates"] = suggestions["split_candidates"][:3]
+    suggestions["recall_hints"] = suggestions["recall_hints"][:3]
+
+    return f"# AI Suggestions\n\n```json\n{json.dumps(suggestions, indent=2)}\n```"
+
+
+def do_compact(ai_path: Path, strategy: str = "normal", dry_run: bool = False) -> str:
+    """Execute memory compaction."""
+    from ai_smartness.storage.threads import ThreadStorage
+    from datetime import timedelta
+    import numpy as np
+
+    if strategy not in COMPACTION_STRATEGIES:
+        strategy = "normal"
+
+    params = COMPACTION_STRATEGIES[strategy]
+    db_path = ai_path / "db"
+    storage = ThreadStorage(db_path / "threads")
+
+    report = {
+        "strategy": strategy,
+        "dry_run": dry_run,
+        "actions": [],
+        "before": {},
+        "after": {}
+    }
+
+    threads = storage.get_active()
+    report["before"] = {
+        "active_threads": len(threads),
+        "total_weight": round(sum(t.weight for t in threads), 2)
+    }
+
+    # 1. Find and merge similar threads
+    threads_with_embeddings = [t for t in threads if t.embedding and not t.split_locked]
+    merged_ids = set()
+
+    for i, t1 in enumerate(threads_with_embeddings):
+        if t1.id in merged_ids:
+            continue
+        for t2 in threads_with_embeddings[i+1:]:
+            if t2.id in merged_ids or t2.split_locked:
+                continue
+            e1 = np.array(t1.embedding)
+            e2 = np.array(t2.embedding)
+            sim = float(np.dot(e1, e2) / (np.linalg.norm(e1) * np.linalg.norm(e2) + 1e-8))
+            if sim >= params["merge_threshold"]:
+                if not dry_run:
+                    storage.merge(t1.id, t2.id)
+                merged_ids.add(t2.id)
+                report["actions"].append({
+                    "action": "merge",
+                    "survivor": t1.id,
+                    "absorbed": t2.id,
+                    "similarity": round(sim, 2)
+                })
+
+    # 2. Archive old threads
+    cutoff = datetime.now() - timedelta(days=params["archive_age_days"])
+    for thread in threads:
+        if thread.id in merged_ids:
+            continue
+        if thread.last_active < cutoff:
+            if not dry_run:
+                thread.archive()
+                storage.save(thread)
+            report["actions"].append({
+                "action": "archive",
+                "thread": thread.id,
+                "reason": "age",
+                "days_inactive": (datetime.now() - thread.last_active).days
+            })
+
+    # 3. Apply weight decay
+    if not dry_run:
+        for thread in storage.get_active():
+            thread.weight *= params["weight_decay"]
+            storage.save(thread)
+
+    # 4. Enforce thread limit
+    remaining = storage.get_active()
+    if len(remaining) > params["max_active_threads"]:
+        to_archive = sorted(remaining, key=lambda t: t.weight)
+        excess = len(remaining) - params["max_active_threads"]
+        for thread in to_archive[:excess]:
+            if not dry_run:
+                thread.archive()
+                storage.save(thread)
+            report["actions"].append({
+                "action": "archive",
+                "thread": thread.id,
+                "reason": "capacity",
+                "weight": round(thread.weight, 2)
+            })
+
+    # 5. Unlock compaction-locked threads
+    if not dry_run:
+        unlocked = storage.unlock_compacted()
+        if unlocked > 0:
+            report["actions"].append({
+                "action": "unlock",
+                "count": unlocked,
+                "reason": "compaction_complete"
+            })
+
+    # Final stats
+    if not dry_run:
+        final = storage.get_active()
+        report["after"] = {
+            "active_threads": len(final),
+            "total_weight": round(sum(t.weight for t in final), 2)
+        }
+    else:
+        report["after"] = report["before"].copy()
+        report["after"]["note"] = "dry_run - no changes made"
+
+    return f"# Compaction Report\n\n```json\n{json.dumps(report, indent=2)}\n```"
+
+
+def set_focus(ai_path: Path, topic: str, weight: float = 0.8) -> str:
+    """Set focus on a topic."""
+    weight = max(0.0, min(1.0, weight))
+
+    focus_path = ai_path / "focus.json"
+
+    # Load existing focus
+    focus_data = {"active_focus": [], "last_updated": ""}
+    if focus_path.exists():
+        try:
+            focus_data = json.loads(focus_path.read_text())
+        except Exception:
+            pass
+
+    # Remove existing focus on same topic
+    focus_data["active_focus"] = [
+        f for f in focus_data.get("active_focus", [])
+        if f.get("topic") != topic
+    ]
+
+    # Add new focus
+    focus_data["active_focus"].append({
+        "topic": topic,
+        "weight": weight,
+        "set_at": datetime.now().isoformat()
+    })
+    focus_data["last_updated"] = datetime.now().isoformat()
+
+    # Save
+    focus_path.write_text(json.dumps(focus_data, indent=2))
+
+    # Count affected threads
+    from ai_smartness.storage.threads import ThreadStorage
+    db_path = ai_path / "db"
+    storage = ThreadStorage(db_path / "threads")
+    threads = storage.get_active()
+
+    affected = 0
+    for t in threads:
+        if topic.lower() in [tp.lower() for tp in t.topics]:
+            affected += 1
+        elif topic.lower() in t.title.lower():
+            affected += 1
+        elif topic == t.id:
+            affected += 1
+
+    return f"# Focus Set\n\nFocus on **{topic}** (weight={weight})\n\n{affected} threads will be prioritized."
+
+
+def clear_focus(ai_path: Path, topic: Optional[str] = None) -> str:
+    """Clear focus on a topic or all focus."""
+    focus_path = ai_path / "focus.json"
+
+    if not focus_path.exists():
+        return "# Focus Cleared\n\nNo active focus to clear."
+
+    focus_data = json.loads(focus_path.read_text())
+
+    if topic:
+        # Clear specific topic
+        before = len(focus_data.get("active_focus", []))
+        focus_data["active_focus"] = [
+            f for f in focus_data.get("active_focus", [])
+            if f.get("topic") != topic
+        ]
+        after = len(focus_data["active_focus"])
+        removed = before - after
+        message = f"Removed focus on **{topic}**" if removed else f"No focus on '{topic}' found"
+    else:
+        # Clear all
+        count = len(focus_data.get("active_focus", []))
+        focus_data["active_focus"] = []
+        message = f"Cleared all focus ({count} topics)"
+
+    focus_data["last_updated"] = datetime.now().isoformat()
+    focus_path.write_text(json.dumps(focus_data, indent=2))
+
+    return f"# Focus Cleared\n\n{message}"
+
+
+def pin_content(ai_path: Path, content: str, title: Optional[str], topics: list, weight_boost: float) -> str:
+    """Pin content as a high-priority thread."""
+    from ai_smartness.storage.threads import ThreadStorage
+    from ai_smartness.models.thread import Thread, OriginType, Message
+
+    weight_boost = max(0.0, min(0.5, weight_boost))
+
+    db_path = ai_path / "db"
+    storage = ThreadStorage(db_path / "threads")
+
+    # Generate title if not provided
+    if not title:
+        title = content[:50].replace('\n', ' ').strip()
+        if len(content) > 50:
+            title += "..."
+
+    # Create thread
+    thread = Thread.create(title=title, origin_type=OriginType.PROMPT)
+    thread.add_message(content, source="agent_pin", source_type="pin")
+    thread.topics = topics or []
+    thread.weight = min(1.5, 1.0 + weight_boost)  # Allow above 1.0 for pinned
+    thread.tags = ["pinned"]
+
+    storage.save(thread)
+
+    return f"# Content Pinned\n\nThread: `{thread.id}`\nTitle: {title}\nWeight: {thread.weight:.2f}\nTopics: {', '.join(topics) if topics else 'none'}"
+
+
+def rate_context(ai_path: Path, thread_id: str, useful: bool, reason: Optional[str]) -> str:
+    """Rate context usefulness."""
+    from ai_smartness.storage.threads import ThreadStorage
+
+    db_path = ai_path / "db"
+    storage = ThreadStorage(db_path / "threads")
+
+    thread = storage.get(thread_id)
+    if not thread:
+        return f"# Error\n\nThread not found: {thread_id}"
+
+    old_score = thread.relevance_score
+    thread.add_rating(useful, reason)
+    new_score = thread.relevance_score
+
+    storage.save(thread)
+
+    rating_text = "useful" if useful else "not useful"
+    direction = "↑" if new_score > old_score else "↓" if new_score < old_score else "="
+
+    return f"# Context Rated\n\nThread: `{thread_id}`\nRating: {rating_text}\nRelevance: {old_score:.2f} {direction} {new_score:.2f}"
+
+
+def handle_profile(ai_path: Path, action: str, key: Optional[str], value: Optional[str]) -> str:
+    """
+    V5.1: Handle user profile management.
+
+    Args:
+        ai_path: Path to .ai directory
+        action: view, set_role, set_preference, add_rule, remove_rule
+        key: Key for the action
+        value: Value for the action
+
+    Returns:
+        Result string
+    """
+    from ai_smartness.models.session import load_user_profile, save_user_profile
+
+    profile = load_user_profile(ai_path)
+
+    if action == "view":
+        lines = ["# User Profile", ""]
+
+        # Identity
+        lines.append("## Identity")
+        lines.append(f"- Role: {profile.identity.get('role', 'user')}")
+        lines.append(f"- Relationship: {profile.identity.get('relationship', 'user')}")
+        if profile.identity.get('name'):
+            lines.append(f"- Name: {profile.identity['name']}")
+        lines.append("")
+
+        # Preferences
+        lines.append("## Preferences")
+        for k, v in profile.preferences.items():
+            lines.append(f"- {k}: {v}")
+        lines.append("")
+
+        # Patterns
+        if any(profile.patterns.values()):
+            lines.append("## Patterns (learned)")
+            if profile.patterns.get("active_hours"):
+                lines.append(f"- Active hours: {', '.join(profile.patterns['active_hours'])}")
+            if profile.patterns.get("common_tasks"):
+                lines.append(f"- Common tasks: {', '.join(profile.patterns['common_tasks'])}")
+            lines.append("")
+
+        # Rules
+        if profile.context_rules:
+            lines.append("## Context Rules")
+            for rule in profile.context_rules:
+                lines.append(f"- {rule}")
+            lines.append("")
+
+        lines.append(f"*Created: {profile.created_at[:10]}*")
+        lines.append(f"*Updated: {profile.updated_at[:10]}*")
+
+        return "\n".join(lines)
+
+    elif action == "set_role":
+        if not key:
+            return "# Error\n\nMissing key parameter. Use: set_role with key='developer|owner|user'"
+        if key not in ["user", "developer", "owner"]:
+            return f"# Error\n\nInvalid role: {key}. Use: developer, owner, or user"
+        profile.set_role(key)
+        save_user_profile(ai_path, profile)
+        return f"# Profile Updated\n\nRole set to: {key}"
+
+    elif action == "set_preference":
+        if not key or not value:
+            return "# Error\n\nMissing key and/or value parameters"
+        if key not in profile.preferences:
+            return f"# Error\n\nUnknown preference: {key}. Available: {', '.join(profile.preferences.keys())}"
+        profile.set_preference(key, value)
+        save_user_profile(ai_path, profile)
+        return f"# Profile Updated\n\nPreference {key} set to: {value}"
+
+    elif action == "add_rule":
+        if not key:
+            return "# Error\n\nMissing key parameter (the rule text)"
+        profile.add_rule(key)
+        save_user_profile(ai_path, profile)
+        return f"# Profile Updated\n\nRule added: {key}"
+
+    elif action == "remove_rule":
+        if not key:
+            return "# Error\n\nMissing key parameter (the rule text to remove)"
+        if key not in profile.context_rules:
+            return f"# Error\n\nRule not found: {key}"
+        profile.remove_rule(key)
+        save_user_profile(ai_path, profile)
+        return f"# Profile Updated\n\nRule removed: {key}"
+
+    else:
+        return f"# Error\n\nUnknown action: {action}. Use: view, set_role, set_preference, add_rule, remove_rule"
 
 
 async def main():

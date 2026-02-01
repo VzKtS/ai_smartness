@@ -134,12 +134,12 @@ def sanitize_unicode(text: str) -> str:
 # DATA RETRIEVAL
 # =============================================================================
 
-def get_tool_data_from_stdin() -> Tuple[str, str, Optional[str], Optional[str]]:
+def get_tool_data_from_stdin() -> Tuple[str, str, Optional[str], Optional[str], Optional[dict]]:
     """
     Get tool data from stdin (Claude Code sends JSON).
 
     Returns:
-        (tool_name, tool_output, file_path, session_id)
+        (tool_name, tool_output, file_path, session_id, tool_input)
     """
     try:
         if not sys.stdin.isatty():
@@ -160,7 +160,7 @@ def get_tool_data_from_stdin() -> Tuple[str, str, Optional[str], Optional[str]]:
 
                     tool_output = sanitize_unicode(tool_output)
 
-                    # Get file_path from tool_input if available
+                    # Get tool_input for session tracking (V5.1)
                     tool_input = data.get('tool_input', {})
                     file_path = None
                     if isinstance(tool_input, dict):
@@ -169,13 +169,13 @@ def get_tool_data_from_stdin() -> Tuple[str, str, Optional[str], Optional[str]]:
                     # Get session_id for context tracking
                     session_id = data.get('session_id')
 
-                    return tool_name, tool_output, file_path, session_id
+                    return tool_name, tool_output, file_path, session_id, tool_input
                 except json.JSONDecodeError:
                     pass
     except Exception:
         pass
 
-    return '', '', None, None
+    return '', '', None, None, None
 
 
 # =============================================================================
@@ -342,6 +342,62 @@ def update_context_tracking(ai_path: Path, session_id: Optional[str]):
         log(f"[CONTEXT] Update failed: {e}")
 
 
+def update_session_state(ai_path: Path, tool_name: str, tool_input: dict, tool_output: str):
+    """
+    V5.1: Update session state for work continuity.
+
+    Tracks:
+    - Files modified (Edit, Write)
+    - Tool history
+    - Last agent action
+
+    Args:
+        ai_path: Path to .ai directory
+        tool_name: Name of the tool used
+        tool_input: Tool input parameters
+        tool_output: Tool output/result
+    """
+    try:
+        from ..models.session import load_session_state, save_session_state
+
+        state = load_session_state(ai_path)
+
+        # Track file modifications
+        if tool_name in ["Edit", "Write"]:
+            file_path = tool_input.get("file_path", "") if isinstance(tool_input, dict) else ""
+            if file_path:
+                # Extract a summary of the change
+                summary = ""
+                if tool_name == "Edit":
+                    old_str = tool_input.get("old_string", "")[:50] if isinstance(tool_input, dict) else ""
+                    summary = f"Modified: {old_str}..." if old_str else "File edited"
+                elif tool_name == "Write":
+                    summary = "File written/created"
+
+                state.add_file_modified(file_path, tool_name, summary)
+                state.set_agent_action(f"{tool_name}: {Path(file_path).name}")
+
+        # Track tool call
+        target = ""
+        if isinstance(tool_input, dict):
+            target = tool_input.get("file_path", "") or \
+                     tool_input.get("command", "")[:50] or \
+                     tool_input.get("pattern", "") or \
+                     tool_input.get("query", "")[:50] or \
+                     ""
+        if isinstance(target, str) and len(target) > 50:
+            target = target[:50] + "..."
+
+        state.add_tool_call(tool_name, target)
+
+        # Save updated state
+        save_session_state(ai_path, state)
+        log(f"[SESSION] Updated: {tool_name} -> {target[:30] if target else 'N/A'}")
+
+    except Exception as e:
+        log(f"[SESSION] Update failed: {e}")
+
+
 def main():
     """Main entry point for capture hook."""
 
@@ -363,8 +419,9 @@ def main():
         # Get data from stdin if not provided
         stdin_file_path = None
         session_id = None
+        tool_input = None
         if not args.tool:
-            stdin_tool, stdin_output, stdin_file_path, session_id = get_tool_data_from_stdin()
+            stdin_tool, stdin_output, stdin_file_path, session_id, tool_input = get_tool_data_from_stdin()
             if stdin_tool:
                 args.tool = stdin_tool
             if stdin_output:
@@ -378,6 +435,10 @@ def main():
 
         # Get AI path
         ai_path = get_ai_path()
+
+        # V5.1: Update session state for work continuity
+        if args.tool and tool_input is not None:
+            update_session_state(ai_path, args.tool, tool_input, args.output)
 
         # Process the capture
         if args.tool and args.output:

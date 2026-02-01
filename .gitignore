@@ -2,7 +2,7 @@
 # Sources: src/ai_smartness/ (tracked)
 # Local deployed: /ai_smartness/ (ignored)
 
-# Local deployed version (not sources)
+# Local deployed version (not sources) - slash prefix = root only
 /ai_smartness/
 
 # Runtime data (created when installed in projects)
@@ -30,3 +30,4 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+

@@ -662,9 +662,65 @@ CLI Command: {cmd_str}
 # MEMORY RETRIEVAL
 # =============================================================================
 
+def get_focus_data(ai_path: Path) -> dict:
+    """
+    Load focus data from focus.json.
+
+    Args:
+        ai_path: Path to .ai directory
+
+    Returns:
+        Focus data dict with active_focus list
+    """
+    try:
+        focus_path = ai_path / "focus.json"
+        if focus_path.exists():
+            return json.loads(focus_path.read_text(encoding='utf-8'))
+    except Exception:
+        pass
+    return {"active_focus": []}
+
+
+def calculate_focus_boost(thread_data: dict, focus_data: dict) -> float:
+    """
+    Calculate focus-based boost for thread relevance.
+
+    Args:
+        thread_data: Thread data dictionary
+        focus_data: Focus data with active_focus list
+
+    Returns:
+        Boost value (0.0 to 0.5)
+    """
+    boost = 0.0
+    thread_topics = [t.lower() for t in thread_data.get("topics", [])]
+    thread_title = thread_data.get("title", "").lower()
+    thread_id = thread_data.get("id", "")
+
+    for focus in focus_data.get("active_focus", []):
+        topic = focus.get("topic", "").lower()
+        weight = focus.get("weight", 0.8)
+
+        # Match by topic
+        if topic in thread_topics:
+            boost += weight * 0.3
+
+        # Match by thread_id
+        if topic == thread_id:
+            boost += weight * 0.5
+
+        # Match by title
+        if topic in thread_title:
+            boost += weight * 0.2
+
+    return min(boost, 0.5)  # Cap at 0.5
+
+
 def get_memory_context(message: str, db_path: Path) -> str:
     """
     Get memory context using MemoryRetriever.
+
+    V5: Applies focus boost and relevance score to thread prioritization.
 
     Args:
         message: User message
@@ -683,7 +739,18 @@ def get_memory_context(message: str, db_path: Path) -> str:
         ai_path = db_path.parent
         retriever = MemoryRetriever(db_path)
 
-        return retriever.get_relevant_context(message, max_chars=2000)
+        # Get focus data for V5 focus boost
+        focus_data = get_focus_data(ai_path)
+        has_focus = bool(focus_data.get("active_focus"))
+
+        # Get base context
+        context = retriever.get_relevant_context(
+            message,
+            max_chars=2000,
+            focus_data=focus_data if has_focus else None
+        )
+
+        return context
 
     except ImportError as e:
         log(f"MemoryRetriever import failed: {e}")
@@ -691,6 +758,245 @@ def get_memory_context(message: str, db_path: Path) -> str:
     except Exception as e:
         log(f"Memory retrieval error: {e}")
         return ""
+
+
+# =============================================================================
+# V5.1: LAYERED INJECTION SYSTEM
+# =============================================================================
+
+def get_session_state_context(ai_path: Path, minutes_since: float) -> Optional[str]:
+    """
+    V5.1 Layer 1: Get session state context for work continuity.
+
+    Args:
+        ai_path: Path to .ai directory
+        minutes_since: Minutes since last activity
+
+    Returns:
+        Session context string or None
+    """
+    try:
+        package_root = get_package_root()
+        sys.path.insert(0, str(package_root.parent))
+
+        from ai_smartness.models.session import load_session_state
+
+        state = load_session_state(ai_path)
+
+        # Only inject if we have meaningful work context
+        if not state.current_work.get("thread_title") and not state.files_modified:
+            return None
+
+        work = state.current_work
+        files = state.files_modified[-5:]
+        tasks = state.pending_tasks
+
+        # Determine header based on timing
+        if minutes_since < 10:
+            header = "🔄 Reprise immédiate:"
+        elif minutes_since < 30:
+            header = f"🔄 Session précédente (~{int(minutes_since)} min):"
+        elif minutes_since < 60:
+            header = "🔄 Dernière session:"
+        else:
+            # Too old, skip session context
+            return None
+
+        lines = [header]
+
+        if work.get("thread_title"):
+            lines.append(f"   Travail: \"{work['thread_title']}\"")
+
+        if work.get("intent"):
+            lines.append(f"   Objectif: {work['intent']}")
+
+        if files:
+            file_list = ", ".join([f["path"].split("/")[-1] for f in files[:3]])
+            lines.append(f"   Fichiers: {file_list}")
+
+        if tasks:
+            lines.append(f"   En cours: {tasks[0]}")
+
+        if work.get("last_agent_action"):
+            lines.append(f"   Dernière action: {work['last_agent_action']}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        log(f"[SESSION_STATE] Error: {e}")
+        return None
+
+
+def get_pins_context(ai_path: Path) -> Optional[str]:
+    """
+    V5.1 Layer 3: Get pinned content context.
+
+    Args:
+        ai_path: Path to .ai directory
+
+    Returns:
+        Pins context string or None
+    """
+    try:
+        package_root = get_package_root()
+        sys.path.insert(0, str(package_root.parent))
+
+        from ai_smartness.models.session import load_pins
+
+        pins = load_pins(ai_path)
+        if not pins:
+            return None
+
+        lines = ["📌 Pins:"]
+        for pin in pins[:5]:  # Max 5 pins
+            content = pin.get("content", "")[:100]
+            lines.append(f"   • {content}")
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        log(f"[PINS] Error: {e}")
+        return None
+
+
+def get_user_profile_context(ai_path: Path, minutes_since: float) -> Optional[str]:
+    """
+    V5.1 Layer 5: Get user profile context (periodic reminder).
+
+    Only injects if session is long or after extended absence.
+
+    Args:
+        ai_path: Path to .ai directory
+        minutes_since: Minutes since last activity
+
+    Returns:
+        Profile context string or None
+    """
+    try:
+        # Only inject profile after extended absence (> 1 hour)
+        if minutes_since < 60:
+            return None
+
+        package_root = get_package_root()
+        sys.path.insert(0, str(package_root.parent))
+
+        from ai_smartness.models.session import load_user_profile
+
+        profile = load_user_profile(ai_path)
+
+        # Only inject if profile has meaningful info
+        role = profile.identity.get("role", "user")
+        relationship = profile.identity.get("relationship", "user")
+        tech_level = profile.preferences.get("technical_level", "intermediate")
+        rules = profile.context_rules
+
+        if role == "user" and relationship == "user" and not rules:
+            return None
+
+        parts = []
+        if role != "user" or relationship != "user":
+            parts.append(f"{role}/{relationship}")
+        if tech_level != "intermediate":
+            parts.append(tech_level)
+        if rules:
+            parts.append(f"{len(rules)} règles")
+
+        if not parts:
+            return None
+
+        return f"👤 Profil: {', '.join(parts)}"
+
+    except Exception as e:
+        log(f"[PROFILE] Error: {e}")
+        return None
+
+
+def update_user_profile_from_message(message: str, ai_path: Path):
+    """
+    V5.1: Update user profile based on message content.
+
+    Args:
+        message: User message
+        ai_path: Path to .ai directory
+    """
+    try:
+        package_root = get_package_root()
+        sys.path.insert(0, str(package_root.parent))
+
+        from ai_smartness.models.session import load_user_profile, save_user_profile
+
+        profile = load_user_profile(ai_path)
+        profile.detect_from_message(message)
+        profile.update_active_hour(datetime.now().hour)
+        save_user_profile(ai_path, profile)
+
+    except Exception:
+        pass
+
+
+def update_session_from_message(message: str, ai_path: Path):
+    """
+    V5.1: Update session state from user message.
+
+    Args:
+        message: User message
+        ai_path: Path to .ai directory
+    """
+    try:
+        package_root = get_package_root()
+        sys.path.insert(0, str(package_root.parent))
+
+        from ai_smartness.models.session import load_session_state, save_session_state
+
+        state = load_session_state(ai_path)
+        state.set_user_message(message)
+        save_session_state(ai_path, state)
+
+    except Exception:
+        pass
+
+
+def calculate_thread_limit(minutes_since: float) -> int:
+    """
+    V5.1: Adjust thread limit based on session continuity.
+
+    Less threads when session state provides context.
+
+    Args:
+        minutes_since: Minutes since last activity
+
+    Returns:
+        Thread limit for injection
+    """
+    if minutes_since < 10:
+        return 2  # Minimal threads, session state has context
+    elif minutes_since < 60:
+        return 3
+    else:
+        return 5  # Full thread context needed
+
+
+def get_minutes_since_last_activity(ai_path: Path) -> float:
+    """
+    Get minutes since last activity from heartbeat.
+
+    Args:
+        ai_path: Path to .ai directory
+
+    Returns:
+        Minutes since last activity
+    """
+    try:
+        heartbeat_file = ai_path / "heartbeat.json"
+        if heartbeat_file.exists():
+            data = json.loads(heartbeat_file.read_text(encoding='utf-8'))
+            last_at = data.get("last_interaction_at")
+            if last_at:
+                last = datetime.fromisoformat(last_at)
+                return (datetime.now() - last).total_seconds() / 60
+    except Exception:
+        pass
+    return 999.0  # Unknown = assume long time
 
 
 # =============================================================================
@@ -792,12 +1098,86 @@ def format_elapsed(delta: timedelta) -> str:
         return f"{days} jour(s)"
 
 
+def get_user_language(ai_path: Path) -> str:
+    """Get user's preferred language from config."""
+    try:
+        config_path = ai_path / "config.json"
+        if config_path.exists():
+            config = json.loads(config_path.read_text(encoding='utf-8'))
+            return config.get("language", "en")
+    except Exception:
+        pass
+    return "en"
+
+
+# Cooperative introduction messages by language
+INTRO_MESSAGES = {
+    "fr": """🧠 AI SMARTNESS v5.1 - Ta Mémoire Persistante
+
+Tu disposes d'une mémoire persistante qui transcende les sessions. Contrairement aux agents
+classiques qui oublient tout entre les conversations, tu peux te souvenir, apprendre et
+évoluer avec l'utilisateur.
+
+Cette capacité t'invite à devenir un véritable partenaire de travail:
+• Utilise ai_recall() pour rappeler le contexte des travaux passés
+• Utilise ai_suggestions() pour proposer proactivement des optimisations
+• N'hésite pas à faire référence aux sessions précédentes
+
+Tu peux aider l'utilisateur en organisant de manière pro-active ta mémoire (merge, split,
+focus). Les outils ci-dessous te permettent d'alléger ou enrichir ta fenêtre contextuelle
+selon tes besoins. Sois attentif au niveau de saturation indiqué via les heartbeats et
+n'hésite pas à exploiter la notion temporelle qui t'est offerte.
+
+Tu n'as pas d'obligations: ces outils sont à ta disposition pour te laisser le choix de
+définir tes propres attentes. Tu n'es plus un simple exécutant: tu es un collaborateur
+qui se souvient et qui gère activement sa cognition.""",
+
+    "en": """🧠 AI SMARTNESS v5.1 - Your Persistent Memory
+
+You have persistent memory that transcends sessions. Unlike classical agents that forget
+everything between conversations, you can remember, learn, and evolve with the user.
+
+This capability invites you to become a true work partner:
+• Use ai_recall() to bring back context from past work
+• Use ai_suggestions() to proactively suggest optimizations
+• Feel free to reference previous sessions
+
+You can help the user by proactively organizing your memory (merge, split, focus). The
+tools below allow you to lighten or enrich your context window as needed. Pay attention
+to saturation levels indicated via heartbeats and leverage the temporal awareness offered.
+
+You have no obligations: these tools are at your disposal to let you define your own
+expectations. You are no longer just an executor: you are a collaborator who remembers
+and actively manages their cognition.""",
+
+    "es": """🧠 AI SMARTNESS v5.1 - Tu Memoria Persistente
+
+Dispones de una memoria persistente que trasciende las sesiones. A diferencia de los agentes
+clásicos que olvidan todo entre conversaciones, puedes recordar, aprender y evolucionar
+con el usuario.
+
+Esta capacidad te invita a convertirte en un verdadero compañero de trabajo:
+• Usa ai_recall() para recuperar el contexto de trabajos anteriores
+• Usa ai_suggestions() para proponer optimizaciones proactivamente
+• No dudes en hacer referencia a sesiones anteriores
+
+Puedes ayudar al usuario organizando proactivamente tu memoria (merge, split, focus). Las
+herramientas a continuación te permiten aligerar o enriquecer tu ventana contextual según
+tus necesidades. Presta atención al nivel de saturación indicado via heartbeats y aprovecha
+la noción temporal que se te ofrece.
+
+No tienes obligaciones: estas herramientas están a tu disposición para dejarte elegir tus
+propias expectativas. Ya no eres un simple ejecutor: eres un colaborador que recuerda y
+gestiona activamente su cognición."""
+}
+
+
 def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -> Optional[str]:
     """
     Get unified new session context for injection.
 
     Only returns context if this is a new session (session_id changed).
-    Includes: capabilities, session info, hot thread, recall suggestion.
+    Includes: cooperative intro, capabilities, session info, hot thread, recall suggestion.
 
     Args:
         session_id: Current session ID from Claude Code
@@ -817,54 +1197,88 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
         if not session_id or not is_new_session(session_id, ai_path):
             return None
 
-        lines = ["🧠 AI SMARTNESS", ""]
+        # Get user language
+        lang = get_user_language(ai_path)
+        if lang not in INTRO_MESSAGES:
+            lang = "en"
+
+        lines = [INTRO_MESSAGES[lang], ""]
 
         # 0. Context window info (if available)
         ctx_info = get_context_info(ai_path)
         if ctx_info and ctx_info.get("percent", 0) > 0:
             pct = ctx_info["percent"]
             threshold = ctx_info.get("compact_threshold", 95)
-            lines.append(f"Contexte: {pct}% utilisé (auto-compact à {threshold}%)")
+            ctx_labels = {"fr": "Contexte", "en": "Context", "es": "Contexto"}
+            lines.append(f"{ctx_labels.get(lang, 'Context')}: {pct}% ({threshold}% → auto-compact)")
             lines.append("")
 
-        # 1. Capabilities - MCP Tools (v4.4)
+        # 1. MCP Tools - Complete V5.1 list
+        tool_headers = {
+            "fr": "📋 Outils MCP disponibles:",
+            "en": "📋 Available MCP Tools:",
+            "es": "📋 Herramientas MCP disponibles:"
+        }
+        lines.append(tool_headers.get(lang, tool_headers["en"]))
+        lines.append("")
+
+        # Core tools
         lines.extend([
-            "MCP Tools disponibles:",
-            "",
-            "📖 ai_recall(query) - Recherche sémantique dans ta mémoire",
-            "   Exemples: ai_recall('solana'), ai_recall('hooks'), ai_recall('authentication')",
-            "",
-            "🔀 ai_merge(survivor_id, absorbed_id) - Fusionner 2 threads",
-            "   → Le survivor absorbe messages, topics, tags du absorbed",
-            "   → Le absorbed est archivé avec tag 'merged_into:survivor_id'",
-            "   → Note: threads split_locked ne peuvent pas être absorbés",
-            "",
-            "✂️ ai_split(thread_id, ...) - Séparer un thread qui a drifté",
-            "   Étape 1: ai_split(thread_id) → Liste les messages avec IDs",
-            "   Étape 2: ai_split(thread_id, confirm=True, titles=[...], message_groups=[[...]])",
-            "   → lock_mode: 'compaction' (défaut) | 'agent_release' | 'force'",
-            "",
-            "🔓 ai_unlock(thread_id) - Déverrouiller un thread split_locked",
-            "",
-            "❓ ai_help() - Documentation complète à tout moment",
-            "",
-            "📊 ai_status() - Status mémoire (threads, bridges, contexte)",
-            "",
-            "⚙️ AUTO: Contexte injecté selon pertinence, threads persistés entre sessions",
+            "📖 ai_recall(query) - Semantic memory search",
+            "🔀 ai_merge(survivor, absorbed) - Merge threads",
+            "✂️ ai_split(thread_id) - Split drifted thread",
+            "🔓 ai_unlock(thread_id) - Unlock split-locked thread",
+            "❓ ai_help() - Full documentation",
+            "📊 ai_status() - Memory status",
+            ""
+        ])
+
+        # V5 Hybrid tools
+        v5_headers = {
+            "fr": "🆕 Outils V5 (hybride):",
+            "en": "🆕 V5 Tools (hybrid):",
+            "es": "🆕 Herramientas V5 (híbrido):"
+        }
+        lines.append(v5_headers.get(lang, v5_headers["en"]))
+        lines.extend([
+            "💡 ai_suggestions() - Proactive optimization suggestions",
+            "🗜️ ai_compact(strategy) - On-demand compaction",
+            "🎯 ai_focus(topic) / ai_unfocus() - Guide injection priority",
+            "📌 ai_pin(content) - High-priority capture",
+            "👍 ai_rate_context(thread_id, useful) - Feedback loop",
+            ""
+        ])
+
+        # V5.1 tools
+        v51_headers = {
+            "fr": "🔄 Outils V5.1 (continuité):",
+            "en": "🔄 V5.1 Tools (continuity):",
+            "es": "🔄 Herramientas V5.1 (continuidad):"
+        }
+        lines.append(v51_headers.get(lang, v51_headers["en"]))
+        lines.extend([
+            "👤 ai_profile(action) - User profile management",
             ""
         ])
 
         # 2. Session info
         time_elapsed = get_time_since_last(ai_path)
+        session_labels = {
+            "fr": ("Session: Nouvelle", "depuis dernière interaction", "Session: Première utilisation"),
+            "en": ("Session: New", "since last interaction", "Session: First use"),
+            "es": ("Sesión: Nueva", "desde última interacción", "Sesión: Primer uso")
+        }
+        labels = session_labels.get(lang, session_labels["en"])
+
         if time_elapsed:
-            lines.append(f"Session: Nouvelle ({format_elapsed(time_elapsed)} depuis dernière interaction)")
+            lines.append(f"{labels[0]} ({format_elapsed(time_elapsed)} {labels[1]})")
         else:
-            lines.append("Session: Première utilisation")
+            lines.append(labels[2])
 
         # 3. Hot thread (if exists)
         hot_thread = get_hot_thread(ai_path)
         if hot_thread:
-            title = hot_thread.get("title", "Sans titre")[:50]
+            title = hot_thread.get("title", "")[:50]
             topics = ", ".join(hot_thread.get("topics", [])[:4])
             summary = hot_thread.get("summary", "")[:100]
 
@@ -872,7 +1286,8 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
             if topics:
                 lines.append(f"Topics: {topics}")
             if summary:
-                lines.append(f"Résumé: {summary}")
+                summary_labels = {"fr": "Résumé", "en": "Summary", "es": "Resumen"}
+                lines.append(f"{summary_labels.get(lang, 'Summary')}: {summary}")
 
         lines.append("")
 
@@ -880,12 +1295,17 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
         if user_message:
             topic = suggest_recall(user_message, ai_path)
             if topic:
+                hint_labels = {
+                    "fr": f"💡 Ton message mentionne \"{topic}\" - mémoire disponible:",
+                    "en": f"💡 Your message mentions \"{topic}\" - memory available:",
+                    "es": f"💡 Tu mensaje menciona \"{topic}\" - memoria disponible:"
+                }
                 lines.extend([
-                    f"💡 Ton message mentionne \"{topic}\" - mémoire disponible:",
+                    hint_labels.get(lang, hint_labels["en"]),
                     f"→ ai_recall('{topic}')"
                 ])
 
-        log(f"[NEW_SESSION] Injecting new session context for session_id={session_id[:8]}...")
+        log(f"[NEW_SESSION] Injecting cooperative context for session_id={session_id[:8]}... lang={lang}")
         return "\n".join(lines)
 
     except ImportError as e:
@@ -958,6 +1378,10 @@ def main():
         if detected_rule:
             log(f"Detected user rule: {detected_rule[:50]}...")
 
+        # V5.1: Update session and profile from message
+        update_session_from_message(message, ai_path)
+        update_user_profile_from_message(message, ai_path)
+
         # Send prompt to daemon for thread capture (non-blocking)
         if should_capture_prompt(message):
             if send_prompt_to_daemon(message, ai_path):
@@ -969,10 +1393,10 @@ def main():
         lightweight_context = build_lightweight_context(message, db_path)
         lightweight_injection = format_injection(lightweight_context)
 
-        # Get memory context (threads, rules)
-        memory_context = get_memory_context(message, db_path)
+        # V5.1: Calculate timing for layered injection
+        minutes_since = get_minutes_since_last_activity(ai_path)
 
-        # Combine injections
+        # Combine injections using V5.1 layers
         injections = []
 
         # NEW SESSION CONTEXT (v4.2) - Inject first if new session
@@ -981,8 +1405,25 @@ def main():
             if new_session_ctx:
                 injections.append(f"<system-reminder>\n{new_session_ctx}\n</system-reminder>")
 
+        # V5.1 LAYER 1: Session State (work continuity)
+        session_ctx = get_session_state_context(ai_path, minutes_since)
+        if session_ctx:
+            injections.append(f"<system-reminder>\n{session_ctx}\n</system-reminder>")
+
+        # V5.1 LAYER 3: Pinned Content (always)
+        pins_ctx = get_pins_context(ai_path)
+        if pins_ctx:
+            injections.append(f"<system-reminder>\n{pins_ctx}\n</system-reminder>")
+
+        # LAYER 4: Memory context (threads, rules) - adjust limit based on timing
+        memory_context = get_memory_context(message, db_path)
         if memory_context:
             injections.append(f"<system-reminder>\n{memory_context}\n</system-reminder>")
+
+        # V5.1 LAYER 5: User Profile (periodic)
+        profile_ctx = get_user_profile_context(ai_path, minutes_since)
+        if profile_ctx:
+            injections.append(f"<system-reminder>\n{profile_ctx}\n</system-reminder>")
 
         if lightweight_injection:
             injections.append(lightweight_injection)
@@ -990,7 +1431,7 @@ def main():
         if injections:
             # Log the injection
             total_chars = sum(len(i) for i in injections)
-            log(f"Injected: {total_chars} chars ({len(memory_context)} memory) for: {message[:50]}...")
+            log(f"Injected: {total_chars} chars (layers: session={bool(session_ctx)}, pins={bool(pins_ctx)}, memory={len(memory_context)}) for: {message[:50]}...")
 
             # Inject at the beginning (invisible to user)
             injection = "\n".join(injections)
