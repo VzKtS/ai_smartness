@@ -488,7 +488,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "5.1.0",
+    "version": "5.1.1",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),

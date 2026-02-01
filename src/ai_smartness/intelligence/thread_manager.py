@@ -430,10 +430,11 @@ class ThreadManager:
         Enforce limits on active threads.
 
         Suspends lowest-weight threads when limit exceeded.
-        Uses active_threads_limit from config if max_active not specified.
+        Re-reads config each time to pick up mode changes without daemon restart.
         """
         if max_active is None:
-            max_active = self.active_threads_limit
+            # Re-read from config each time (allows mode changes without restart)
+            max_active = self._load_active_threads_limit()
 
         active = self.storage.threads.get_active()
 
@@ -445,9 +446,13 @@ class ThreadManager:
 
         # Suspend excess threads
         to_suspend = len(active) - max_active
+        suspended_titles = []
         for thread in active[:to_suspend]:
+            suspended_titles.append(thread.title[:30])
             thread.suspend("auto_limit")
             self.storage.threads.save(thread)
+
+        logger.info(f"LIMIT: Suspended {to_suspend} threads (limit={max_active}, was={len(active)}): {suspended_titles}")
 
     def get_context_for_injection(self, max_threads: int = 3) -> dict:
         """
