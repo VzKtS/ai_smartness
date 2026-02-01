@@ -1,10 +1,13 @@
-# AI Smartness - Active augmentation at root (not the sources)
-# Sources are in src/ai_smartness/
-# GitHub Action flattens src/ to ai_smartness/ on push
+# AI Smartness
+# Sources: src/ai_smartness/ (tracked)
+# Local deployed: /ai_smartness/ (ignored)
+
+# Local deployed version (not sources)
 /ai_smartness/
 
 # Runtime data (created when installed in projects)
 **/.ai/
+.ai/
 
 # Python
 __pycache__/
@@ -27,8 +30,3 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
-
-# AI Smartness
-ai_smartness/
-.ai/
-
