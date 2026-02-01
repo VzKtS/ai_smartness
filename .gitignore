@@ -20,6 +20,8 @@ __pycache__/
 # Claude settings (local only)
 .claude/
 .claudeignore
+# Claude plan files (random-name.md at root)
+/*-*-*.md
 
 # IDE
 .vscode/
