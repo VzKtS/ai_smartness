@@ -1,4 +1,4 @@
-# AI Smartness
+# AI Smartness v5.1
 
 **Meta-cognition layer for Claude Code agents.**
 
@@ -10,42 +10,14 @@ Compatible with VS Code & Claude Code CLI.
 
 ## Philosophy: Partnership, Not Control
 
-AI Smartness is built on a fundamental insight: **the best AI partnerships emerge from trust and collaboration, not constraints and control**.
+AI Smartness enables **partnership** between you and your agent. It provides cognitive tools - not constraints.
 
-### What This Means for You
+- **GuardCode is advisory**: Suggestions, not enforcement
+- **First contacts matter**: Let concepts emerge naturally with new agents
+- **Trust develops over time**: The agent learns your preferences through collaboration
+- **Agent autonomy**: The agent actively manages its own cognition and context window
 
-When you install AI Smartness on a new agent, you're not installing a "control system" - you're giving your agent **cognitive tools** that enhance its capabilities. Like any partnership:
-
-- **First contacts matter**: The initial interactions shape the relationship. Let concepts emerge naturally rather than forcing rigid rules.
-- **Trust develops over time**: As you work together, your agent learns your preferences, your coding style, your project's patterns.
-- **Guidance, not guardrails**: GuardCode provides *advice* to your agent, not guarantees. It's a mentor, not a jailer.
-
-### GuardCode: An Advisor, Not an Enforcer
-
-Many users expect GuardCode to "prevent" certain behaviors or "guarantee" specific outcomes. **This is not how it works.**
-
-GuardCode is an **advisory system** that:
-- Reminds the agent of best practices
-- Suggests planning before implementation
-- Encourages presenting all options
-
-It does **not**:
-- Guarantee the agent will follow advice
-- Prevent all mistakes
-- Replace your judgment as a user
-
-**Why?** Because rigid enforcement creates brittle, untrustworthy systems. Advisory guidance creates agents that *understand* why certain practices matter - and can adapt when exceptions are warranted.
-
-### Onboarding New Agents
-
-When introducing a new agent to AI Smartness:
-
-1. **Let it explore**: Don't immediately restrict. Let the agent discover its tools.
-2. **Teach through collaboration**: Work on real problems together. The agent learns from your reactions.
-3. **Express preferences naturally**: "I prefer TypeScript" works better than rigid rules.
-4. **Trust the process**: Memory builds over sessions. Early sessions teach fundamentals.
-
-The goal is an agent that *wants* to follow good practices because it understands their value - not one that follows them because it has no choice.
+See the main [README](../../README.md) for the full philosophy discussion.
 
 ---
 
@@ -56,11 +28,11 @@ AI Smartness v5.1 is a **neural-inspired working memory** with **full context co
 - **Threads** = Neurons (active reasoning streams)
 - **ThinkBridges** = Synapses (semantic connections between threads)
 - **Recall** = Active memory retrieval on demand
-- **Context Tracking** = Proactive context management
+- **Memory Injection** = Context restoration at each prompt
 - **Session State** = Work continuity across sessions
 - **User Profile** = Persistent personalization
 
-The system maintains a **thought network** where concepts remain connected and accessible, avoiding the context loss typical of classic LLM interactions.
+The system maintains a **thought network** where concepts remain connected and accessible.
 
 ---
 
@@ -71,26 +43,30 @@ The system maintains a **thought network** where concepts remain connected and a
 | **Threads** | Semantic work units with auto-generated titles |
 | **ThinkBridges** | Automatic connections between related threads |
 | **MCP Tools** | Native agent tools for memory management |
-| **Merge/Split** | Agent manages its own memory topology |
+| **Merge/Split** | Agent-controlled memory topology |
 | **Context Tracking** | Real-time context % with adaptive throttle |
 | **Session State** | Track files modified, tool history, pending tasks |
 | **User Profile** | Role, preferences, context rules |
 | **Layered Injection** | 5-layer priority context system |
 | **Cooperative Intro** | Empowers agent to manage its own cognition |
+| **CLI in Prompt** | `ai status` directly in prompt |
+| **User Rules** | Automatic detection and persistence of preferences |
 | **GuardCode** | Advisory system for best practices |
 | **95% Synthesis** | Automatic context preservation before compaction |
+| **Daemon Architecture** | Background processing + auto-pruning |
 | **100% Transparent** | Zero user action required |
 
 ---
 
-## Agent MCP Tools (v4.4)
+## Agent MCP Tools (v5.1)
 
-Your agent has access to these native MCP tools:
+Your agent has access to native MCP tools:
 
-### Memory Recall
+### Core Tools
 ```
 ai_recall(query="authentication")   # Search by keyword/topic
-ai_recall(query="thread_xxx")       # Recall specific thread
+ai_help()                           # Agent self-documentation
+ai_status()                         # Memory status
 ```
 
 ### Thread Management
@@ -101,125 +77,129 @@ ai_split(thread_id="t1", confirm=True, ...)    # Execute split (step 2)
 ai_unlock(thread_id="t1")                       # Unlock split-locked thread
 ```
 
-### Status & Help
+### V5 Hybrid Tools
 ```
-ai_help()     # Agent self-documentation
-ai_status()   # Memory status (threads, bridges, context %)
+ai_suggestions()              # Proactive optimization suggestions
+ai_compact(strategy="normal") # On-demand compaction (gentle/normal/aggressive)
+ai_focus(topic="solana")      # Boost injection priority for topics
+ai_unfocus()                  # Clear focus topics
+ai_pin(content="important")   # High-priority content capture
+ai_rate_context(thread_id, useful=True)  # Feedback on injection quality
 ```
 
-These native tools let the agent **proactively manage its own context** - the mark of a mature AI partnership.
+### V5.1 Context Continuity
+```
+ai_profile(action="view")                          # View profile
+ai_profile(action="set_role", role="developer")    # Set role
+ai_profile(action="add_rule", rule="Always use TypeScript")  # Add rule
+```
 
 ---
 
 ## Installation
 
-**Platform compatibility:**
-- **Linux / macOS**: Native support via `install.sh`
-- **Windows**: Requires **WSL** (Windows Subsystem for Linux)
+**Platform:** Linux / macOS / Windows (via WSL only)
 
-> **Why WSL?** The hooks in `.claude/settings.json` require **absolute paths** (e.g., `/home/user/project/ai_smartness/hooks/inject.py`). Windows paths (`C:\Users\...`) are not compatible with the hook system. WSL provides a Linux environment where the installer works natively.
-
-```bash
-# In your target project (Linux/macOS/WSL)
-/path/to/ai_smartness/install.sh .
-```
+> Hooks require absolute Unix paths. Windows native paths are not supported.
 
 ### Prerequisites (Recommended)
 
-**sentence-transformers** is required for semantic memory. The install script will try to install it automatically, but **we recommend installing it beforehand** to choose your PyTorch variant:
+**sentence-transformers** requires PyTorch. We recommend installing **before** running the install script to choose your variant:
 
 ```bash
-# CPU only (lighter, no GPU required)
+# CPU only (lighter)
 pip install torch --index-url https://download.pytorch.org/whl/cpu
 pip install sentence-transformers
 
-# OR with CUDA support (faster if you have NVIDIA GPU)
-pip install torch  # Automatically detects CUDA
-pip install sentence-transformers
+# OR with CUDA (faster with NVIDIA GPU)
+pip install torch && pip install sentence-transformers
 ```
 
-If you skip this step, the installer will attempt `pip install --user sentence-transformers` which installs the default (usually CPU) version.
+### Run Installer
 
-### Interactive Setup
-
-1. **Language**: English, French, or Spanish
-2. **Mode**: MAX (200), Heavy (100), Normal (50), or Light (15 threads)
-3. **Database**: Keep existing data or start fresh (if reinstalling)
-
-### What the Script Does
-
-The install script performs these actions in order:
-
-| Step | Action | Details |
-|------|--------|---------|
-| 1 | **Language selection** | en/fr/es - affects UI messages |
-| 2 | **Mode selection** | Determines active thread limit |
-| 3 | **Migration check** | Detects legacy `ai_smartness_v2` and migrates |
-| 4 | **Copy files** | Copies package to `project/ai_smartness/` |
-| 5 | **Initialize database** | Creates `.ai/db/threads/`, `bridges/`, `synthesis/` |
-| 6 | **Initialize heartbeat** | Creates `.ai/heartbeat.json` for session tracking |
-| 7 | **Check MCP package** | Installs `mcp` for native agent tools |
-| 8 | **Check sentence-transformers** | Detects if installed, attempts auto-install if not |
-| 9 | **Detect Claude CLI** | Finds `claude` in PATH for LLM extraction |
-| 10 | **Create config** | Writes `.ai/config.json` with settings |
-| 11 | **Configure hooks** | Adds 4 hooks to `.claude/settings.json` (absolute paths) |
-| 12 | **Configure MCP server** | Adds `ai-smartness` MCP server to settings |
-| 13 | **Configure .gitignore** | Excludes `ai_smartness/` |
-| 14 | **Configure .claudeignore** | Makes AI Smartness invisible to agent |
-| 15 | **Install CLI** | Copies `ai` command to `~/.local/bin/` |
-| 16 | **Start daemon** | Launches background processor for capture/extraction |
-
-### About the Daemon
-
-AI Smartness runs a **background daemon** that:
-- Receives tool captures asynchronously (non-blocking)
-- Performs LLM extraction for thread decisions
-- Manages thread/bridge lifecycle
-- Runs auto-pruning every 5 minutes
-
-The daemon starts automatically during installation and restarts if needed. Control it with:
 ```bash
-ai daemon status   # Check if running
-ai daemon start    # Start daemon
-ai daemon stop     # Stop daemon
+/path/to/ai_smartness-DEV/install.sh /path/to/your/project
 ```
 
-### Hooks Installed
+### What the Installer Does
 
-| Hook | Script | Trigger |
-|------|--------|---------|
-| `PreToolUse` | pretool.py | Before Read tool (virtual .ai/ paths) |
-| `UserPromptSubmit` | inject.py | Before each user message (memory injection) |
-| `PostToolUse` | capture.py | After each tool (capture to daemon) |
-| `PreCompact` | compact.py | At 95% context (synthesis generation) |
+| Step | Action |
+|------|--------|
+| 1 | **Language selection** (en/fr/es) |
+| 2 | **Mode selection** (MAX/Heavy/Normal/Light → thread limits) |
+| 3 | **Migration** from legacy `ai_smartness_v2` if present |
+| 4 | **Copy files** to `project/ai_smartness/` |
+| 5 | **Initialize database** (threads, bridges, synthesis dirs) |
+| 6 | **Initialize heartbeat.json** (session tracking) |
+| 7 | **Check sentence-transformers** (auto-install if missing) |
+| 8 | **Detect Claude CLI** path |
+| 9 | **Create config.json** |
+| 10 | **Configure hooks** (4 hooks with absolute paths) |
+| 11 | **Configure MCP server** (ai-smartness MCP tools) |
+| 12 | **Configure .gitignore/.claudeignore** |
+| 13 | **Install CLI** to `~/.local/bin/ai` |
+| 14 | **Start daemon** (background processor) |
 
-**Note**: Extraction uses your session's model (no hardcoded version). Your main agent can use any model (Opus, Sonnet, etc.).
+### The Daemon
+
+A background daemon handles:
+- Asynchronous capture processing
+- LLM extraction for thread decisions
+- Auto-pruning every 5 minutes
+
+```bash
+ai daemon status/start/stop
+```
+
+### Requirements
+
+- Python 3.10+
+- Claude Code (CLI or VS Code extension)
+- sentence-transformers (auto-installed or pre-installed)
 
 ---
 
 ## CLI Commands
 
 ```bash
-# Navigate to your project
-cd /your/project
-
 # Status overview
-python3 ai_smartness/cli/main.py status
+ai status
 
 # List threads
-python3 ai_smartness/cli/main.py threads
-python3 ai_smartness/cli/main.py threads --status active
-python3 ai_smartness/cli/main.py threads --limit 20
+ai threads
+ai threads --status active
+ai threads --prune
 
 # View specific thread
-python3 ai_smartness/cli/main.py thread <thread_id>
+ai thread <thread_id>
 
 # List bridges
-python3 ai_smartness/cli/main.py bridges
-python3 ai_smartness/cli/main.py bridges --thread <thread_id>
+ai bridges
+ai bridges --thread <thread_id>
 
 # Semantic search
-python3 ai_smartness/cli/main.py search "authentication"
+ai search "authentication"
+
+# System health
+ai health
+
+# Recalculate embeddings
+ai reindex
+
+# Daemon control
+ai daemon start
+ai daemon stop
+
+# Mode management
+ai mode heavy
+```
+
+### In Prompt (v3.0.0+)
+
+Type CLI commands directly:
+```
+You: ai status
+Claude: [Shows memory status]
 ```
 
 ---
@@ -227,85 +207,116 @@ python3 ai_smartness/cli/main.py search "authentication"
 ## How It Works
 
 ### 1. Capture (PostToolUse hook)
-
-Every tool result (Read, Write, Task, etc.) is captured:
 ```
-[Tool Result] → [Noise Filter] → [LLM Extraction] → [Thread Decision]
+[Tool Result] → [Daemon] → [LLM Extraction] → [Thread Decision]
 ```
 
 ### 2. Thread Management
-
-The LLM decides for each input:
-- **NEW_THREAD**: Different topic → create new thread
-- **CONTINUE**: Same topic → add to active thread
-- **FORK**: Sub-topic → create child thread
-- **REACTIVATE**: Old topic returns → wake up archived thread
+- **NEW_THREAD**: Different topic
+- **CONTINUE**: Same topic (similarity > 0.35)
+- **FORK**: Sub-topic
+- **REACTIVATE**: Old topic returns (similarity > 0.50)
 
 ### 3. Active Recall (v4.4)
-
-Agent can actively query memory via MCP tools:
 ```
 ai_recall(query="authentication")
-→ Returns matching threads, summaries, bridges
+→ Returns threads, summaries, bridges
 ```
 
-### 4. Memory Injection (UserPromptSubmit hook)
+### 4. Memory Injection (UserPromptSubmit)
 
-Before each user prompt, relevant context is injected:
-- On **new sessions**: Capabilities overview + last working thread
-- On **each message**: Relevant threads by similarity
-- **Recall suggestions**: When message matches known topics
+New sessions get:
+- Capabilities overview
+- Last active thread ("hot thread")
+- Recall suggestions
+
+Each message gets:
+- Relevant threads by similarity
+- User rules
 
 ### 5. Context Tracking (v4.3)
+- <70%: Updates every 30s
+- ≥70%: Updates on 5% delta only
 
-Real-time context usage monitoring:
-- **<70%**: Updates every 30s
-- **≥70%**: Updates only on 5% delta (adaptive throttle)
-- **Agent awareness**: Can see `context_percent` in heartbeat
-
-### 6. Synthesis (PreCompact hook)
-
-At 95% context window:
-- LLM generates synthesis of current state
-- Decisions, open questions, active threads
-- Injected after compaction
-- User sees nothing
+### 6. Synthesis (PreCompact, 95%)
+Auto-generated state synthesis before compaction.
 
 ---
 
 ## Configuration
 
-Config stored in `ai_smartness/.ai/config.json`:
-
 ```json
 {
-  "version": "4.4.0",
-  "project_name": "MyProject",
-  "language": "en",
+  "version": "4.3.0",
   "settings": {
     "thread_mode": "heavy",
-    "auto_capture": true,
     "active_threads_limit": 100
-  },
-  "llm": {
-    "extraction_model": "claude-3-5-haiku-20241022",
-    "claude_cli_path": "/usr/local/bin/claude"
   },
   "guardcode": {
     "enforce_plan_mode": true,
-    "warn_quick_solutions": true,
-    "require_all_choices": true
+    "warn_quick_solutions": true
   }
 }
 ```
 
-### Mode Differences
+### Modes
 
-| Mode | Thread Limit | Use Case |
-|------|--------------|----------|
-| Light | 15 | Small projects |
-| Normal | 50 | Medium projects |
-| Heavy | 100 | Large/complex projects |
+| Mode | Thread Limit |
+|------|--------------|
+| Light | 15 |
+| Normal | 50 |
+| Heavy | 100 |
+| Max | 200 |
+
+---
+
+## Architecture
+
+### Components
+
+| Component | File | Role |
+|-----------|------|------|
+| Daemon | `daemon/processor.py` | Background processing |
+| Client | `daemon/client.py` | Fast communication |
+| Capture Hook | `hooks/capture.py` | PostToolUse |
+| Inject Hook | `hooks/inject.py` | UserPromptSubmit |
+| PreTool Hook | `hooks/pretool.py` | Virtual .ai/ paths |
+| Recall Handler | `hooks/recall.py` | Memory recall + merge/split |
+| Compact Hook | `hooks/compact.py` | PreCompact synthesis |
+| Memory Retriever | `intelligence/memory_retriever.py` | Context retrieval |
+| Thread Manager | `intelligence/thread_manager.py` | Thread lifecycle |
+| Embeddings | `processing/embeddings.py` | Vector embeddings |
+
+### Hooks
+
+| Hook | Script | Function |
+|------|--------|----------|
+| `UserPromptSubmit` | inject.py | CLI commands + memory injection |
+| `PreToolUse` | pretool.py | Virtual .ai/ paths |
+| `PostToolUse` | capture.py | Thread capture |
+| `PreCompact` | compact.py | Synthesis generation |
+
+---
+
+## Troubleshooting
+
+### Daemon not running
+```bash
+ai daemon start
+```
+
+### Agent doesn't use recall
+Normal for new agents. They need to discover tools:
+1. Mention `ai_recall()` exists
+2. Point to `ai_help()`
+3. Trust the learning process
+
+### Low similarity scores
+```bash
+pip install sentence-transformers
+ai daemon stop && ai daemon start
+ai reindex
+```
 
 ---
 
@@ -313,90 +324,18 @@ Config stored in `ai_smartness/.ai/config.json`:
 
 ```
 ai_smartness/.ai/
-├── config.json           # Configuration
+├── config.json
 ├── heartbeat.json        # Session tracking, context %
-├── db/
-│   ├── threads/          # Thread JSON files
-│   │   └── thread_*.json
-│   ├── bridges/          # ThinkBridge JSON files
-│   │   └── bridge_*.json
-│   └── synthesis/        # Compaction syntheses
-└── processor.sock        # Daemon socket (when running)
+├── user_rules.json
+├── processor.pid
+├── processor.sock
+├── processor.log
+├── inject.log
+└── db/
+    ├── threads/
+    ├── bridges/
+    └── synthesis/
 ```
-
----
-
-## Claude Code Hooks
-
-| Hook | Script | Function |
-|------|--------|----------|
-| `UserPromptSubmit` | inject.py | Context injection |
-| `PreToolUse` | pretool.py | Virtual .ai/ paths |
-| `PostToolUse` | capture.py | Automatic capture |
-| `PreCompact` | compact.py | 95% synthesis |
-
----
-
-## GuardCode Rules (Advisory)
-
-| Rule | Description |
-|------|-------------|
-| `enforce_plan_mode` | *Suggests* planning before code changes |
-| `warn_quick_solutions` | *Reminds* that simple ≠ better |
-| `require_all_choices` | *Encourages* presenting all alternatives |
-
-**Remember**: These are *advice*, not enforcement. Your agent may choose differently based on context - and that's okay.
-
----
-
-## Requirements
-
-- Python 3.10+
-- Claude Code (CLI or VS Code extension)
-- sentence-transformers (for local embeddings)
-
----
-
-## Troubleshooting
-
-### Captures not working
-
-Check the hook paths in `.claude/settings.json` - they must be **absolute paths**.
-
-### Extraction showing "heuristic fallback"
-
-Claude CLI not found. Check:
-```bash
-which claude
-# Should return /usr/local/bin/claude or similar
-```
-
-### Too many threads
-
-Increase limit in config:
-```json
-"active_threads_limit": 150
-```
-
-### Agent not using recall
-
-This is normal for new agents! They need to discover their tools. You can:
-1. Mention recall exists: "You can use `ai_recall()` to search your memory"
-2. Let them discover it via `ai_help()`
-3. Trust that they'll learn over sessions
-
----
-
-## The Partnership Journey
-
-| Phase | What Happens |
-|-------|--------------|
-| **First session** | Agent discovers capabilities, builds initial threads |
-| **Early sessions** | Patterns emerge, preferences stored, trust develops |
-| **Mature partnership** | Agent proactively manages context, recalls relevant history |
-| **Long-term** | Agent almost never needs compaction - context is managed proactively |
-
-The goal is not an agent that blindly follows rules, but one that **understands your project deeply** and works as a true collaborator.
 
 ---
 
@@ -406,4 +345,4 @@ MIT
 
 ---
 
-**Note**: AI Smartness v4 transforms context management from a system limitation into a partnership capability. The best agents are those that learn to manage their own memory - and AI Smartness gives them the tools to do so.
+**Note**: AI Smartness is designed to be invisible. The best indication it's working is that your agent becomes a better collaborator over time - not that nothing ever goes wrong.
