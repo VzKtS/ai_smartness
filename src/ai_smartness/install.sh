@@ -624,11 +624,45 @@ for hook_type, hook_list in ai_hooks.items():
         settings['hooks'][hook_type] = []
     settings['hooks'][hook_type].extend(hook_list)
 
-# MCP Server configuration (v4.4)
-if 'mcpServers' not in settings:
-    settings['mcpServers'] = {}
+# Remove mcpServers from settings.json if present (moved to .mcp.json)
+if 'mcpServers' in settings:
+    del settings['mcpServers']
 
-settings['mcpServers']['ai-smartness'] = {
+settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
+print("   ✓ Hooks configured (PreToolUse, UserPromptSubmit, PostToolUse, PreCompact)")
+print(f"   ✓ Using absolute path: {ai_path}")
+EOF
+
+# ============================================================================
+# CONFIGURE MCP SERVER (.mcp.json)
+# ============================================================================
+
+echo "🔌 Configuring MCP server..."
+
+MCP_CONFIG_FILE="$TARGET_DIR/.mcp.json"
+
+python3 << EOF
+import json
+from pathlib import Path
+
+mcp_path = Path("$MCP_CONFIG_FILE")
+ai_path = "$AI_SMARTNESS_PATH"
+
+# Load existing config or create new
+if mcp_path.exists():
+    try:
+        mcp_config = json.loads(mcp_path.read_text())
+    except:
+        mcp_config = {}
+else:
+    mcp_config = {}
+
+if 'mcpServers' not in mcp_config:
+    mcp_config['mcpServers'] = {}
+
+# Add/update ai-smartness MCP server
+mcp_config['mcpServers']['ai-smartness'] = {
+    "type": "stdio",
     "command": "python3",
     "args": [f"{ai_path}/mcp/server.py"],
     "env": {
@@ -636,10 +670,9 @@ settings['mcpServers']['ai-smartness'] = {
     }
 }
 
-settings_path.write_text(json.dumps(settings, indent=2, ensure_ascii=False))
-print("   ✓ Hooks configured (PreToolUse, UserPromptSubmit, PostToolUse, PreCompact)")
-print("   ✓ MCP server configured (ai-smartness)")
-print(f"   ✓ Using absolute path: {ai_path}")
+mcp_path.write_text(json.dumps(mcp_config, indent=2, ensure_ascii=False))
+print("   ✓ MCP server configured in .mcp.json")
+print(f"   ✓ Server path: {ai_path}/mcp/server.py")
 EOF
 
 # ============================================================================
@@ -652,6 +685,7 @@ GITIGNORE="$TARGET_DIR/.gitignore"
 GITIGNORE_ENTRIES="
 # AI Smartness
 ai_smartness/
+.mcp.json
 "
 
 if [ -f "$GITIGNORE" ]; then
@@ -823,6 +857,7 @@ echo "📍 Installed in: $AI_SMARTNESS_DIR"
 echo ""
 echo "🔧 Configuration:"
 echo "   • Hooks: $CLAUDE_DIR/settings.json"
+echo "   • MCP: $TARGET_DIR/.mcp.json"
 echo "   • Database: $AI_SMARTNESS_DIR/.ai/db/"
 echo "   • Config: $AI_SMARTNESS_DIR/.ai/config.json"
 echo ""
