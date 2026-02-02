@@ -382,6 +382,46 @@ TOOLS = [
             "required": ["action"]
         }
     ),
+    # V5.1.2: Cleanup tool
+    Tool(
+        name="ai_cleanup",
+        description="Fix threads and bridges with missing or invalid titles. Mode 'auto' uses heuristics, 'interactive' returns items for agent review.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": ["auto", "interactive"],
+                    "default": "auto",
+                    "description": "auto: fix with heuristics, interactive: return items for agent to analyze and rename"
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "If true (auto mode only), show what would be fixed without making changes"
+                }
+            },
+            "required": []
+        }
+    ),
+    Tool(
+        name="ai_rename",
+        description="Rename a thread with a new title. Use after ai_cleanup(mode='interactive') to fix problematic titles.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "thread_id": {
+                    "type": "string",
+                    "description": "Thread ID to rename"
+                },
+                "new_title": {
+                    "type": "string",
+                    "description": "New title for the thread (max 60 chars)"
+                }
+            },
+            "required": ["thread_id", "new_title"]
+        }
+    ),
 ]
 
 
@@ -539,6 +579,19 @@ async def execute_tool(name: str, arguments: dict, ai_path: Path) -> str:
         key = arguments.get("key")
         value = arguments.get("value")
         return handle_profile(ai_path, action, key, value)
+
+    # V5.1.2: Cleanup tool
+    elif name == "ai_cleanup":
+        mode = arguments.get("mode", "auto")
+        dry_run = arguments.get("dry_run", False)
+        return cleanup_threads(ai_path, mode, dry_run)
+
+    elif name == "ai_rename":
+        thread_id = arguments.get("thread_id", "")
+        new_title = arguments.get("new_title", "")
+        if not thread_id or not new_title:
+            return "# Error\n\nMissing required parameters: thread_id and new_title"
+        return rename_thread(ai_path, thread_id, new_title)
 
     else:
         return f"# Error\n\nUnknown tool: {name}"
@@ -1086,6 +1139,256 @@ def handle_profile(ai_path: Path, action: str, key: Optional[str], value: Option
 
     else:
         return f"# Error\n\nUnknown action: {action}. Use: view, set_role, set_preference, add_rule, remove_rule"
+
+
+def cleanup_threads(ai_path: Path, mode: str = "auto", dry_run: bool = False) -> str:
+    """
+    Fix threads and bridges with missing or invalid titles.
+
+    Args:
+        ai_path: Path to .ai directory
+        mode: 'auto' = fix with heuristics, 'interactive' = return items for agent review
+        dry_run: If True (auto mode only), show what would be fixed without making changes
+
+    Returns:
+        Cleanup report or list of items for review
+    """
+    from ai_smartness.processing.extractor import extract_title_from_content
+
+    problematic_threads = []
+    fixed_threads = []
+    fixed_bridges = []
+    errors = []
+
+    # Titles that indicate extraction failed
+    BAD_TITLES = ["Unknown", "Unknown topic", "Untitled", ""]
+
+    # Find problematic threads
+    threads_dir = ai_path / "db" / "threads"
+    if threads_dir.exists():
+        for f in threads_dir.glob("*.json"):
+            # Skip index files (_active.json, _suspended.json) - these are system files
+            if f.stem.startswith("_"):
+                continue
+
+            try:
+                data = json.loads(f.read_text())
+                title = data.get("title", "")
+                thread_id = data.get("id", f.stem)
+
+                # Check for problematic titles
+                is_bad_title = title in BAD_TITLES or not title
+
+                # Also check for very short/unhelpful titles (like "Cette")
+                is_short_title = len(title) <= 5 and title not in BAD_TITLES
+
+                if is_bad_title or is_short_title:
+                    summary = data.get("summary", "")
+
+                    # Try to get content from messages if no summary
+                    if not summary:
+                        messages = data.get("messages", [])
+                        if messages:
+                            summary = messages[0].get("content", "")[:200]
+
+                    if mode == "interactive":
+                        # Return for agent review
+                        problematic_threads.append({
+                            "thread_id": thread_id,
+                            "current_title": title if title else "(empty)",
+                            "summary": summary[:150] if summary else "(no content)",
+                            "suggested_title": extract_title_from_content(summary) if summary else None,
+                            "reason": "short_title" if is_short_title else "bad_title"
+                        })
+                    else:
+                        # Auto mode - fix with heuristics
+                        if summary:
+                            new_title = extract_title_from_content(summary)
+                            old_title = title if title else "(empty)"
+
+                            if not dry_run:
+                                data["title"] = new_title
+                                f.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+
+                            fixed_threads.append({
+                                "id": thread_id,
+                                "old": old_title,
+                                "new": new_title,
+                                "summary_preview": summary[:50]
+                            })
+            except Exception as e:
+                errors.append(f"thread {f.name}: {e}")
+
+    # Fix bridges
+    bridges_dir = ai_path / "db" / "bridges"
+    if bridges_dir.exists():
+        for f in bridges_dir.glob("*.json"):
+            try:
+                data = json.loads(f.read_text())
+
+                # Check source and target titles
+                source_title = data.get("source_title", "")
+                target_title = data.get("target_title", "")
+                description = data.get("description", "")
+                modified = False
+
+                if source_title in ["Unknown", "Unknown topic", "Untitled", ""] or not source_title:
+                    if description:
+                        new_title = extract_title_from_content(description)[:30]
+                        if not dry_run:
+                            data["source_title"] = new_title
+                        fixed_bridges.append({
+                            "id": data.get("id", f.stem),
+                            "field": "source_title",
+                            "old": source_title if source_title else "(empty)",
+                            "new": new_title
+                        })
+                        modified = True
+
+                if target_title in ["Unknown", "Unknown topic", "Untitled", ""] or not target_title:
+                    if description:
+                        new_title = extract_title_from_content(description)[:30]
+                        if not dry_run:
+                            data["target_title"] = new_title
+                        fixed_bridges.append({
+                            "id": data.get("id", f.stem),
+                            "field": "target_title",
+                            "old": target_title if target_title else "(empty)",
+                            "new": new_title
+                        })
+                        modified = True
+
+                if modified and not dry_run:
+                    f.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+
+            except Exception as e:
+                errors.append(f"bridge {f.name}: {e}")
+
+    # Build report based on mode
+    if mode == "interactive":
+        # Interactive mode: return items for agent review
+        lines = ["# AI Cleanup - Interactive Mode", ""]
+        lines.append("Review the following threads and use `ai_rename(thread_id, new_title)` to fix them.")
+        lines.append("")
+
+        if problematic_threads:
+            lines.append(f"## Threads to Review: {len(problematic_threads)}")
+            lines.append("")
+
+            for item in problematic_threads:
+                lines.append(f"### `{item['thread_id']}`")
+                lines.append(f"- **Current title**: \"{item['current_title']}\"")
+                lines.append(f"- **Reason**: {item['reason']}")
+                lines.append(f"- **Summary**: {item['summary']}")
+                if item['suggested_title']:
+                    lines.append(f"- **Suggested**: \"{item['suggested_title']}\"")
+                lines.append("")
+                lines.append(f"```")
+                lines.append(f"ai_rename(thread_id='{item['thread_id']}', new_title='YOUR_TITLE')")
+                lines.append(f"```")
+                lines.append("")
+        else:
+            lines.append("No threads need review.")
+            lines.append("")
+
+        if errors:
+            lines.append(f"## Errors: {len(errors)}")
+            for err in errors:
+                lines.append(f"- {err}")
+    else:
+        # Auto mode: show what was fixed
+        lines = ["# AI Cleanup Report", ""]
+
+        if dry_run:
+            lines.append("**Mode: DRY RUN** (no changes made)")
+            lines.append("")
+
+        # Threads section
+        lines.append(f"## Threads Fixed: {len(fixed_threads)}")
+        lines.append("")
+
+        if fixed_threads:
+            for item in fixed_threads:
+                lines.append(f"- `{item['id']}`")
+                lines.append(f"  - Old: \"{item['old']}\"")
+                lines.append(f"  - New: \"{item['new']}\"")
+                lines.append(f"  - From: \"{item['summary_preview']}...\"")
+                lines.append("")
+        else:
+            lines.append("No threads need fixing.")
+            lines.append("")
+
+        # Bridges section
+        lines.append(f"## Bridges Fixed: {len(fixed_bridges)}")
+        lines.append("")
+
+        if fixed_bridges:
+            for item in fixed_bridges:
+                lines.append(f"- `{item['id']}` ({item['field']})")
+                lines.append(f"  - Old: \"{item['old']}\"")
+                lines.append(f"  - New: \"{item['new']}\"")
+                lines.append("")
+        else:
+            lines.append("No bridges need fixing.")
+            lines.append("")
+
+        if errors:
+            lines.append(f"## Errors: {len(errors)}")
+            lines.append("")
+            for err in errors:
+                lines.append(f"- {err}")
+
+    return "\n".join(lines)
+
+
+def rename_thread(ai_path: Path, thread_id: str, new_title: str) -> str:
+    """
+    Rename a thread with a new title.
+
+    Args:
+        ai_path: Path to .ai directory
+        thread_id: Thread ID to rename
+        new_title: New title for the thread
+
+    Returns:
+        Confirmation message
+    """
+    # Truncate title to 60 chars
+    new_title = new_title[:60]
+
+    threads_dir = ai_path / "db" / "threads"
+    if not threads_dir.exists():
+        return "# Error\n\nThreads directory not found"
+
+    # Find the thread file
+    thread_file = None
+    for f in threads_dir.glob("*.json"):
+        try:
+            data = json.loads(f.read_text())
+            if data.get("id") == thread_id:
+                thread_file = f
+                break
+        except:
+            continue
+
+    if not thread_file:
+        # Try direct filename match
+        direct_file = threads_dir / f"{thread_id}.json"
+        if direct_file.exists():
+            thread_file = direct_file
+        else:
+            return f"# Error\n\nThread not found: {thread_id}"
+
+    try:
+        data = json.loads(thread_file.read_text())
+        old_title = data.get("title", "(empty)")
+        data["title"] = new_title
+        thread_file.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+
+        return f"# Thread Renamed\n\n- **ID**: `{thread_id}`\n- **Old title**: \"{old_title}\"\n- **New title**: \"{new_title}\""
+
+    except Exception as e:
+        return f"# Error\n\nFailed to rename thread: {e}"
 
 
 async def main():

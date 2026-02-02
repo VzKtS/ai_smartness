@@ -595,6 +595,30 @@ ai_profile(action="remove_rule", key="...")
 4. **Thread Relevance** - Mémoire thématique
 5. **User Profile** - Personnalisation (> 1h)
 
+---
+
+## V5.1.2 Cleanup Tools
+
+### 🧹 ai_cleanup(mode?, dry_run?) - Nettoyer les threads mal nommés
+```
+ai_cleanup()                        # Mode auto (heuristiques)
+ai_cleanup(mode="interactive")      # Mode interactif (analyse par l'agent)
+ai_cleanup(dry_run=True)           # Preview sans modifier
+```
+**Modes:**
+- `auto` (défaut) - Corrige automatiquement avec heuristiques
+- `interactive` - Retourne la liste pour analyse manuelle par l'agent
+
+---
+
+### ✏️ ai_rename(thread_id, new_title) - Renommer un thread
+```
+ai_rename(thread_id="thread_xxx", new_title="Mon nouveau titre")
+```
+→ Utilisé après `ai_cleanup(mode="interactive")` pour corriger les titres
+
+---
+
 ## Tips
 
 1. **Libérer du contexte:** `ai_compact()` ou merge des threads similaires
@@ -605,7 +629,7 @@ ai_profile(action="remove_rule", key="...")
 6. **Profil:** `ai_profile()` pour personnaliser ton expérience
 
 ---
-*AI Smartness v5.1 - Full Context Continuity for LLM agents*
+*AI Smartness v5.1.2 - Full Context Continuity + Cleanup Tools for LLM agents*
 """
 
 

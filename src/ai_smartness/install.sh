@@ -472,11 +472,10 @@ lang = "$LANG"
 project_name = "$PROJECT_NAME"
 claude_cli_path = "$CLAUDE_CLI_PATH"
 
-# Extraction uses the session default model (no hardcoded version)
-# This ensures compatibility with future model releases
-# The extractor will use whatever model is available in the user's Claude session
-extraction_model = None  # Use session default
-guardian_model = None  # Use session default
+# Use Haiku for extraction/guardian tasks (cost-effective)
+# These are lightweight LLM tasks that don't need expensive models
+extraction_model = "haiku"  # Fast & cheap for title/summary extraction
+guardian_model = "haiku"  # Fast & cheap for guardcode checks
 
 # Thread limits by mode
 thread_limits = {
@@ -488,7 +487,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "5.1.1",
+    "version": "5.1.2",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),

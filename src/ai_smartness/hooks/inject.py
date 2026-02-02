@@ -1261,6 +1261,19 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
             ""
         ])
 
+        # V5.1.2 cleanup tools
+        v512_headers = {
+            "fr": "🧹 Outils V5.1.2 (nettoyage):",
+            "en": "🧹 V5.1.2 Tools (cleanup):",
+            "es": "🧹 Herramientas V5.1.2 (limpieza):"
+        }
+        lines.append(v512_headers.get(lang, v512_headers["en"]))
+        lines.extend([
+            "🧹 ai_cleanup(mode) - Fix threads with bad titles (auto/interactive)",
+            "✏️ ai_rename(thread_id, new_title) - Rename a thread",
+            ""
+        ])
+
         # 2. Session info
         time_elapsed = get_time_since_last(ai_path)
         session_labels = {

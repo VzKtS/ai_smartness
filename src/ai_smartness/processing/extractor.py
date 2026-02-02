@@ -374,8 +374,8 @@ class LLMExtractor:
         words = content.split()
         significant_words = [w for w in words if len(w) > 4 and w[0].isupper()][:5]
 
-        # Build title from significant words (noun-based)
-        title = ' '.join(significant_words[:3]) if significant_words else "Unknown topic"
+        # Build title from significant words (noun-based), fallback to content extraction
+        title = ' '.join(significant_words[:3]) if significant_words else extract_title_from_content(content)
 
         # Build summary from first sentence
         first_sentence = content.split('.')[0].strip() if '.' in content else content[:100]
@@ -491,9 +491,12 @@ class LLMExtractor:
             first_sentence = original_content.split('.')[0].strip()
             fallback_summary = first_sentence[:150] if first_sentence else ""
 
+        # Generate fallback title from content
+        fallback_title = extract_title_from_content(original_content) if original_content else "Unknown"
+
         return Extraction(
             source_type=source_type,
-            title="Unknown",
+            title=fallback_title,
             summary=fallback_summary,
             intent="Parsing failed",
             subjects=[],
