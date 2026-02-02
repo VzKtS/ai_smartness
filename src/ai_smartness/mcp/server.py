@@ -422,6 +422,51 @@ TOOLS = [
             "required": ["thread_id", "new_title"]
         }
     ),
+    # V5.2: Batch operations
+    Tool(
+        name="ai_merge_batch",
+        description="Merge multiple thread pairs in a single operation. More efficient than multiple ai_merge calls.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "operations": {
+                    "type": "array",
+                    "description": "List of merge operations [{survivor_id, absorbed_id}, ...]",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "survivor_id": {"type": "string"},
+                            "absorbed_id": {"type": "string"}
+                        },
+                        "required": ["survivor_id", "absorbed_id"]
+                    }
+                }
+            },
+            "required": ["operations"]
+        }
+    ),
+    Tool(
+        name="ai_rename_batch",
+        description="Rename multiple threads in a single operation. More efficient than multiple ai_rename calls.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "operations": {
+                    "type": "array",
+                    "description": "List of rename operations [{thread_id, new_title}, ...]",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "thread_id": {"type": "string"},
+                            "new_title": {"type": "string"}
+                        },
+                        "required": ["thread_id", "new_title"]
+                    }
+                }
+            },
+            "required": ["operations"]
+        }
+    ),
 ]
 
 
@@ -592,6 +637,19 @@ async def execute_tool(name: str, arguments: dict, ai_path: Path) -> str:
         if not thread_id or not new_title:
             return "# Error\n\nMissing required parameters: thread_id and new_title"
         return rename_thread(ai_path, thread_id, new_title)
+
+    # V5.2: Batch operations
+    elif name == "ai_merge_batch":
+        operations = arguments.get("operations", [])
+        if not operations:
+            return "# Error\n\nMissing required parameter: operations"
+        return merge_batch(ai_path, operations)
+
+    elif name == "ai_rename_batch":
+        operations = arguments.get("operations", [])
+        if not operations:
+            return "# Error\n\nMissing required parameter: operations"
+        return rename_batch(ai_path, operations)
 
     else:
         return f"# Error\n\nUnknown tool: {name}"
@@ -1389,6 +1447,151 @@ def rename_thread(ai_path: Path, thread_id: str, new_title: str) -> str:
 
     except Exception as e:
         return f"# Error\n\nFailed to rename thread: {e}"
+
+
+def merge_batch(ai_path: Path, operations: list) -> str:
+    """
+    Merge multiple thread pairs in a single operation.
+
+    Args:
+        ai_path: Path to .ai directory
+        operations: List of {survivor_id, absorbed_id} dicts
+
+    Returns:
+        Batch result summary
+    """
+    from ai_smartness.hooks.recall import handle_merge
+
+    results = []
+    success_count = 0
+    error_count = 0
+
+    for op in operations:
+        survivor_id = op.get("survivor_id", "")
+        absorbed_id = op.get("absorbed_id", "")
+
+        if not survivor_id or not absorbed_id:
+            results.append({
+                "status": "error",
+                "error": "Missing survivor_id or absorbed_id",
+                **op
+            })
+            error_count += 1
+            continue
+
+        try:
+            result = handle_merge(survivor_id, absorbed_id, ai_path)
+            if "Error" in result:
+                results.append({
+                    "status": "error",
+                    "error": result.split("\n")[-1],
+                    "survivor_id": survivor_id,
+                    "absorbed_id": absorbed_id
+                })
+                error_count += 1
+            else:
+                results.append({
+                    "status": "ok",
+                    "survivor_id": survivor_id,
+                    "absorbed_id": absorbed_id
+                })
+                success_count += 1
+        except Exception as e:
+            results.append({
+                "status": "error",
+                "error": str(e),
+                "survivor_id": survivor_id,
+                "absorbed_id": absorbed_id
+            })
+            error_count += 1
+
+    # Build report
+    lines = ["# Batch Merge Results", ""]
+    lines.append(f"**Total:** {len(operations)} | **Success:** {success_count} | **Errors:** {error_count}")
+    lines.append("")
+
+    if success_count > 0:
+        lines.append("## Successful Merges")
+        for r in results:
+            if r["status"] == "ok":
+                lines.append(f"- `{r['absorbed_id']}` → `{r['survivor_id']}`")
+        lines.append("")
+
+    if error_count > 0:
+        lines.append("## Errors")
+        for r in results:
+            if r["status"] == "error":
+                lines.append(f"- `{r.get('absorbed_id', '?')}` → `{r.get('survivor_id', '?')}`: {r['error']}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def rename_batch(ai_path: Path, operations: list) -> str:
+    """
+    Rename multiple threads in a single operation.
+
+    Args:
+        ai_path: Path to .ai directory
+        operations: List of {thread_id, new_title} dicts
+
+    Returns:
+        Batch result summary
+    """
+    results = []
+    success_count = 0
+    error_count = 0
+
+    for op in operations:
+        thread_id = op.get("thread_id", "")
+        new_title = op.get("new_title", "")
+
+        if not thread_id or not new_title:
+            results.append({
+                "status": "error",
+                "error": "Missing thread_id or new_title",
+                **op
+            })
+            error_count += 1
+            continue
+
+        result = rename_thread(ai_path, thread_id, new_title)
+        if "Error" in result:
+            results.append({
+                "status": "error",
+                "error": result.split("\n")[-1],
+                "thread_id": thread_id,
+                "new_title": new_title
+            })
+            error_count += 1
+        else:
+            results.append({
+                "status": "ok",
+                "thread_id": thread_id,
+                "new_title": new_title
+            })
+            success_count += 1
+
+    # Build report
+    lines = ["# Batch Rename Results", ""]
+    lines.append(f"**Total:** {len(operations)} | **Success:** {success_count} | **Errors:** {error_count}")
+    lines.append("")
+
+    if success_count > 0:
+        lines.append("## Successful Renames")
+        for r in results:
+            if r["status"] == "ok":
+                lines.append(f"- `{r['thread_id']}` → \"{r['new_title']}\"")
+        lines.append("")
+
+    if error_count > 0:
+        lines.append("## Errors")
+        for r in results:
+            if r["status"] == "error":
+                lines.append(f"- `{r.get('thread_id', '?')}`: {r['error']}")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 async def main():

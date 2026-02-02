@@ -470,6 +470,9 @@ class ProcessorDaemon:
                 # V5.1: Check for session idle
                 self._check_session_idle()
 
+                # V5.2: Proactive compression
+                self._check_proactive_compact()
+
                 logger.info("Running periodic prune...")
 
                 # Prune threads (suspend low-weight)
@@ -575,6 +578,67 @@ class ProcessorDaemon:
 
         except Exception as e:
             logger.debug(f"Session idle check error: {e}")
+
+    def _check_proactive_compact(self) -> None:
+        """
+        V5.2: Check context pressure and trigger proactive compaction.
+
+        Automatically compacts memory when pressure exceeds threshold:
+        - > 0.80 → normal compaction
+        - > 0.95 → aggressive compaction
+        """
+        try:
+            # Load config to check if enabled and get threshold
+            config_path = self.ai_path / "config.json"
+            config = {}
+            if config_path.exists():
+                config = json.loads(config_path.read_text())
+
+            auto_opt = config.get("settings", {}).get("auto_optimization", {})
+            enabled = auto_opt.get("proactive_compact_enabled", True)  # Default enabled
+            threshold = auto_opt.get("proactive_compact_threshold", 0.80)
+
+            if not enabled:
+                return
+
+            # Calculate context pressure
+            if not self.thread_manager:
+                return
+
+            active = self.storage.threads.get_active()
+            total_weight = sum(t.weight for t in active)
+
+            # Rough pressure estimate (total_weight / typical_limit)
+            # A typical limit is around 10.0 total weight for good context
+            pressure = min(1.0, total_weight / 10.0)
+
+            if pressure <= threshold:
+                return
+
+            # Determine strategy based on pressure
+            strategy = "aggressive" if pressure > 0.95 else "normal"
+
+            logger.info(f"PROACTIVE-COMPACT: pressure={pressure:.2f}, threshold={threshold}, strategy={strategy}")
+
+            # Import and run compaction
+            package_dir = Path(__file__).parent.parent
+            package_parent = package_dir.parent
+            package_name = package_dir.name
+
+            if str(package_parent) not in sys.path:
+                sys.path.insert(0, str(package_parent))
+
+            import importlib
+            compactor_mod = importlib.import_module(f"{package_name}.intelligence.compactor")
+
+            compactor = compactor_mod.Compactor(self.storage)
+            result = compactor.compact(strategy=strategy, dry_run=False)
+
+            if result.get("merged", 0) > 0 or result.get("archived", 0) > 0:
+                logger.info(f"PROACTIVE-COMPACT result: merged={result.get('merged', 0)}, archived={result.get('archived', 0)}")
+
+        except Exception as e:
+            logger.debug(f"Proactive compact error: {e}")
 
     def run(self):
         """Run the daemon main loop."""

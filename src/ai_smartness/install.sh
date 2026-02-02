@@ -487,14 +487,25 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "5.1.2",
+    "version": "5.2.0",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
     "settings": {
         "thread_mode": thread_mode,
         "auto_capture": True,
-        "active_threads_limit": active_threads_limit
+        "active_threads_limit": active_threads_limit,
+        "auto_optimization": {
+            "proactive_compact_enabled": True,
+            "proactive_compact_threshold": 0.80,
+            "auto_merge_enabled": False,
+            "auto_merge_threshold": 0.90,
+            "dedup_enabled": False,
+            "dedup_threshold": 0.85,
+            "weight_decay_enabled": False,
+            "weight_decay_rate": 0.02,
+            "weight_decay_min": 0.1
+        }
     },
     "llm": {
         "extraction_model": extraction_model,

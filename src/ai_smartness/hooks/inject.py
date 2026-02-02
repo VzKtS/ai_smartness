@@ -1274,6 +1274,20 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
             ""
         ])
 
+        # V5.2 batch tools
+        v52_headers = {
+            "fr": "📦 Outils V5.2 (batch & auto-optimisation):",
+            "en": "📦 V5.2 Tools (batch & auto-optimization):",
+            "es": "📦 Herramientas V5.2 (batch y auto-optimización):"
+        }
+        lines.append(v52_headers.get(lang, v52_headers["en"]))
+        lines.extend([
+            "📦 ai_merge_batch(ops) - Merge multiple threads at once",
+            "📦 ai_rename_batch(ops) - Rename multiple threads at once",
+            "🔄 Proactive compression (automatic when pressure > 0.80)",
+            ""
+        ])
+
         # 2. Session info
         time_elapsed = get_time_since_last(ai_path)
         session_labels = {

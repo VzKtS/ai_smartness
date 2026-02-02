@@ -619,6 +619,49 @@ ai_rename(thread_id="thread_xxx", new_title="Mon nouveau titre")
 
 ---
 
+## V5.2 Batch Operations & Auto-Optimization
+
+### 📦 ai_merge_batch(operations) - Merge multiple threads at once
+```
+ai_merge_batch(operations=[
+    {"survivor_id": "t1", "absorbed_id": "t2"},
+    {"survivor_id": "t3", "absorbed_id": "t4"}
+])
+```
+→ Plus efficace que plusieurs appels `ai_merge()`
+
+---
+
+### 📦 ai_rename_batch(operations) - Rename multiple threads at once
+```
+ai_rename_batch(operations=[
+    {"thread_id": "t1", "new_title": "New Title 1"},
+    {"thread_id": "t2", "new_title": "New Title 2"}
+])
+```
+→ Plus efficace que plusieurs appels `ai_rename()`
+
+---
+
+### 🔄 Proactive Compression (automatique)
+Le daemon surveille la pression mémoire et déclenche automatiquement:
+- `> 0.80` → compaction normale
+- `> 0.95` → compaction agressive
+
+Configuration dans `config.json`:
+```json
+{
+  "settings": {
+    "auto_optimization": {
+      "proactive_compact_enabled": true,
+      "proactive_compact_threshold": 0.80
+    }
+  }
+}
+```
+
+---
+
 ## Tips
 
 1. **Libérer du contexte:** `ai_compact()` ou merge des threads similaires
@@ -629,7 +672,7 @@ ai_rename(thread_id="thread_xxx", new_title="Mon nouveau titre")
 6. **Profil:** `ai_profile()` pour personnaliser ton expérience
 
 ---
-*AI Smartness v5.1.2 - Full Context Continuity + Cleanup Tools for LLM agents*
+*AI Smartness v5.2.0 - Auto-Optimization + Batch Operations for LLM agents*
 """
 
 
