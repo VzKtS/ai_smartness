@@ -624,8 +624,8 @@ ai_rename(thread_id="thread_xxx", new_title="Mon nouveau titre")
 ### 📦 ai_merge_batch(operations) - Merge multiple threads at once
 ```
 ai_merge_batch(operations=[
-    {"survivor_id": "t1", "absorbed_id": "t2"},
-    {"survivor_id": "t3", "absorbed_id": "t4"}
+    {{"survivor_id": "t1", "absorbed_id": "t2"}},
+    {{"survivor_id": "t3", "absorbed_id": "t4"}}
 ])
 ```
 → Plus efficace que plusieurs appels `ai_merge()`
@@ -635,8 +635,8 @@ ai_merge_batch(operations=[
 ### 📦 ai_rename_batch(operations) - Rename multiple threads at once
 ```
 ai_rename_batch(operations=[
-    {"thread_id": "t1", "new_title": "New Title 1"},
-    {"thread_id": "t2", "new_title": "New Title 2"}
+    {{"thread_id": "t1", "new_title": "New Title 1"}},
+    {{"thread_id": "t2", "new_title": "New Title 2"}}
 ])
 ```
 → Plus efficace que plusieurs appels `ai_rename()`
@@ -650,14 +650,14 @@ Le daemon surveille la pression mémoire et déclenche automatiquement:
 
 Configuration dans `config.json`:
 ```json
-{
-  "settings": {
-    "auto_optimization": {
+{{
+  "settings": {{
+    "auto_optimization": {{
       "proactive_compact_enabled": true,
       "proactive_compact_threshold": 0.80
-    }
-  }
-}
+    }}
+  }}
+}}
 ```
 
 ---
