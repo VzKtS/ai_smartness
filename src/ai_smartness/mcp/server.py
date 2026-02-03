@@ -689,7 +689,7 @@ def get_status(ai_path: Path) -> str:
         from ai_smartness.storage.bridges import BridgeStorage
         db_path = ai_path / "db"
         bridge_storage = BridgeStorage(db_path / "bridges")
-        bridge_count = bridge_storage.count()
+        bridge_count = len(bridge_storage.get_all())
 
         lines.append("## Bridges")
         lines.append(f"- Total: {bridge_count}")
