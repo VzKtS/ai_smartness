@@ -57,7 +57,7 @@ Le système maintient un **réseau de pensées** où les concepts restent connec
 
 ---
 
-## Outils MCP Agent (v5.1)
+## Outils MCP Agent (v5.2)
 
 Votre agent a accès aux outils MCP natifs :
 
@@ -92,6 +92,16 @@ ai_profile(action="view")                          # Voir profil
 ai_profile(action="set_role", role="developer")    # Définir rôle
 ai_profile(action="add_rule", rule="Toujours utiliser TypeScript")  # Ajouter règle
 ```
+
+### V5.2 Opérations Batch & Auto-Optimisation
+```
+ai_merge_batch(operations=[...])   # Fusionner plusieurs threads d'un coup
+ai_rename_batch(operations=[...])  # Renommer plusieurs threads d'un coup
+ai_cleanup(mode="auto")            # Corriger les threads mal nommés
+ai_cleanup(mode="interactive")     # Réviser avant correction
+ai_rename(thread_id, new_title)    # Renommer un thread
+```
+**Compression Proactive :** Le daemon compacte auto quand la pression > 0.80
 
 ---
 

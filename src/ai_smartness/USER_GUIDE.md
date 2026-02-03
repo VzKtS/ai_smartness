@@ -196,6 +196,32 @@ ai_status()  # Memory status (threads, bridges, context %)
 
 Useful when agent needs to remember its capabilities or check current memory state.
 
+### Batch Operations (v5.2)
+
+Perform multiple operations efficiently:
+
+```
+ai_merge_batch(operations=[
+    {"survivor_id": "t1", "absorbed_id": "t2"},
+    {"survivor_id": "t3", "absorbed_id": "t4"}
+])
+
+ai_rename_batch(operations=[
+    {"thread_id": "t1", "new_title": "New Title 1"},
+    {"thread_id": "t2", "new_title": "New Title 2"}
+])
+```
+
+### Cleanup Tools (v5.1.2+)
+
+Fix threads with missing or bad titles:
+
+```
+ai_cleanup()                     # Auto-fix with heuristics
+ai_cleanup(mode="interactive")   # Review before fixing
+ai_rename(thread_id, new_title)  # Rename single thread
+```
+
 ---
 
 ## CLI in Prompt (v3.0.0+)

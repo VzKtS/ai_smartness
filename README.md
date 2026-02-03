@@ -58,7 +58,7 @@ The system maintains a **thought network** where concepts remain connected and a
 
 ---
 
-## Agent MCP Tools (v5.1)
+## Agent MCP Tools (v5.2)
 
 Your agent has access to native MCP tools:
 
@@ -93,6 +93,16 @@ ai_profile(action="view")                          # View profile
 ai_profile(action="set_role", role="developer")    # Set role
 ai_profile(action="add_rule", rule="Always use TypeScript")  # Add rule
 ```
+
+### V5.2 Batch Operations & Auto-Optimization
+```
+ai_merge_batch(operations=[...])   # Merge multiple threads at once
+ai_rename_batch(operations=[...])  # Rename multiple threads at once
+ai_cleanup(mode="auto")            # Fix threads with bad titles
+ai_cleanup(mode="interactive")     # Review before fixing
+ai_rename(thread_id, new_title)    # Rename a single thread
+```
+**Proactive Compression:** Daemon auto-compacts when context pressure > 0.80
 
 ---
 
