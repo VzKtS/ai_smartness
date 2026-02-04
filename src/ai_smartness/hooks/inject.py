@@ -1354,8 +1354,11 @@ def main():
     if not check_hook_guard():
         # Already in a hook, pass through unchanged
         message, _ = get_message_from_stdin()
-        if message:
+        if message and message.strip():
             print(message)  # Raw text output
+        else:
+            print("Empty prompt blocked - please type a message.", file=sys.stderr)
+            sys.exit(2)
         sys.exit(0)
 
     set_hook_guard()
@@ -1364,9 +1367,10 @@ def main():
         # Get user message AND session_id (v4.2)
         message, session_id = get_message_from_stdin()
 
-        if not message:
-            # No message - exit without output (print('') causes API 400)
-            sys.exit(0)
+        if not message or not message.strip():
+            # Block empty prompt submission to avoid API 400 error
+            print("Empty prompt blocked - please type a message.", file=sys.stderr)
+            sys.exit(2)
 
         # Get database path
         db_path = get_db_path()
@@ -1476,9 +1480,14 @@ def main():
         log(f"[ERROR] {e}")
         # Note: can't re-read stdin, use message if available
         try:
-            print(message)  # Raw text output
+            if message and message.strip():
+                print(message)  # Raw text output
+            else:
+                print("Empty prompt blocked - please type a message.", file=sys.stderr)
+                sys.exit(2)
         except NameError:
-            sys.exit(0)  # No output - avoid API 400 empty text block
+            print("Empty prompt blocked - please type a message.", file=sys.stderr)
+            sys.exit(2)  # Block instead of silent exit to avoid API 400
 
     finally:
         clear_hook_guard()
