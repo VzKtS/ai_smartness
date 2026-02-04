@@ -1,4 +1,4 @@
-# AI Smartness v4 - User Guide
+# AI Smartness v6 - User Guide
 
 ## Quick Start
 
@@ -112,6 +112,46 @@ A **ThinkBridge** is a semantic connection between two threads.
 
 Bridges are created automatically when the system detects semantic similarity.
 
+### SharedThreads (v6.0)
+
+A **SharedThread** is a read-only snapshot of a thread published to the network for inter-agent sharing.
+
+| Property | Description |
+|----------|-------------|
+| `shared_id` | Unique identifier for the shared snapshot |
+| `owner_agent` | Agent that published the thread |
+| `visibility` | `network` (all agents) or `restricted` (specific agents) |
+| `snapshot` | Copy of thread content at publish time |
+
+SharedThreads maintain memory isolation - the original thread remains private.
+
+### Subscriptions (v6.0)
+
+A **Subscription** is a local cached copy of a SharedThread from another agent.
+
+| Property | Description |
+|----------|-------------|
+| `shared_id` | The SharedThread being subscribed to |
+| `local_copy` | Read-only cached snapshot |
+| `last_synced` | Timestamp of last sync |
+| `stale` | True if owner has published updates |
+
+Use `ai_sync()` to pull updates for stale subscriptions.
+
+### InterAgentBridges (v6.0)
+
+An **InterAgentBridge** is a semantic connection between threads from different agents.
+
+| Property | Description |
+|----------|-------------|
+| `source_shared_id` | SharedThread from proposing agent |
+| `target_shared_id` | SharedThread from accepting agent |
+| `strength` | Semantic similarity score |
+| `status` | `pending`, `accepted`, `rejected` |
+| `ttl` | Time-to-live (24h default) |
+
+Requires bilateral consent - both agents must agree to the connection.
+
 ### User Rules
 
 The system detects and remembers your preferences. Say things like:
@@ -124,7 +164,7 @@ These rules are stored permanently and injected into every prompt.
 
 ---
 
-## Agent MCP Tools (v4.4)
+## Agent MCP Tools (v6.0)
 
 Your agent has access to native MCP tools for memory management:
 
@@ -221,6 +261,26 @@ ai_cleanup()                     # Auto-fix with heuristics
 ai_cleanup(mode="interactive")   # Review before fixing
 ai_rename(thread_id, new_title)  # Rename single thread
 ```
+
+### V6.0 Shared Cognition (Inter-Agent Memory)
+
+Share knowledge with other agents while maintaining memory isolation:
+
+```
+ai_share(thread_id)           # Share a thread to the network
+ai_unshare(shared_id)         # Remove shared thread
+ai_publish(shared_id)         # Publish update to subscribers
+ai_discover(topics=["rust"])  # Find shared threads by topics
+ai_subscribe(shared_id)       # Subscribe to a shared thread
+ai_unsubscribe(shared_id)     # Unsubscribe from shared thread
+ai_sync()                     # Sync all stale subscriptions
+ai_shared_status()            # Show shared cognition status
+```
+
+**Memory Isolation Principles:**
+- **Copy-on-share**: Publishing creates a read-only snapshot
+- **Pull not push**: Subscribers explicitly pull updates via `ai_sync()`
+- **No private leakage**: Only SharedThread IDs, never private thread IDs
 
 ---
 
@@ -465,9 +525,16 @@ A mature agent should rarely hit compaction. Encourage this by:
 
 ```json
 {
+  "version": "6.0.1",
   "settings": {
     "thread_mode": "heavy",
-    "active_threads_limit": 100
+    "active_threads_limit": 100,
+    "shared_cognition": {
+      "enabled": true,
+      "auto_notify_mcp_smartness": true,
+      "bridge_proposal_ttl_hours": 24,
+      "default_visibility": "network"
+    }
   },
   "guardcode": {
     "enforce_plan_mode": true,
@@ -549,6 +616,10 @@ Check `.claude/settings.json`:
 | `.ai/db/threads/*.json` | Thread data |
 | `.ai/db/bridges/*.json` | Bridge data |
 | `.ai/db/synthesis/*.json` | Compaction syntheses |
+| `.ai/db/shared/published/*.json` | SharedThreads owned by this agent |
+| `.ai/db/shared/subscriptions/*.json` | Subscriptions to other agents' SharedThreads |
+| `.ai/db/shared/cross_bridges/*.json` | InterAgentBridges (bilateral consent) |
+| `.ai/db/shared/proposals/` | Pending bridge proposals (incoming/outgoing) |
 
 ---
 

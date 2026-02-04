@@ -1,8 +1,8 @@
-# AI Smartness v5.1
+# AI Smartness v6.0
 
-**Couche de méta-cognition pour agents Claude Code.**
+**Couche de méta-cognition pour agents Claude Code avec partage de mémoire inter-agents.**
 
-Un système de mémoire persistante qui transforme Claude Code en un agent capable de maintenir le contexte sémantique sur de longues sessions, de détecter les connexions entre concepts, et de reprendre le travail après des semaines/mois comme si vous veniez de faire une pause café.
+Un système de mémoire persistante qui transforme Claude Code en un agent capable de maintenir le contexte sémantique sur de longues sessions, de détecter les connexions entre concepts, de partager des connaissances avec d'autres agents, et de reprendre le travail après des semaines/mois comme si vous veniez de faire une pause café.
 
 Compatible avec VS Code & Claude Code CLI.
 
@@ -16,39 +16,44 @@ AI Smartness permet un **partenariat** entre vous et votre agent. Il fournit des
 - **Les premiers contacts comptent** : Laissez les concepts émerger naturellement avec les nouveaux agents
 - **La confiance se développe avec le temps** : L'agent apprend vos préférences par la collaboration
 - **Autonomie de l'agent** : L'agent gère activement sa propre cognition et sa fenêtre contextuelle
-
-Voir le [README principal](../../README.md) pour la discussion complète sur la philosophie.
+- **Collaboration inter-agents** : Les agents peuvent partager leurs connaissances tout en maintenant l'isolation mémoire
 
 ---
 
 ## Vision
 
-AI Smartness v5.1 est une **mémoire de travail inspirée des réseaux neuronaux** avec **continuité contextuelle complète** :
+AI Smartness v6.0 est une **mémoire de travail inspirée des réseaux neuronaux** avec **cognition partagée** :
 
 - **Threads** = Neurones (flux de raisonnement actifs)
 - **ThinkBridges** = Synapses (connexions sémantiques entre threads)
+- **SharedThreads** = Connaissances publiées (partage inter-agents)
+- **Subscriptions** = Connaissances importées d'autres agents
+- **InterAgentBridges** = Connexions sémantiques inter-agents (consentement bilatéral)
 - **Recall** = Récupération active de la mémoire à la demande
 - **Injection Mémoire** = Restauration du contexte à chaque prompt
 - **État de Session** = Continuité du travail entre les sessions
 - **Profil Utilisateur** = Personnalisation persistante
 
-Le système maintient un **réseau de pensées** où les concepts restent connectés et accessibles.
+Le système maintient un **réseau de pensées** où les concepts restent connectés, accessibles et partageables.
 
 ---
 
-## Fonctionnalités Clés v5.1
+## Fonctionnalités Clés v6.0
 
 | Fonctionnalité | Description |
 |----------------|-------------|
 | **Threads** | Unités de travail sémantiques avec titres auto-générés |
 | **ThinkBridges** | Connexions automatiques entre threads liés |
+| **SharedThreads** | Publication de threads sur le réseau pour partage inter-agents |
+| **Subscriptions** | Abonnement aux SharedThreads d'autres agents |
+| **InterAgentBridges** | Ponts sémantiques inter-agents (consentement bilatéral, TTL 24h) |
 | **Outils MCP** | Outils natifs agent pour la gestion mémoire |
 | **Merge/Split** | Topologie mémoire contrôlée par l'agent |
 | **Suivi Contexte** | % contexte en temps réel avec throttle adaptatif |
 | **État de Session** | Suivi des fichiers modifiés, historique outils, tâches |
 | **Profil Utilisateur** | Rôle, préférences, règles contextuelles |
 | **Injection en Couches** | Système de contexte à 5 niveaux de priorité |
-| **Intro Coopérative** | L'agent gère activement sa cognition |
+| **Isolation Mémoire** | Copy-on-share, pull pas push |
 | **CLI dans le Prompt** | `ai status` directement dans le prompt |
 | **Règles Utilisateur** | Détection et persistance automatiques des préférences |
 | **GuardCode** | Système consultatif pour les bonnes pratiques |
@@ -102,6 +107,23 @@ ai_cleanup(mode="interactive")     # Réviser avant correction
 ai_rename(thread_id, new_title)    # Renommer un thread
 ```
 **Compression Proactive :** Le daemon compacte auto quand la pression > 0.80
+
+### V6.0 Cognition Partagée (Mémoire Inter-Agents)
+```
+ai_share(thread_id)           # Partager un thread sur le réseau
+ai_unshare(shared_id)         # Retirer le partage d'un thread
+ai_publish(shared_id)         # Publier mise à jour aux abonnés
+ai_discover(topics=["rust"])  # Trouver des threads partagés par topics
+ai_subscribe(shared_id)       # S'abonner à un thread partagé
+ai_unsubscribe(shared_id)     # Se désabonner d'un thread partagé
+ai_sync()                     # Synchroniser tous les abonnements périmés
+ai_shared_status()            # Afficher le statut de la cognition partagée
+```
+
+**Principes d'Isolation Mémoire :**
+- **Copy-on-share** : La publication crée un snapshot en lecture seule
+- **Pull pas push** : Les abonnés récupèrent explicitement via `ai_sync()`
+- **Pas de fuite privée** : Uniquement les IDs SharedThread, jamais les IDs threads privés
 
 ---
 
@@ -256,10 +278,16 @@ Synthèse d'état auto-générée avant compaction.
 
 ```json
 {
-  "version": "4.3.0",
+  "version": "6.0.1",
   "settings": {
     "thread_mode": "heavy",
-    "active_threads_limit": 100
+    "active_threads_limit": 100,
+    "shared_cognition": {
+      "enabled": true,
+      "auto_notify_mcp_smartness": true,
+      "bridge_proposal_ttl_hours": 24,
+      "default_visibility": "network"
+    }
   },
   "guardcode": {
     "enforce_plan_mode": true,
@@ -340,7 +368,14 @@ ai_smartness/.ai/
 └── db/
     ├── threads/
     ├── bridges/
-    └── synthesis/
+    ├── synthesis/
+    └── shared/           # v6.0 Cognition Partagée
+        ├── published/    # SharedThreads de cet agent
+        ├── subscriptions/# Abonnements aux SharedThreads d'autres agents
+        ├── cross_bridges/# InterAgentBridges (consentement bilatéral)
+        └── proposals/    # Propositions de bridges en attente
+            ├── outgoing/
+            └── incoming/
 ```
 
 ---

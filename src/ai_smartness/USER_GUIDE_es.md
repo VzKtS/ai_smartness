@@ -1,4 +1,4 @@
-# AI Smartness v4 - Guía de Usuario
+# AI Smartness v6 - Guía de Usuario
 
 ## Inicio Rápido
 
@@ -112,6 +112,46 @@ Un **ThinkBridge** es una conexión semántica entre dos threads.
 
 Los bridges se crean automáticamente cuando el sistema detecta similitud semántica.
 
+### SharedThreads (v6.0)
+
+Un **SharedThread** es una instantánea de solo lectura de un thread publicado en la red para compartir entre agentes.
+
+| Propiedad | Descripción |
+|-----------|-------------|
+| `shared_id` | Identificador único de la instantánea compartida |
+| `owner_agent` | Agente que publicó el thread |
+| `visibility` | `network` (todos los agentes) o `restricted` (agentes específicos) |
+| `snapshot` | Copia del contenido del thread al momento de publicar |
+
+Los SharedThreads mantienen el aislamiento de memoria - el thread original permanece privado.
+
+### Subscriptions (v6.0)
+
+Una **Subscription** es una copia local en caché de un SharedThread de otro agente.
+
+| Propiedad | Descripción |
+|-----------|-------------|
+| `shared_id` | El SharedThread al que está suscrito |
+| `local_copy` | Instantánea en caché de solo lectura |
+| `last_synced` | Timestamp de la última sincronización |
+| `stale` | True si el propietario ha publicado actualizaciones |
+
+Usa `ai_sync()` para obtener actualizaciones de suscripciones obsoletas.
+
+### InterAgentBridges (v6.0)
+
+Un **InterAgentBridge** es una conexión semántica entre threads de diferentes agentes.
+
+| Propiedad | Descripción |
+|-----------|-------------|
+| `source_shared_id` | SharedThread del agente que propone |
+| `target_shared_id` | SharedThread del agente que acepta |
+| `strength` | Puntuación de similitud semántica |
+| `status` | `pending`, `accepted`, `rejected` |
+| `ttl` | Tiempo de vida (24h por defecto) |
+
+Requiere consentimiento bilateral - ambos agentes deben aceptar la conexión.
+
 ### Reglas de Usuario
 
 El sistema detecta y recuerda tus preferencias. Di cosas como:
@@ -124,7 +164,7 @@ Estas reglas se almacenan permanentemente y se inyectan en cada prompt.
 
 ---
 
-## Herramientas MCP del Agente (v4.4)
+## Herramientas MCP del Agente (v6.0)
 
 Tu agente tiene acceso a herramientas MCP nativas para gestión de memoria:
 
@@ -195,6 +235,52 @@ ai_status()  # Estado de memoria (threads, bridges, % contexto)
 ```
 
 Útil cuando el agente necesita recordar sus capacidades o verificar el estado actual de la memoria.
+
+### Operaciones Batch (v5.2)
+
+Realizar múltiples operaciones eficientemente:
+
+```
+ai_merge_batch(operations=[
+    {"survivor_id": "t1", "absorbed_id": "t2"},
+    {"survivor_id": "t3", "absorbed_id": "t4"}
+])
+
+ai_rename_batch(operations=[
+    {"thread_id": "t1", "new_title": "Nuevo Título 1"},
+    {"thread_id": "t2", "new_title": "Nuevo Título 2"}
+])
+```
+
+### Herramientas de Limpieza (v5.1.2+)
+
+Corregir threads con títulos malos o faltantes:
+
+```
+ai_cleanup()                     # Auto-corrección con heurísticas
+ai_cleanup(mode="interactive")   # Revisar antes de corregir
+ai_rename(thread_id, new_title)  # Renombrar un thread
+```
+
+### V6.0 Cognición Compartida (Memoria Inter-Agentes)
+
+Compartir conocimiento con otros agentes manteniendo el aislamiento de memoria:
+
+```
+ai_share(thread_id)           # Compartir un thread en la red
+ai_unshare(shared_id)         # Eliminar compartición de un thread
+ai_publish(shared_id)         # Publicar actualización a suscriptores
+ai_discover(topics=["rust"])  # Encontrar threads compartidos por topics
+ai_subscribe(shared_id)       # Suscribirse a un thread compartido
+ai_unsubscribe(shared_id)     # Desuscribirse de un thread compartido
+ai_sync()                     # Sincronizar todas las suscripciones obsoletas
+ai_shared_status()            # Mostrar estado de la cognición compartida
+```
+
+**Principios de Aislamiento de Memoria:**
+- **Copy-on-share**: La publicación crea una instantánea de solo lectura
+- **Pull no push**: Los suscriptores recuperan explícitamente vía `ai_sync()`
+- **Sin fuga privada**: Solo IDs de SharedThread, nunca IDs de threads privados
 
 ---
 
@@ -439,9 +525,16 @@ Un agente maduro raramente debería llegar al compactado. Anima esto:
 
 ```json
 {
+  "version": "6.0.1",
   "settings": {
     "thread_mode": "heavy",
-    "active_threads_limit": 100
+    "active_threads_limit": 100,
+    "shared_cognition": {
+      "enabled": true,
+      "auto_notify_mcp_smartness": true,
+      "bridge_proposal_ttl_hours": 24,
+      "default_visibility": "network"
+    }
   },
   "guardcode": {
     "enforce_plan_mode": true,
@@ -523,6 +616,10 @@ Verifica `.claude/settings.json`:
 | `.ai/db/threads/*.json` | Datos de threads |
 | `.ai/db/bridges/*.json` | Datos de bridges |
 | `.ai/db/synthesis/*.json` | Síntesis de compactado |
+| `.ai/db/shared/published/*.json` | SharedThreads de este agente |
+| `.ai/db/shared/subscriptions/*.json` | Suscripciones a SharedThreads de otros agentes |
+| `.ai/db/shared/cross_bridges/*.json` | InterAgentBridges (consentimiento bilateral) |
+| `.ai/db/shared/proposals/` | Propuestas de bridges pendientes (incoming/outgoing) |
 
 ---
 

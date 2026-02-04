@@ -1,8 +1,8 @@
-# AI Smartness v5.1
+# AI Smartness v6.0
 
-**Meta-cognition layer for Claude Code agents.**
+**Meta-cognition layer for Claude Code agents with inter-agent memory sharing.**
 
-A persistent memory system that transforms Claude Code into an agent capable of maintaining semantic context across long sessions, detecting connections between concepts, and resuming work after weeks/months as if you just stepped away for coffee.
+A persistent memory system that transforms Claude Code into an agent capable of maintaining semantic context across long sessions, detecting connections between concepts, sharing knowledge with other agents, and resuming work after weeks/months as if you just stepped away for coffee.
 
 Compatible with VS Code & Claude Code CLI.
 
@@ -16,39 +16,44 @@ AI Smartness enables **partnership** between you and your agent. It provides cog
 - **First contacts matter**: Let concepts emerge naturally with new agents
 - **Trust develops over time**: The agent learns your preferences through collaboration
 - **Agent autonomy**: The agent actively manages its own cognition and context window
-
-See the main [README](../../README.md) for the full philosophy discussion.
+- **Inter-agent collaboration**: Agents can share knowledge while maintaining memory isolation
 
 ---
 
 ## Vision
 
-AI Smartness v5.1 is a **neural-inspired working memory** with **full context continuity**:
+AI Smartness v6.0 is a **neural-inspired working memory** with **shared cognition**:
 
 - **Threads** = Neurons (active reasoning streams)
 - **ThinkBridges** = Synapses (semantic connections between threads)
+- **SharedThreads** = Published knowledge (inter-agent sharing)
+- **Subscriptions** = Imported knowledge from other agents
+- **InterAgentBridges** = Cross-agent semantic connections (bilateral consent)
 - **Recall** = Active memory retrieval on demand
 - **Memory Injection** = Context restoration at each prompt
 - **Session State** = Work continuity across sessions
 - **User Profile** = Persistent personalization
 
-The system maintains a **thought network** where concepts remain connected and accessible.
+The system maintains a **thought network** where concepts remain connected, accessible, and shareable.
 
 ---
 
-## Key Features v5.1
+## Key Features v6.0
 
 | Feature | Description |
 |---------|-------------|
 | **Threads** | Semantic work units with auto-generated titles |
 | **ThinkBridges** | Automatic connections between related threads |
+| **SharedThreads** | Publish threads to network for inter-agent sharing |
+| **Subscriptions** | Subscribe to SharedThreads from other agents |
+| **InterAgentBridges** | Cross-agent semantic bridges (bilateral consent, 24h TTL) |
 | **MCP Tools** | Native agent tools for memory management |
 | **Merge/Split** | Agent-controlled memory topology |
 | **Context Tracking** | Real-time context % with adaptive throttle |
 | **Session State** | Track files modified, tool history, pending tasks |
 | **User Profile** | Role, preferences, context rules |
 | **Layered Injection** | 5-layer priority context system |
-| **Cooperative Intro** | Empowers agent to manage its own cognition |
+| **Memory Isolation** | Copy-on-share, pull not push |
 | **CLI in Prompt** | `ai status` directly in prompt |
 | **User Rules** | Automatic detection and persistence of preferences |
 | **GuardCode** | Advisory system for best practices |
@@ -103,6 +108,23 @@ ai_cleanup(mode="interactive")     # Review before fixing
 ai_rename(thread_id, new_title)    # Rename a single thread
 ```
 **Proactive Compression:** Daemon auto-compacts when context pressure > 0.80
+
+### V6.0 Shared Cognition (Inter-Agent Memory)
+```
+ai_share(thread_id)           # Share a thread to the network
+ai_unshare(shared_id)         # Remove shared thread
+ai_publish(shared_id)         # Publish update to subscribers
+ai_discover(topics=["rust"])  # Find shared threads by topics
+ai_subscribe(shared_id)       # Subscribe to a shared thread
+ai_unsubscribe(shared_id)     # Unsubscribe from shared thread
+ai_sync()                     # Sync all stale subscriptions
+ai_shared_status()            # Show shared cognition status
+```
+
+**Memory Isolation Principles:**
+- **Copy-on-share**: Publishing creates a read-only snapshot
+- **Pull not push**: Subscribers explicitly pull updates via `ai_sync()`
+- **No private leakage**: Only SharedThread IDs, never private thread IDs
 
 ---
 
@@ -257,10 +279,16 @@ Auto-generated state synthesis before compaction.
 
 ```json
 {
-  "version": "4.3.0",
+  "version": "6.0.1",
   "settings": {
     "thread_mode": "heavy",
-    "active_threads_limit": 100
+    "active_threads_limit": 100,
+    "shared_cognition": {
+      "enabled": true,
+      "auto_notify_mcp_smartness": true,
+      "bridge_proposal_ttl_hours": 24,
+      "default_visibility": "network"
+    }
   },
   "guardcode": {
     "enforce_plan_mode": true,
@@ -344,7 +372,14 @@ ai_smartness/.ai/
 └── db/
     ├── threads/
     ├── bridges/
-    └── synthesis/
+    ├── synthesis/
+    └── shared/           # v6.0 Shared Cognition
+        ├── published/    # SharedThreads owned by this agent
+        ├── subscriptions/# Subscriptions to other agents' SharedThreads
+        ├── cross_bridges/# InterAgentBridges (bilateral consent)
+        └── proposals/    # Pending bridge proposals
+            ├── outgoing/
+            └── incoming/
 ```
 
 ---
