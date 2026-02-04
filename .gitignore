@@ -40,11 +40,7 @@ Thumbs.db
 # MCP config (contains machine-specific absolute paths)
 .mcp.json
 
-# MCP Smartness (separate project)
+# MCP Smartness (separate project, lives in workspace but NOT part of this repo)
 .mcp_smartness_agent
+/mcp_smartness/
 SPECS/
-
-# AI Smartness - local deploy only (leading slash = root only)
-/ai_smartness/
-.mcp.json
-
