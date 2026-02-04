@@ -672,7 +672,7 @@ Configuration dans `config.json`:
 6. **Profil:** `ai_profile()` pour personnaliser ton expérience
 
 ---
-*AI Smartness v6.0.1 - Shared Cognition + Auto-Optimization for LLM agents*
+*AI Smartness v6.0.2 - Shared Cognition + Auto-Optimization for LLM agents*
 """
 
 

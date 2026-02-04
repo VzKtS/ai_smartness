@@ -525,7 +525,7 @@ A mature agent should rarely hit compaction. Encourage this by:
 
 ```json
 {
-  "version": "6.0.1",
+  "version": "6.0.2",
   "settings": {
     "thread_mode": "heavy",
     "active_threads_limit": 100,

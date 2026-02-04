@@ -525,7 +525,7 @@ Un agent mature devrait rarement atteindre le compactage. Encouragez cela en :
 
 ```json
 {
-  "version": "6.0.1",
+  "version": "6.0.2",
   "settings": {
     "thread_mode": "heavy",
     "active_threads_limit": 100,
