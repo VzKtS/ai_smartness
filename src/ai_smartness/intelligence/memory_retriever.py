@@ -106,6 +106,7 @@ class MemoryRetriever:
         Get relevant memory context for user message.
 
         V5: Supports focus_data for focus boost and relevance_score filtering.
+        V6.2: Includes Shared Context Injection from subscribed threads.
 
         Args:
             user_message: The user's prompt
@@ -126,8 +127,14 @@ class MemoryRetriever:
             # 2. Get user rules
             user_rules = self._load_user_rules()
 
-            # 3. Build context string
-            context = self._build_context_string(similar_threads, user_rules, max_chars)
+            # 3. V6.2: Get relevant subscribed thread context
+            subscription_context = self._get_subscription_context(user_message)
+
+            # 4. Build context string
+            context = self._build_context_string(
+                similar_threads, user_rules, max_chars,
+                subscription_context=subscription_context
+            )
 
             logger.info(f"Built context: {len(context)} chars for message: {user_message[:50]}...")
 
@@ -625,24 +632,95 @@ class MemoryRetriever:
             logger.debug(f"Error loading user rules: {e}")
             return []
 
+    def _get_subscription_context(self, user_message: str) -> List[Dict[str, Any]]:
+        """
+        V6.2: Get relevant context from subscribed shared threads.
+
+        Scores subscriptions by topic overlap with user message,
+        returns top matches for context injection.
+
+        Args:
+            user_message: User's current message
+
+        Returns:
+            List of subscription dicts with relevance info
+        """
+        try:
+            shared_path = self.ai_path / "shared"
+            if not shared_path.exists():
+                return []
+
+            from ..storage.shared import SharedStorage
+            shared_storage = SharedStorage(shared_path)
+            subs = shared_storage.get_active_subscriptions()
+
+            if not subs:
+                return []
+
+            # Score subscriptions by relevance to message
+            message_lower = user_message.lower()
+            message_words = set(message_lower.split())
+            scored = []
+
+            for sub in subs:
+                score = 0.0
+                sub_topics = [t.lower() for t in sub.cached_topics]
+
+                # Topic word overlap
+                for topic in sub_topics:
+                    if topic in message_lower:
+                        score += 0.4
+                    elif any(w in topic for w in message_words if len(w) > 3):
+                        score += 0.2
+
+                # Title word overlap
+                title_lower = sub.cached_title.lower()
+                title_words = set(title_lower.split())
+                common = message_words & title_words
+                significant = {w for w in common if len(w) > 3}
+                score += len(significant) * 0.15
+
+                if score > 0.1:
+                    # Record access for recommendation scoring
+                    shared_storage.record_subscription_access(sub.id)
+                    scored.append({
+                        "title": sub.cached_title,
+                        "summary": sub.cached_summary,
+                        "topics": sub.cached_topics,
+                        "owner": sub.owner_agent_id,
+                        "score": score
+                    })
+
+            # Sort by score, return top 2
+            scored.sort(key=lambda x: x["score"], reverse=True)
+            return scored[:2]
+
+        except Exception as e:
+            logger.debug(f"Error getting subscription context: {e}")
+            return []
+
     def _build_context_string(
         self,
         threads: List[Dict[str, Any]],
         user_rules: List[str],
-        max_chars: int
+        max_chars: int,
+        subscription_context: Optional[List[Dict[str, Any]]] = None
     ) -> str:
         """
         Build the context string for injection.
+
+        V6.2: Includes subscribed thread context.
 
         Args:
             threads: List of relevant threads
             user_rules: List of user rules
             max_chars: Maximum characters
+            subscription_context: Optional list of relevant subscription data
 
         Returns:
             Formatted context string
         """
-        if not threads and not user_rules:
+        if not threads and not user_rules and not subscription_context:
             return ""
 
         parts = ["AI Smartness Memory Context:"]
@@ -674,6 +752,16 @@ class MemoryRetriever:
                     parts.append(f"- \"{title}\" - {summary}")
                 else:
                     parts.append(f"- \"{title}\"")
+
+        # V6.2: Add subscribed thread context
+        if subscription_context:
+            parts.append("")
+            parts.append("Subscribed context (from other agents):")
+            for sub in subscription_context:
+                title = sub["title"][:40]
+                owner = sub["owner"]
+                summary = sub["summary"][:80] if sub["summary"] else ""
+                parts.append(f"- [{owner}] \"{title}\"" + (f" - {summary}" if summary else ""))
 
         # Add user rules
         if user_rules:

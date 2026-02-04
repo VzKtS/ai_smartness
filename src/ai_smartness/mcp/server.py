@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI Smartness MCP Server v6.0
+AI Smartness MCP Server v6.2
 
 A local MCP server that exposes AI Smartness memory tools to Claude Code agents.
 Runs as a subprocess communicating via stdio (JSON-RPC).
@@ -32,6 +32,12 @@ V6 Shared Cognition (inter-agent collaboration):
 - ai_unsubscribe: Unsubscribe from a shared thread
 - ai_sync: Pull updates for subscriptions
 - ai_shared_status: Get shared cognition status
+
+V6.2 Phase 3 - Advanced Features:
+- ai_recommend: Subscription recommendations based on topic similarity
+- ai_topics: Network-wide topic discovery and cross-agent overlap
+- Shared Context Injection: Subscribed threads injected into recall context
+- Bridge Strength: Cross-agent usage tracking for dynamic bridge weight
 
 Usage:
     python3 -m ai_smartness.mcp.server
@@ -644,6 +650,36 @@ TOOLS = [
             "required": []
         }
     ),
+    # V6.2: Phase 3 - Advanced Features
+    Tool(
+        name="ai_recommend",
+        description="Get subscription recommendations. Suggests shared threads from other agents that match your interests based on topic similarity.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Max recommendations (default 5)",
+                    "default": 5
+                }
+            },
+            "required": []
+        }
+    ),
+    Tool(
+        name="ai_topics",
+        description="Network-wide topic discovery. Shows trending topics across all agents, who works on what, and cross-agent overlap.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "agent_id": {
+                    "type": "string",
+                    "description": "Optional: filter topics by specific agent"
+                }
+            },
+            "required": []
+        }
+    ),
 ]
 
 
@@ -884,6 +920,15 @@ async def execute_tool(name: str, arguments: dict, ai_path: Path) -> str:
 
     elif name == "ai_bridge_analysis":
         return bridge_analysis(ai_path)
+
+    # V6.2: Phase 3 - Advanced Features
+    elif name == "ai_recommend":
+        limit = arguments.get("limit", 5)
+        return recommend_subscriptions(ai_path, limit)
+
+    elif name == "ai_topics":
+        agent_id = arguments.get("agent_id")
+        return discover_network_topics(ai_path, agent_id)
 
     else:
         return f"# Error\n\nUnknown tool: {name}"
@@ -2572,6 +2617,192 @@ def bridge_analysis(ai_path: Path) -> str:
     propagated = sum(1 for b in all_bridges if b.propagation_depth > 0)
     direct = total - propagated
     lines.append(f"- Direct: {direct} | Propagated: {propagated}")
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# V6.2: PHASE 3 - ADVANCED FEATURES
+# =============================================================================
+
+def recommend_subscriptions(ai_path: Path, limit: int = 5) -> str:
+    """
+    Recommend shared threads to subscribe to based on topic similarity
+    with the agent's local threads.
+
+    F1: Subscription Recommendations
+
+    Args:
+        ai_path: Path to .ai directory
+        limit: Max recommendations
+    """
+    from ai_smartness.storage.threads import ThreadStorage
+    from collections import Counter
+
+    shared_storage = get_shared_storage(ai_path)
+    agent_id = get_agent_id()
+
+    # Get local thread topics
+    db_path = ai_path / "db"
+    thread_storage = ThreadStorage(db_path / "threads")
+    local_threads = thread_storage.get_active()
+
+    local_topics = Counter()
+    for t in local_threads:
+        for topic in t.topics:
+            local_topics[topic.lower()] += 1
+
+    if not local_topics:
+        return "# No Recommendations\n\nNo local threads found to base recommendations on."
+
+    # Get available shared threads from network
+    available = shared_storage.discover_shared_threads(limit=50)
+
+    # Get existing subscriptions to exclude
+    existing_subs = shared_storage.get_all_subscriptions()
+    subscribed_ids = {s.shared_thread_id for s in existing_subs}
+
+    # Score each available thread
+    recommendations = []
+    for shared in available:
+        # Skip own threads
+        if shared.owner_agent_id == agent_id:
+            continue
+        # Skip already subscribed
+        if shared.id in subscribed_ids:
+            continue
+
+        # Calculate topic overlap score
+        score = 0.0
+        matching_topics = []
+        shared_topics = [t.lower() for t in shared.topics]
+
+        for topic in shared_topics:
+            if topic in local_topics:
+                score += local_topics[topic] * 0.3
+                matching_topics.append(topic)
+            else:
+                # Partial match (substring)
+                for local_t in local_topics:
+                    if local_t in topic or topic in local_t:
+                        score += 0.15
+                        matching_topics.append(f"{topic}~{local_t}")
+                        break
+
+        if score > 0:
+            recommendations.append({
+                "shared_id": shared.id,
+                "title": shared.title,
+                "owner": shared.owner_agent_id,
+                "topics": shared.topics,
+                "summary": shared.summary[:100],
+                "score": round(score, 2),
+                "matching_topics": list(set(matching_topics))[:5],
+                "version": shared.version,
+                "subscribers": len(shared.subscribers)
+            })
+
+    # Sort by score
+    recommendations.sort(key=lambda x: x["score"], reverse=True)
+    recommendations = recommendations[:limit]
+
+    if not recommendations:
+        return "# No Recommendations\n\nNo matching shared threads found in the network.\nYour topics: " + ", ".join(list(local_topics.keys())[:10])
+
+    lines = ["# Subscription Recommendations", ""]
+    lines.append(f"Based on your {len(local_topics)} local topics, found {len(recommendations)} recommendation(s):")
+    lines.append("")
+
+    for i, rec in enumerate(recommendations, 1):
+        lines.append(f"## {i}. {rec['title']}")
+        lines.append(f"- **Owner**: {rec['owner']}")
+        lines.append(f"- **Score**: {rec['score']}")
+        lines.append(f"- **Matching**: {', '.join(rec['matching_topics'])}")
+        lines.append(f"- **Topics**: {', '.join(rec['topics'][:5])}")
+        if rec['summary']:
+            lines.append(f"- **Summary**: {rec['summary']}")
+        lines.append(f"- **Subscribers**: {rec['subscribers']}")
+        lines.append(f"- **Subscribe**: `ai_subscribe(shared_id='{rec['shared_id']}')`")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def discover_network_topics(ai_path: Path, agent_id: str = None) -> str:
+    """
+    Network-wide topic discovery.
+
+    F4: Shows trending topics, agent distributions, and cross-agent overlap.
+
+    Args:
+        ai_path: Path to .ai directory
+        agent_id: Optional agent filter
+    """
+    shared_storage = get_shared_storage(ai_path)
+    network_data = shared_storage.get_network_topics()
+
+    topic_counts = network_data["topic_counts"]
+    agent_topics = network_data["agent_topics"]
+    total_threads = network_data["total_threads"]
+
+    if not topic_counts:
+        return "# Network Topics\n\nNo shared threads found in the network."
+
+    lines = ["# Network-Wide Topic Discovery", ""]
+    lines.append(f"**Total shared threads**: {total_threads}")
+    lines.append(f"**Active agents**: {len(agent_topics)}")
+    lines.append("")
+
+    # Filter by agent if requested
+    if agent_id:
+        if agent_id in agent_topics:
+            lines.append(f"## Topics for agent: {agent_id}")
+            for topic, count in agent_topics[agent_id].items():
+                lines.append(f"- **{topic}**: {count} thread(s)")
+            return "\n".join(lines)
+        else:
+            return f"# No Topics\n\nAgent `{agent_id}` has no shared threads."
+
+    # Trending topics (sorted by frequency)
+    lines.append("## Trending Topics")
+    for topic, count in list(topic_counts.items())[:15]:
+        # Find which agents work on this topic
+        agents_with_topic = []
+        for agent, topics in agent_topics.items():
+            if topic in topics:
+                agents_with_topic.append(agent)
+
+        agent_str = ", ".join(agents_with_topic)
+        cross = " (cross-agent)" if len(agents_with_topic) > 1 else ""
+        lines.append(f"- **{topic}**: {count}{cross} [{agent_str}]")
+    lines.append("")
+
+    # Cross-agent overlap (topics shared by multiple agents)
+    cross_topics = []
+    for topic, count in topic_counts.items():
+        agents_with = [a for a, t in agent_topics.items() if topic in t]
+        if len(agents_with) > 1:
+            cross_topics.append({
+                "topic": topic,
+                "agents": agents_with,
+                "total": count
+            })
+
+    if cross_topics:
+        lines.append("## Cross-Agent Overlap")
+        lines.append("Topics worked on by multiple agents:")
+        lines.append("")
+        for ct in sorted(cross_topics, key=lambda x: len(x["agents"]), reverse=True)[:10]:
+            agents_str = " + ".join(ct["agents"])
+            lines.append(f"- **{ct['topic']}**: {agents_str} ({ct['total']} threads)")
+        lines.append("")
+
+    # Per-agent breakdown
+    lines.append("## Agent Breakdown")
+    for agent, topics in agent_topics.items():
+        topic_list = ", ".join(list(topics.keys())[:5])
+        total = sum(topics.values())
+        lines.append(f"- **{agent}**: {total} thread(s) — {topic_list}")
 
     return "\n".join(lines)
 

@@ -360,6 +360,86 @@ class SharedStorage:
     # DISCOVERY (for finding shared threads from other agents)
     # =========================================================================
 
+    # =========================================================================
+    # USAGE TRACKING (Phase 3 - Cross-Agent Bridge Strength)
+    # =========================================================================
+
+    def record_bridge_cross_use(self, bridge_id: str, agent_id: str) -> bool:
+        """Record cross-agent usage of a bridge."""
+        bridge = self.get_bridge(bridge_id)
+        if bridge and bridge.is_active():
+            bridge.record_cross_agent_use(agent_id)
+            self.save_bridge(bridge)
+            return True
+        return False
+
+    def record_subscription_access(self, sub_id: str) -> bool:
+        """Record access to a subscription (for recommendation scoring)."""
+        sub = self.get_subscription(sub_id)
+        if sub:
+            sub.record_access()
+            self.save_subscription(sub)
+            return True
+        return False
+
+    # =========================================================================
+    # TOPIC AGGREGATION (Phase 3 - Network-Wide Topic Discovery)
+    # =========================================================================
+
+    def get_network_topics(self) -> dict:
+        """
+        Aggregate topics from all shared threads in the network.
+
+        Returns:
+            Dict with topic_counts, agent_topics, trending
+        """
+        from collections import Counter
+
+        network_path = Path.home() / ".mcp_smartness" / "shared_threads"
+        if not network_path.exists():
+            return {"topic_counts": {}, "agent_topics": {}, "total_threads": 0}
+
+        topic_counts = Counter()
+        agent_topics = {}
+        total_threads = 0
+
+        for path in network_path.glob("shared_*.json"):
+            data = self._read_json(path)
+            if not data:
+                continue
+
+            status = data.get("status", "active")
+            if status != "active":
+                continue
+
+            total_threads += 1
+            owner = data.get("owner_agent_id", "unknown")
+            topics = data.get("topics", [])
+
+            for topic in topics:
+                topic_lower = topic.lower()
+                topic_counts[topic_lower] += 1
+
+                if owner not in agent_topics:
+                    agent_topics[owner] = Counter()
+                agent_topics[owner][topic_lower] += 1
+
+        # Convert agent_topics counters to plain dicts
+        agent_topics_dict = {
+            agent: dict(counter.most_common(10))
+            for agent, counter in agent_topics.items()
+        }
+
+        return {
+            "topic_counts": dict(topic_counts.most_common(30)),
+            "agent_topics": agent_topics_dict,
+            "total_threads": total_threads
+        }
+
+    # =========================================================================
+    # DISCOVERY (for finding shared threads from other agents)
+    # =========================================================================
+
     def discover_shared_threads(
         self,
         topics: Optional[List[str]] = None,

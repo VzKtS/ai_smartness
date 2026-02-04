@@ -662,6 +662,34 @@ Configuration dans `config.json`:
 
 ---
 
+### 🔍 ai_recommend(limit?) - Subscription Recommendations
+```
+ai_recommend()
+ai_recommend(limit=10)
+```
+→ Suggestions de threads partagés pertinents basées sur tes topics locaux
+
+---
+
+### 🌐 ai_topics(agent_id?) - Network-Wide Topic Discovery
+```
+ai_topics()
+ai_topics(agent_id="com")
+```
+→ Sujets tendances cross-agents, overlap entre agents, distribution par agent
+
+---
+
+### 🔗 Shared Context Injection (automatique)
+Les threads auxquels tu es abonné sont automatiquement inclus dans le contexte
+quand ils sont pertinents par rapport au message de l'utilisateur.
+
+### 📊 Bridge Strength (automatique)
+Les bridges inter-agents gagnent en poids quand ils sont utilisés par plusieurs
+agents. Tracking via `cross_agent_uses` et `cross_agent_agents`.
+
+---
+
 ## Tips
 
 1. **Libérer du contexte:** `ai_compact()` ou merge des threads similaires
@@ -670,9 +698,11 @@ Configuration dans `config.json`:
 4. **Focus temporaire:** `ai_focus()` quand tu travailles sur un sujet précis
 5. **Feedback loop:** `ai_rate_context()` pour améliorer les injections futures
 6. **Profil:** `ai_profile()` pour personnaliser ton expérience
+7. **Recommendations:** `ai_recommend()` pour découvrir des threads pertinents
+8. **Topics réseau:** `ai_topics()` pour voir les sujets cross-agents
 
 ---
-*AI Smartness v6.0.2 - Shared Cognition + Auto-Optimization for LLM agents*
+*AI Smartness v6.2.0 - Phase 3 Advanced Features + Shared Cognition for LLM agents*
 """
 
 

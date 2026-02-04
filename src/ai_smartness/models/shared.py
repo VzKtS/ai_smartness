@@ -449,12 +449,26 @@ class InterAgentBridge:
             return True
         return False
 
+    # Cross-agent usage tracking (Phase 3)
+    cross_agent_uses: int = 0
+    cross_agent_agents: List[str] = field(default_factory=list)  # Unique agents who used this bridge
+
     def record_use(self):
         """Record that this bridge was used."""
         self.use_count += 1
         self.last_used = datetime.now()
         # Boost weight (Hebbian learning)
         self.weight = min(1.0, self.weight + 0.1)
+
+    def record_cross_agent_use(self, agent_id: str):
+        """Record cross-agent usage for dynamic bridge strength."""
+        self.cross_agent_uses += 1
+        if agent_id not in self.cross_agent_agents:
+            self.cross_agent_agents.append(agent_id)
+        self.last_used = datetime.now()
+        # Stronger boost for cross-agent usage (validates bridge relevance)
+        self.weight = min(1.0, self.weight + 0.15)
+        self.confidence = min(1.0, self.confidence + 0.05)
 
     def invalidate(self, reason: str = ""):
         """Mark bridge as invalidated."""
@@ -486,6 +500,8 @@ class InterAgentBridge:
             "confidence": self.confidence,
             "weight": self.weight,
             "use_count": self.use_count,
+            "cross_agent_uses": self.cross_agent_uses,
+            "cross_agent_agents": self.cross_agent_agents,
             "last_used": self.last_used.isoformat() if self.last_used else None,
             "created_at": self.created_at.isoformat(),
             "accepted_at": self.accepted_at.isoformat() if self.accepted_at else None,
@@ -513,6 +529,8 @@ class InterAgentBridge:
             confidence=data.get("confidence", 0.8),
             weight=data.get("weight", 1.0),
             use_count=data.get("use_count", 0),
+            cross_agent_uses=data.get("cross_agent_uses", 0),
+            cross_agent_agents=data.get("cross_agent_agents", []),
             created_at=datetime.fromisoformat(data["created_at"])
         )
 
