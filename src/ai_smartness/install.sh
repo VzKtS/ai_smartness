@@ -1,8 +1,18 @@
 #!/bin/bash
 #
-# AI Smartness Installation Script (v6.0.2)
+# AI Smartness Installation Script (v6.2.0)
 # Simplified architecture with absolute paths
 # Includes migration from ai_smartness_v2 to ai_smartness
+#
+# v6.2: Phase 3 - Advanced Shared Cognition
+# - ai_recommend: Subscription recommendations based on topic similarity
+# - ai_topics: Network-wide topic discovery and cross-agent overlap
+# - Shared Context Injection: Subscribed threads auto-injected in recall context
+# - Bridge Strength: Cross-agent usage tracking (cross_agent_uses)
+#
+# v6.1: Bridge Management Suite
+# - ai_bridges: List/filter ThinkBridges
+# - ai_bridge_analysis: Bridge network analytics
 #
 # v6.0: Shared Cognition Protocol
 # - SharedThread: Publish threads to network for inter-agent sharing
@@ -87,9 +97,9 @@ export AI_SMARTNESS_LANG="$LANG"
 
 # Localized messages
 declare -A MSG_BANNER_TITLE=(
-    ["en"]="AI Smartness v6.0.2"
-    ["fr"]="AI Smartness v6.0.2"
-    ["es"]="AI Smartness v6.0.2"
+    ["en"]="AI Smartness v6.2.0"
+    ["fr"]="AI Smartness v6.2.0"
+    ["es"]="AI Smartness v6.2.0"
 )
 declare -A MSG_BANNER_SUB=(
     ["en"]="Persistent Memory for Claude Agents"
@@ -499,7 +509,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "6.0.2",
+    "version": "6.2.0",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
@@ -901,6 +911,8 @@ echo "   • V5 Hybrid: Focus boost, relevance scoring, proactive suggestions"
 echo "   • V5.1 Full Context Continuity: Session state, user profile, layered injection"
 echo "   • V5.2 Auto-Optimization: Batch operations, proactive compression"
 echo "   • V6.0 Shared Cognition: Inter-agent memory sharing with isolation"
+echo "   • V6.1 Bridge Management: ai_bridges, ai_bridge_analysis"
+echo "   • V6.2 Phase 3: ai_recommend, ai_topics, shared context injection, bridge strength"
 echo ""
 echo "🖥️  CLI Commands:"
 echo "   ai status      - Show memory status"
@@ -916,7 +928,7 @@ echo "   ai daemon      - Daemon control (start/stop/status)"
 echo "   ai mode        - View/change mode (light/normal/heavy/max)"
 echo "   ai help        - Show help"
 echo ""
-echo "🔧 MCP Tools (v5.1):"
+echo "🔧 MCP Tools (v6.2):"
 echo "   ai_recall(query)     - Semantic memory search"
 echo "   ai_merge(s, a)       - Merge threads"
 echo "   ai_split(id)         - Split thread"
@@ -959,6 +971,16 @@ echo "   ai_propose_bridge()  - Propose a cross-agent bridge"
 echo "   ai_accept_bridge()   - Accept incoming proposal"
 echo "   ai_reject_bridge()   - Reject incoming proposal"
 echo "   Proposals expire after 24 hours if not accepted"
+echo ""
+echo "🔗 V6.1 Bridge Management Suite:"
+echo "   ai_bridges(thread_id?, relation_type?, status?) - List/filter bridges"
+echo "   ai_bridge_analysis()  - Bridge network analytics (stats, health, distribution)"
+echo ""
+echo "🚀 V6.2 Phase 3 - Advanced Shared Cognition:"
+echo "   ai_recommend(limit?)  - Subscription recommendations based on topic overlap"
+echo "   ai_topics(agent_id?)  - Network-wide topic discovery & cross-agent overlap"
+echo "   Shared Context Injection - Subscribed threads auto-injected in recall context"
+echo "   Bridge Strength        - Cross-agent usage tracking for dynamic weight"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""

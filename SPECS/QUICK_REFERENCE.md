@@ -1,4 +1,4 @@
-# AI Smartness v4.0 - Quick Reference
+# AI Smartness v6.2.0 - Quick Reference
 
 ## Recall Actif (v4.0)
 
@@ -108,7 +108,7 @@ Claude: [Shows memory status from CLI]
 
 **Pattern:** `^ai\s+(status|threads?|bridges?|search|health|daemon|mode|help)`
 
-## Fichiers Clés
+## Fichiers Clés (base)
 
 ```
 .ai/
@@ -123,6 +123,7 @@ Claude: [Shows memory status from CLI]
     ├── bridges/*.json
     └── synthesis/*.json
 ```
+(Voir section v6.2 ci-dessous pour la structure complète avec shared/)
 
 ## Modes
 
@@ -243,3 +244,98 @@ PRUNE_INTERVAL_SECONDS = 300  # Every 5 minutes
 | Thread | 5000 ch |
 | Prompt capture | 50 ch min |
 | User rules | 20 max |
+
+## V5 Hybrid Enhancement Tools
+
+```
+ai_suggestions(context?)     # Proactive optimization suggestions
+ai_compact(strategy?)        # On-demand compaction (gentle/normal/aggressive)
+ai_focus(topic, weight?)     # Boost injection priority for topics
+ai_unfocus(topic?)           # Clear focus
+ai_pin(content, title?)      # High-priority content capture
+ai_rate_context(id, useful)  # Feedback on injection quality
+```
+
+## V5.1 Full Context Continuity
+
+```
+ai_profile(action, key?, value?)  # User profile management
+```
+
+**Injection Layers (5):**
+1. Session State (< 1h) → Reprise immédiate
+2. Work Context → Fichiers modifiés liés aux threads
+3. Pinned Content → Contenu prioritaire
+4. Thread Relevance → Mémoire thématique
+5. User Profile (> 1h) → Personnalisation
+
+## V5.2 Batch Operations
+
+```
+ai_merge_batch(operations)   # Merge multiple threads at once
+ai_rename_batch(operations)  # Rename multiple threads at once
+ai_cleanup(mode?)            # Fix threads with bad titles
+ai_rename(id, title)         # Rename single thread
+```
+
+## V6.0 Shared Cognition
+
+```
+ai_share(thread_id)          # Share thread to network
+ai_unshare(shared_id)        # Remove shared thread
+ai_publish(shared_id)        # Update shared snapshot
+ai_discover(topics?)         # Find shared threads
+ai_subscribe(shared_id)      # Subscribe to shared thread
+ai_unsubscribe(shared_id)    # Unsubscribe
+ai_sync(shared_id?)          # Sync subscriptions
+ai_shared_status()           # Shared cognition status
+```
+
+**Inter-Agent Bridges (bilateral consent):**
+```
+ai_propose_bridge()          # Propose cross-agent bridge
+ai_accept_bridge(id)         # Accept proposal
+ai_reject_bridge(id)         # Reject proposal (24h TTL)
+```
+
+## V6.1 Bridge Management Suite
+
+```
+ai_bridges(thread_id?, relation_type?, status?)  # List/filter bridges
+ai_bridge_analysis()         # Network analytics (stats, health, distribution)
+```
+
+## V6.2 Phase 3 - Advanced Shared Cognition
+
+```
+ai_recommend(limit?)         # Subscription recommendations (topic overlap)
+ai_topics(agent_id?)         # Network-wide topic discovery
+```
+
+**Automatic features:**
+- **Shared Context Injection** — Subscribed threads auto-injected when relevant
+- **Bridge Strength** — Cross-agent usage tracking (`cross_agent_uses`)
+
+## Fichiers Clés (v6.2)
+
+```
+.ai/
+├── config.json              # Config
+├── user_rules.json          # User rules
+├── heartbeat.json           # Temporal awareness
+├── processor.sock           # Daemon socket
+├── processor.pid            # Daemon PID
+├── tmp/recall/              # Recall temp files
+└── db/
+    ├── threads/*.json
+    ├── bridges/*.json
+    ├── synthesis/*.json
+    └── shared/              # V6.0 Shared Cognition
+        ├── published/
+        ├── subscriptions/
+        ├── cross_bridges/
+        ├── proposals/
+        │   ├── outgoing/
+        │   └── incoming/
+        └── index.json
+```
