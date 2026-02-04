@@ -44,3 +44,8 @@ Thumbs.db
 .mcp_smartness_agent
 /mcp_smartness/
 SPECS/
+
+# AI Smartness
+ai_smartness/
+.mcp.json
+

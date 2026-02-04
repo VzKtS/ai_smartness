@@ -1,4 +1,4 @@
-# AI Smartness v6.2.0 - Quick Reference
+# AI Smartness v6.2.1 - Quick Reference
 
 ## Recall Actif (v4.0)
 

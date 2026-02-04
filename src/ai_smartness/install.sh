@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# AI Smartness Installation Script (v6.2.0)
+# AI Smartness Installation Script (v6.2.1)
 # Simplified architecture with absolute paths
 # Includes migration from ai_smartness_v2 to ai_smartness
 #
@@ -97,9 +97,9 @@ export AI_SMARTNESS_LANG="$LANG"
 
 # Localized messages
 declare -A MSG_BANNER_TITLE=(
-    ["en"]="AI Smartness v6.2.0"
-    ["fr"]="AI Smartness v6.2.0"
-    ["es"]="AI Smartness v6.2.0"
+    ["en"]="AI Smartness v6.2.1"
+    ["fr"]="AI Smartness v6.2.1"
+    ["es"]="AI Smartness v6.2.1"
 )
 declare -A MSG_BANNER_SUB=(
     ["en"]="Persistent Memory for Claude Agents"
@@ -509,7 +509,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "6.2.0",
+    "version": "6.2.1",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),

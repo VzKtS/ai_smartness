@@ -702,7 +702,7 @@ agents. Tracking via `cross_agent_uses` et `cross_agent_agents`.
 8. **Topics réseau:** `ai_topics()` pour voir les sujets cross-agents
 
 ---
-*AI Smartness v6.2.0 - Phase 3 Advanced Features + Shared Cognition for LLM agents*
+*AI Smartness v6.2.1 - Phase 3 Advanced Features + Shared Cognition for LLM agents*
 """
 
 
