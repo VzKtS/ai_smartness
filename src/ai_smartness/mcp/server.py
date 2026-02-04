@@ -51,8 +51,9 @@ import asyncio
 import sys
 import os
 import json
+import uuid
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 # Setup imports
@@ -1963,18 +1964,19 @@ def notify_mcp_smartness(
     target_agent: str = None
 ) -> bool:
     """
-    Send notification to mcp_smartness network.
+    Send notification to mcp_smartness network via native message queue.
+
+    Writes directly to ~/.mcp_smartness/messages/pending/ in the
+    exact Message format expected by mcp_smartness v2.0.
 
     Args:
-        event_type: Type of event (shared_thread, bridge_proposal, etc.)
+        event_type: Type of event (shared_thread_published, etc.)
         payload: Event data
         target_agent: Specific agent to notify (None for broadcast)
 
     Returns:
         True if notification sent successfully
     """
-    import subprocess
-
     agent_id = get_agent_id()
     if agent_id == "unknown":
         return False
@@ -1989,33 +1991,43 @@ def notify_mcp_smartness(
         except Exception:
             pass
 
-    # Build notification message
-    message = {
-        "event": event_type,
-        "from_agent": agent_id,
-        "timestamp": datetime.now().isoformat(),
-        **payload
-    }
-
     try:
-        # Use mcp_smartness CLI to send message
-        mcp_smartness_path = Path.home() / ".mcp_smartness"
-        if not mcp_smartness_path.exists():
+        pending_dir = Path.home() / ".mcp_smartness" / "messages" / "pending"
+        if not pending_dir.parent.exists():
             return False
+        pending_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write message to outbox for async delivery
-        outbox_path = mcp_smartness_path / "outbox"
-        outbox_path.mkdir(parents=True, exist_ok=True)
+        now = datetime.now()
+        msg_id = f"msg_{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
 
-        msg_file = outbox_path / f"{event_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        # Build message in mcp_smartness v2.0 Message format
         msg_data = {
-            "type": "broadcast" if target_agent is None else "notify",
-            "to": target_agent,
+            "id": msg_id,
+            "from_agent": agent_id,
+            "to_agent": target_agent or "*",
+            "msg_type": "notify" if target_agent else "broadcast",
             "subject": f"[ai_smartness] {event_type}",
-            "payload": message,
-            "priority": "normal"
+            "payload": {
+                "event": event_type,
+                "from_agent": agent_id,
+                "timestamp": now.isoformat(),
+                **payload
+            },
+            "priority": "normal",
+            "status": "pending",
+            "reply_to": None,
+            "thread_id": msg_id,
+            "created_at": now.isoformat(),
+            "delivered_at": None,
+            "read_at": None,
+            "expires_at": (now + timedelta(hours=24)).isoformat()
         }
-        msg_file.write_text(json.dumps(msg_data, indent=2))
+
+        msg_file = pending_dir / f"{msg_id}.json"
+        msg_file.write_text(
+            json.dumps(msg_data, indent=2, ensure_ascii=False),
+            encoding="utf-8"
+        )
         return True
 
     except Exception:
