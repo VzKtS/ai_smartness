@@ -1354,8 +1354,9 @@ def main():
     if not check_hook_guard():
         # Already in a hook, pass through unchanged
         message, _ = get_message_from_stdin()
-        print(message)  # Raw text output
-        return
+        if message:
+            print(message)  # Raw text output
+        sys.exit(0)
 
     set_hook_guard()
 
@@ -1364,9 +1365,8 @@ def main():
         message, session_id = get_message_from_stdin()
 
         if not message:
-            # No message, pass through unchanged
-            print("")
-            return
+            # No message - exit without output (print('') causes API 400)
+            sys.exit(0)
 
         # Get database path
         db_path = get_db_path()
@@ -1478,7 +1478,7 @@ def main():
         try:
             print(message)  # Raw text output
         except NameError:
-            print("")  # Empty output on error
+            sys.exit(0)  # No output - avoid API 400 empty text block
 
     finally:
         clear_hook_guard()
