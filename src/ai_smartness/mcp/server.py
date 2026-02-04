@@ -1789,16 +1789,123 @@ def rename_batch(ai_path: Path, operations: list) -> str:
 # V6: SHARED COGNITION IMPLEMENTATIONS
 # =============================================================================
 
-def get_agent_id() -> str:
-    """Get current agent ID from config."""
-    config_path = Path.cwd() / ".mcp_smartness_agent"
+_cached_agent_id: str = ""
+
+
+def _is_pid_alive(pid: int) -> bool:
+    """Check if a process with given PID is still running."""
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def _get_ppid(pid: int):
+    """Get parent PID of a process (Linux)."""
+    try:
+        status_path = Path(f"/proc/{pid}/status")
+        if status_path.exists():
+            for line in status_path.read_text().splitlines():
+                if line.startswith("PPid:"):
+                    return int(line.split()[1])
+    except Exception:
+        pass
+    return None
+
+
+def _is_ancestor_of(ancestor_pid: int, descendant_pid: int, max_depth: int = 10) -> bool:
+    """Check if ancestor_pid is in the process tree above descendant_pid."""
+    pid = descendant_pid
+    for _ in range(max_depth):
+        ppid = _get_ppid(pid)
+        if ppid is None or ppid <= 1:
+            return False
+        if ppid == ancestor_pid:
+            return True
+        pid = ppid
+    return False
+
+
+def _resolve_agent_id(project_path: str = None) -> str:
+    """
+    Resolve agent ID using mcp_smartness v2.0 session registry.
+
+    Strategy (aligned with mcp_smartness):
+    1. Session registry (PID-based): ~/.mcp_smartness/sessions/server_*.json
+    2. Project config: {cwd}/.mcp_smartness_agent
+    3. Global config: ~/.mcp_smartness/current_agent.json
+    4. Fallback: "unknown"
+
+    ai_smartness is a read-only consumer of the session registry.
+    """
+    global _cached_agent_id
+    if _cached_agent_id:
+        return _cached_agent_id
+
+    if project_path is None:
+        project_path = str(Path.cwd())
+
+    # Tier 1: Session registry (PID-based)
+    sessions_dir = Path.home() / ".mcp_smartness" / "sessions"
+    if sessions_dir.exists():
+        candidates = []
+        for session_file in sessions_dir.glob("server_*.json"):
+            try:
+                data = json.loads(session_file.read_text(encoding="utf-8"))
+                server_pid = data.get("server_pid")
+                if not server_pid or not _is_pid_alive(server_pid):
+                    continue
+                if data.get("project_path") == project_path:
+                    candidates.append(data)
+            except Exception:
+                continue
+
+        if len(candidates) == 1:
+            _cached_agent_id = candidates[0].get("agent_id", "unknown")
+            return _cached_agent_id
+
+        if len(candidates) > 1:
+            # Multiple sessions - use PPID matching
+            my_pid = os.getpid()
+            for data in candidates:
+                parent_pid = data.get("parent_pid")
+                if parent_pid and _is_ancestor_of(parent_pid, my_pid):
+                    _cached_agent_id = data.get("agent_id", "unknown")
+                    return _cached_agent_id
+            _cached_agent_id = candidates[0].get("agent_id", "unknown")
+            return _cached_agent_id
+
+    # Tier 2: Project config file
+    config_path = Path(project_path) / ".mcp_smartness_agent"
     if config_path.exists():
         try:
-            data = json.loads(config_path.read_text())
-            return data.get("agent_id", "unknown")
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+            agent_id = data.get("agent_id")
+            if agent_id:
+                _cached_agent_id = agent_id
+                return _cached_agent_id
         except Exception:
             pass
+
+    # Tier 3: Global config
+    global_config = Path.home() / ".mcp_smartness" / "current_agent.json"
+    if global_config.exists():
+        try:
+            data = json.loads(global_config.read_text(encoding="utf-8"))
+            agent_id = data.get("agent_id")
+            if agent_id:
+                _cached_agent_id = agent_id
+                return _cached_agent_id
+        except Exception:
+            pass
+
     return "unknown"
+
+
+def get_agent_id() -> str:
+    """Get current agent ID - aligned with mcp_smartness v2.0 resolution."""
+    return _resolve_agent_id()
 
 
 def get_shared_storage(ai_path: Path):
