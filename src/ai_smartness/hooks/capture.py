@@ -330,7 +330,18 @@ def update_context_tracking(ai_path: Path, session_id: Optional[str]):
         return
 
     try:
-        from ..storage import heartbeat as hb
+        # Try relative import first (when running as module)
+        try:
+            from ..storage import heartbeat as hb
+        except ImportError:
+            # Fallback: dynamic import (when running as script)
+            import importlib.util
+            package_dir = Path(__file__).parent.parent
+            hb_path = package_dir / "storage" / "heartbeat.py"
+            spec = importlib.util.spec_from_file_location("heartbeat", hb_path)
+            hb = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(hb)
+
         result = hb.update_context_tokens(ai_path, session_id)
         if result:
             if result.get("throttled"):
@@ -358,7 +369,19 @@ def update_session_state(ai_path: Path, tool_name: str, tool_input: dict, tool_o
         tool_output: Tool output/result
     """
     try:
-        from ..models.session import load_session_state, save_session_state
+        # Try relative import first (when running as module)
+        try:
+            from ..models.session import load_session_state, save_session_state
+        except ImportError:
+            # Fallback: dynamic import (when running as script)
+            import importlib.util
+            package_dir = Path(__file__).parent.parent
+            session_path = package_dir / "models" / "session.py"
+            spec = importlib.util.spec_from_file_location("session", session_path)
+            session_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(session_mod)
+            load_session_state = session_mod.load_session_state
+            save_session_state = session_mod.save_session_state
 
         state = load_session_state(ai_path)
 

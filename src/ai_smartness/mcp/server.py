@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI Smartness MCP Server v5.1
+AI Smartness MCP Server v6.0
 
 A local MCP server that exposes AI Smartness memory tools to Claude Code agents.
 Runs as a subprocess communicating via stdio (JSON-RPC).
@@ -22,6 +22,16 @@ V5 Hybrid Enhancement Tools:
 
 V5.1 Full Context Continuity:
 - ai_profile: User profile management (role, preferences, rules)
+
+V6 Shared Cognition (inter-agent collaboration):
+- ai_share: Share a thread with the network
+- ai_unshare: Remove thread from sharing
+- ai_publish: Update shared snapshot
+- ai_discover: Find shared threads from other agents
+- ai_subscribe: Subscribe to a shared thread
+- ai_unsubscribe: Unsubscribe from a shared thread
+- ai_sync: Pull updates for subscriptions
+- ai_shared_status: Get shared cognition status
 
 Usage:
     python3 -m ai_smartness.mcp.server
@@ -467,6 +477,140 @@ TOOLS = [
             "required": ["operations"]
         }
     ),
+    # V6: Shared Cognition Tools
+    Tool(
+        name="ai_share",
+        description="Share a thread with other agents. Creates a read-only snapshot visible to the network.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "thread_id": {
+                    "type": "string",
+                    "description": "Thread ID to share"
+                },
+                "visibility": {
+                    "type": "string",
+                    "enum": ["network", "restricted"],
+                    "description": "Who can see: 'network' (all agents) or 'restricted' (specific agents)",
+                    "default": "network"
+                },
+                "include_messages": {
+                    "type": "boolean",
+                    "description": "Include full message content (heavier payload)",
+                    "default": False
+                },
+                "allowed_agents": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Agent IDs allowed to subscribe (for restricted visibility)"
+                }
+            },
+            "required": ["thread_id"]
+        }
+    ),
+    Tool(
+        name="ai_unshare",
+        description="Remove a thread from sharing. Existing subscribers keep their cached copy.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "shared_id": {
+                    "type": "string",
+                    "description": "Shared thread ID to unshare"
+                }
+            },
+            "required": ["shared_id"]
+        }
+    ),
+    Tool(
+        name="ai_publish",
+        description="Update the shared snapshot with current thread state. Subscribers can sync to get updates.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "shared_id": {
+                    "type": "string",
+                    "description": "Shared thread ID to update"
+                }
+            },
+            "required": ["shared_id"]
+        }
+    ),
+    Tool(
+        name="ai_discover",
+        description="Discover shared threads from other agents.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "topics": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Filter by topics"
+                },
+                "agent_id": {
+                    "type": "string",
+                    "description": "Filter by owner agent"
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max results (default 20)",
+                    "default": 20
+                }
+            },
+            "required": []
+        }
+    ),
+    Tool(
+        name="ai_subscribe",
+        description="Subscribe to a shared thread from another agent. Creates a local read-only copy.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "shared_id": {
+                    "type": "string",
+                    "description": "Shared thread ID to subscribe to"
+                }
+            },
+            "required": ["shared_id"]
+        }
+    ),
+    Tool(
+        name="ai_unsubscribe",
+        description="Unsubscribe from a shared thread.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "shared_id": {
+                    "type": "string",
+                    "description": "Shared thread ID to unsubscribe from"
+                }
+            },
+            "required": ["shared_id"]
+        }
+    ),
+    Tool(
+        name="ai_sync",
+        description="Pull updates for subscribed threads. Syncs all or specific subscription.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "shared_id": {
+                    "type": "string",
+                    "description": "Optional: specific shared thread to sync (omit for all)"
+                }
+            },
+            "required": []
+        }
+    ),
+    Tool(
+        name="ai_shared_status",
+        description="Get status of shared cognition: published threads, subscriptions, bridges.",
+        inputSchema={
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    ),
 ]
 
 
@@ -650,6 +794,53 @@ async def execute_tool(name: str, arguments: dict, ai_path: Path) -> str:
         if not operations:
             return "# Error\n\nMissing required parameter: operations"
         return rename_batch(ai_path, operations)
+
+    # V6: Shared Cognition Tools
+    elif name == "ai_share":
+        thread_id = arguments.get("thread_id", "")
+        if not thread_id:
+            return "# Error\n\nMissing required parameter: thread_id"
+        visibility = arguments.get("visibility", "network")
+        include_messages = arguments.get("include_messages", False)
+        allowed_agents = arguments.get("allowed_agents", [])
+        return share_thread(ai_path, thread_id, visibility, include_messages, allowed_agents)
+
+    elif name == "ai_unshare":
+        shared_id = arguments.get("shared_id", "")
+        if not shared_id:
+            return "# Error\n\nMissing required parameter: shared_id"
+        return unshare_thread(ai_path, shared_id)
+
+    elif name == "ai_publish":
+        shared_id = arguments.get("shared_id", "")
+        if not shared_id:
+            return "# Error\n\nMissing required parameter: shared_id"
+        return publish_update(ai_path, shared_id)
+
+    elif name == "ai_discover":
+        topics = arguments.get("topics", [])
+        agent_id = arguments.get("agent_id")
+        limit = arguments.get("limit", 20)
+        return discover_threads(ai_path, topics, agent_id, limit)
+
+    elif name == "ai_subscribe":
+        shared_id = arguments.get("shared_id", "")
+        if not shared_id:
+            return "# Error\n\nMissing required parameter: shared_id"
+        return subscribe_thread(ai_path, shared_id)
+
+    elif name == "ai_unsubscribe":
+        shared_id = arguments.get("shared_id", "")
+        if not shared_id:
+            return "# Error\n\nMissing required parameter: shared_id"
+        return unsubscribe_thread(ai_path, shared_id)
+
+    elif name == "ai_sync":
+        shared_id = arguments.get("shared_id")
+        return sync_subscriptions(ai_path, shared_id)
+
+    elif name == "ai_shared_status":
+        return get_shared_status(ai_path)
 
     else:
         return f"# Error\n\nUnknown tool: {name}"
@@ -1590,6 +1781,454 @@ def rename_batch(ai_path: Path, operations: list) -> str:
             if r["status"] == "error":
                 lines.append(f"- `{r.get('thread_id', '?')}`: {r['error']}")
         lines.append("")
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# V6: SHARED COGNITION IMPLEMENTATIONS
+# =============================================================================
+
+def get_agent_id() -> str:
+    """Get current agent ID from config."""
+    config_path = Path.cwd() / ".mcp_smartness_agent"
+    if config_path.exists():
+        try:
+            data = json.loads(config_path.read_text())
+            return data.get("agent_id", "unknown")
+        except Exception:
+            pass
+    return "unknown"
+
+
+def get_shared_storage(ai_path: Path):
+    """Get SharedStorage instance."""
+    from ai_smartness.storage.shared import SharedStorage
+    shared_path = ai_path / "shared"
+    return SharedStorage(shared_path)
+
+
+def notify_mcp_smartness(
+    event_type: str,
+    payload: dict,
+    target_agent: str = None
+) -> bool:
+    """
+    Send notification to mcp_smartness network.
+
+    Args:
+        event_type: Type of event (shared_thread, bridge_proposal, etc.)
+        payload: Event data
+        target_agent: Specific agent to notify (None for broadcast)
+
+    Returns:
+        True if notification sent successfully
+    """
+    import subprocess
+
+    agent_id = get_agent_id()
+    if agent_id == "unknown":
+        return False
+
+    # Check if auto_notify is enabled in config
+    config_path = Path.cwd() / "ai_smartness" / ".ai" / "config.json"
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text())
+            if not config.get("settings", {}).get("shared_cognition", {}).get("auto_notify_mcp_smartness", True):
+                return False
+        except Exception:
+            pass
+
+    # Build notification message
+    message = {
+        "event": event_type,
+        "from_agent": agent_id,
+        "timestamp": datetime.now().isoformat(),
+        **payload
+    }
+
+    try:
+        # Use mcp_smartness CLI to send message
+        mcp_smartness_path = Path.home() / ".mcp_smartness"
+        if not mcp_smartness_path.exists():
+            return False
+
+        # Write message to outbox for async delivery
+        outbox_path = mcp_smartness_path / "outbox"
+        outbox_path.mkdir(parents=True, exist_ok=True)
+
+        msg_file = outbox_path / f"{event_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        msg_data = {
+            "type": "broadcast" if target_agent is None else "notify",
+            "to": target_agent,
+            "subject": f"[ai_smartness] {event_type}",
+            "payload": message,
+            "priority": "normal"
+        }
+        msg_file.write_text(json.dumps(msg_data, indent=2))
+        return True
+
+    except Exception:
+        return False
+
+
+def share_thread(
+    ai_path: Path,
+    thread_id: str,
+    visibility: str = "network",
+    include_messages: bool = False,
+    allowed_agents: list = None
+) -> str:
+    """Share a thread with the network."""
+    from ai_smartness.storage.threads import ThreadStorage
+    from ai_smartness.models.shared import SharedThread, SharedVisibility
+
+    # Get the thread
+    db_path = ai_path / "db"
+    thread_storage = ThreadStorage(db_path / "threads")
+    thread = thread_storage.get(thread_id)
+
+    if not thread:
+        return f"# Error\n\nThread not found: {thread_id}"
+
+    # Create shared thread
+    agent_id = get_agent_id()
+    vis = SharedVisibility.RESTRICTED if visibility == "restricted" else SharedVisibility.NETWORK
+
+    messages_snapshot = None
+    if include_messages:
+        messages_snapshot = [m.to_dict() for m in thread.messages]
+
+    shared = SharedThread.create(
+        source_thread_id=thread_id,
+        owner_agent_id=agent_id,
+        title=thread.title,
+        summary=thread.summary,
+        topics=thread.topics,
+        tags=thread.tags,
+        visibility=vis,
+        include_messages=include_messages,
+        messages_snapshot=messages_snapshot
+    )
+
+    if allowed_agents:
+        shared.allowed_agents = allowed_agents
+
+    # Save to local storage
+    shared_storage = get_shared_storage(ai_path)
+    shared_storage.save_published(shared)
+
+    # Publish to network
+    shared_storage.publish_to_network(shared)
+
+    # Notify mcp_smartness network
+    notified = notify_mcp_smartness(
+        "shared_thread_published",
+        {
+            "shared_id": shared.id,
+            "title": shared.title,
+            "topics": shared.topics,
+            "visibility": visibility
+        }
+    )
+
+    notification_status = " (network notified)" if notified else ""
+
+    return f"""# Thread Shared{notification_status}
+
+**Shared ID**: `{shared.id}`
+**Source**: `{thread_id}`
+**Title**: {shared.title}
+**Visibility**: {visibility}
+**Include Messages**: {include_messages}
+**Owner**: {agent_id}
+
+Other agents can now discover and subscribe to this thread."""
+
+
+def unshare_thread(ai_path: Path, shared_id: str) -> str:
+    """Remove a thread from sharing."""
+    shared_storage = get_shared_storage(ai_path)
+
+    shared = shared_storage.get_published(shared_id)
+    if not shared:
+        return f"# Error\n\nShared thread not found: {shared_id}"
+
+    # Archive it
+    shared.archive()
+    shared_storage.save_published(shared)
+
+    # Remove from network
+    shared_storage.unpublish_from_network(shared_id)
+
+    return f"""# Thread Unshared
+
+**Shared ID**: `{shared_id}`
+**Status**: Archived
+
+Existing subscribers keep their cached copy but won't receive updates."""
+
+
+def publish_update(ai_path: Path, shared_id: str) -> str:
+    """Update the shared snapshot."""
+    from ai_smartness.storage.threads import ThreadStorage
+
+    shared_storage = get_shared_storage(ai_path)
+    shared = shared_storage.get_published(shared_id)
+
+    if not shared:
+        return f"# Error\n\nShared thread not found: {shared_id}"
+
+    # Get source thread
+    db_path = ai_path / "db"
+    thread_storage = ThreadStorage(db_path / "threads")
+    thread = thread_storage.get(shared.source_thread_id)
+
+    if not thread:
+        return f"# Error\n\nSource thread no longer exists: {shared.source_thread_id}"
+
+    # Update snapshot
+    old_version = shared.version
+    messages_snapshot = None
+    if shared.include_messages:
+        messages_snapshot = [m.to_dict() for m in thread.messages]
+
+    shared.publish_update(
+        title=thread.title,
+        summary=thread.summary,
+        topics=thread.topics,
+        messages_snapshot=messages_snapshot
+    )
+
+    # Save
+    shared_storage.save_published(shared)
+    shared_storage.publish_to_network(shared)
+
+    # Notify subscribers via mcp_smartness
+    notified_count = 0
+    for subscriber in shared.subscribers:
+        if notify_mcp_smartness(
+            "shared_thread_updated",
+            {
+                "shared_id": shared_id,
+                "title": shared.title,
+                "new_version": shared.version,
+                "old_version": old_version
+            },
+            target_agent=subscriber
+        ):
+            notified_count += 1
+
+    notification_status = f" ({notified_count} notified)" if notified_count > 0 else ""
+
+    return f"""# Shared Thread Updated{notification_status}
+
+**Shared ID**: `{shared_id}`
+**Version**: {old_version} → {shared.version}
+**Subscribers**: {len(shared.subscribers)}
+
+Subscribers can sync to get the latest version."""
+
+
+def discover_threads(
+    ai_path: Path,
+    topics: list = None,
+    agent_id: str = None,
+    limit: int = 20
+) -> str:
+    """Discover shared threads from the network."""
+    shared_storage = get_shared_storage(ai_path)
+    threads = shared_storage.discover_shared_threads(topics, agent_id, limit)
+
+    if not threads:
+        filter_info = ""
+        if topics:
+            filter_info += f" topics={topics}"
+        if agent_id:
+            filter_info += f" agent={agent_id}"
+        return f"# No Shared Threads Found\n\nNo shared threads match your criteria.{filter_info}"
+
+    lines = ["# Discovered Shared Threads", ""]
+    lines.append(f"Found {len(threads)} shared thread(s):")
+    lines.append("")
+
+    for t in threads:
+        lines.append(f"## `{t.id}`")
+        lines.append(f"- **Title**: {t.title}")
+        lines.append(f"- **Owner**: {t.owner_agent_id}")
+        lines.append(f"- **Topics**: {', '.join(t.topics) if t.topics else 'none'}")
+        lines.append(f"- **Version**: {t.version}")
+        lines.append(f"- **Summary**: {t.summary[:100]}..." if len(t.summary) > 100 else f"- **Summary**: {t.summary}")
+        lines.append(f"- **Subscribe**: `ai_subscribe(shared_id='{t.id}')`")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def subscribe_thread(ai_path: Path, shared_id: str) -> str:
+    """Subscribe to a shared thread."""
+    from ai_smartness.models.shared import Subscription
+
+    shared_storage = get_shared_storage(ai_path)
+    agent_id = get_agent_id()
+
+    # Check if already subscribed
+    existing = shared_storage.get_subscription_by_shared_id(shared_id, agent_id)
+    if existing:
+        return f"# Already Subscribed\n\nYou are already subscribed to `{shared_id}`.\nUse `ai_sync(shared_id='{shared_id}')` to get updates."
+
+    # Find the shared thread in network
+    threads = shared_storage.discover_shared_threads()
+    shared = None
+    for t in threads:
+        if t.id == shared_id:
+            shared = t
+            break
+
+    if not shared:
+        return f"# Error\n\nShared thread not found: {shared_id}"
+
+    # Check visibility
+    from ai_smartness.models.shared import SharedVisibility
+    if shared.visibility == SharedVisibility.RESTRICTED:
+        if agent_id not in shared.allowed_agents:
+            return f"# Error\n\nAccess denied. This thread is restricted to specific agents."
+
+    # Create subscription
+    sub = Subscription.create(shared, agent_id)
+    shared_storage.save_subscription(sub)
+
+    # Register as subscriber on the shared thread
+    shared.add_subscriber(agent_id)
+    shared_storage.publish_to_network(shared)
+
+    return f"""# Subscribed
+
+**Shared ID**: `{shared_id}`
+**Title**: {shared.title}
+**Owner**: {shared.owner_agent_id}
+**Version**: {shared.version}
+
+You now have a local copy. Use `ai_sync()` to pull updates."""
+
+
+def unsubscribe_thread(ai_path: Path, shared_id: str) -> str:
+    """Unsubscribe from a shared thread."""
+    shared_storage = get_shared_storage(ai_path)
+    agent_id = get_agent_id()
+
+    sub = shared_storage.get_subscription_by_shared_id(shared_id, agent_id)
+    if not sub:
+        return f"# Error\n\nNot subscribed to: {shared_id}"
+
+    sub.unsubscribe()
+    shared_storage.save_subscription(sub)
+
+    return f"""# Unsubscribed
+
+**Shared ID**: `{shared_id}`
+
+Your local cache is preserved but marked as unsubscribed."""
+
+
+def sync_subscriptions(ai_path: Path, shared_id: str = None) -> str:
+    """Sync subscribed threads."""
+    shared_storage = get_shared_storage(ai_path)
+    agent_id = get_agent_id()
+
+    if shared_id:
+        # Sync specific subscription
+        sub = shared_storage.get_subscription_by_shared_id(shared_id, agent_id)
+        if not sub:
+            return f"# Error\n\nNot subscribed to: {shared_id}"
+
+        # Find latest version
+        threads = shared_storage.discover_shared_threads()
+        shared = None
+        for t in threads:
+            if t.id == shared_id:
+                shared = t
+                break
+
+        if not shared:
+            sub.mark_stale()
+            shared_storage.save_subscription(sub)
+            return f"# Sync Failed\n\nShared thread no longer available: {shared_id}"
+
+        if sub.synced_version >= shared.version:
+            return f"# Already Up-to-Date\n\n`{shared_id}` is at version {shared.version}"
+
+        old_version = sub.synced_version
+        sub.sync_from(shared)
+        shared_storage.save_subscription(sub)
+
+        return f"""# Synced
+
+**Shared ID**: `{shared_id}`
+**Version**: {old_version} → {shared.version}"""
+
+    else:
+        # Sync all subscriptions
+        subs = shared_storage.get_active_subscriptions()
+        if not subs:
+            return "# No Subscriptions\n\nYou have no active subscriptions to sync."
+
+        threads = shared_storage.discover_shared_threads()
+        threads_by_id = {t.id: t for t in threads}
+
+        results = []
+        for sub in subs:
+            shared = threads_by_id.get(sub.shared_thread_id)
+            if not shared:
+                sub.mark_stale()
+                shared_storage.save_subscription(sub)
+                results.append(f"- `{sub.shared_thread_id}`: **stale** (no longer available)")
+            elif sub.synced_version >= shared.version:
+                results.append(f"- `{sub.shared_thread_id}`: up-to-date (v{shared.version})")
+            else:
+                old_v = sub.synced_version
+                sub.sync_from(shared)
+                shared_storage.save_subscription(sub)
+                results.append(f"- `{sub.shared_thread_id}`: synced v{old_v} → v{shared.version}")
+
+        return "# Sync Complete\n\n" + "\n".join(results)
+
+
+def get_shared_status(ai_path: Path) -> str:
+    """Get shared cognition status."""
+    shared_storage = get_shared_storage(ai_path)
+    stats = shared_storage.get_stats()
+    agent_id = get_agent_id()
+
+    lines = ["# Shared Cognition Status", ""]
+    lines.append(f"**Agent ID**: {agent_id}")
+    lines.append("")
+
+    lines.append("## Published (my shared threads)")
+    lines.append(f"- Count: {stats['published_count']}")
+
+    published = shared_storage.get_all_published()
+    if published:
+        for p in published[:5]:
+            lines.append(f"  - `{p.id}`: {p.title[:40]} (v{p.version}, {len(p.subscribers)} subs)")
+    lines.append("")
+
+    lines.append("## Subscriptions")
+    lines.append(f"- Active: {stats['active_subscriptions']}")
+    lines.append(f"- Total: {stats['subscriptions_count']}")
+
+    subs = shared_storage.get_active_subscriptions()
+    if subs:
+        for s in subs[:5]:
+            lines.append(f"  - `{s.shared_thread_id}`: {s.cached_title[:40]} (v{s.synced_version})")
+    lines.append("")
+
+    lines.append("## Cross-Agent Bridges")
+    lines.append(f"- Active: {stats['active_bridges']}")
+    lines.append(f"- Total: {stats['bridges_count']}")
+    lines.append(f"- Pending outgoing: {stats['pending_outgoing']}")
+    lines.append(f"- Pending incoming: {stats['pending_incoming']}")
 
     return "\n".join(lines)
 

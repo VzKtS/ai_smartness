@@ -39,3 +39,7 @@ Thumbs.db
 
 # MCP config (contains machine-specific absolute paths)
 .mcp.json
+
+# MCP Smartness (separate project)
+.mcp_smartness_agent
+SPECS/

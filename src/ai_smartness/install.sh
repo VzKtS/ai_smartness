@@ -1,15 +1,21 @@
 #!/bin/bash
 #
-# AI Smartness Installation Script (v5.1)
+# AI Smartness Installation Script (v6.0.1)
 # Simplified architecture with absolute paths
 # Includes migration from ai_smartness_v2 to ai_smartness
 #
+# v6.0: Shared Cognition Protocol
+# - SharedThread: Publish threads to network for inter-agent sharing
+# - Subscription: Subscribe to SharedThreads from other agents
+# - InterAgentBridge: Bilateral consent cross-agent bridges (24h TTL)
+# - Memory Isolation: Copy-on-share, pull not push
+# - MCP Smartness Integration: Inter-agent notifications
+#
+# v5.2: Batch operations, proactive compression
 # v5.1: Full Context Continuity
 # - Session State tracking (files_modified, tool_history, pending_tasks)
 # - User Profile (role, preferences, context_rules)
 # - 5-Layer Injection (Session → Pins → Threads → Profile)
-# - Cooperative Introduction (agent autonomy)
-# - ai_profile() MCP tool
 #
 # Supports: English (en), French (fr), Spanish (es)
 # Usage: ./install.sh [project_path] [--lang=en|fr|es]
@@ -81,9 +87,9 @@ export AI_SMARTNESS_LANG="$LANG"
 
 # Localized messages
 declare -A MSG_BANNER_TITLE=(
-    ["en"]="AI Smartness v5.1"
-    ["fr"]="AI Smartness v5.1"
-    ["es"]="AI Smartness v5.1"
+    ["en"]="AI Smartness v6.0.1"
+    ["fr"]="AI Smartness v6.0.1"
+    ["es"]="AI Smartness v6.0.1"
 )
 declare -A MSG_BANNER_SUB=(
     ["en"]="Persistent Memory for Claude Agents"
@@ -365,6 +371,12 @@ else
     mkdir -p "$AI_SMARTNESS_DIR/.ai/db/threads"
     mkdir -p "$AI_SMARTNESS_DIR/.ai/db/bridges"
     mkdir -p "$AI_SMARTNESS_DIR/.ai/db/synthesis"
+    # v6.0 Shared Cognition directories
+    mkdir -p "$AI_SMARTNESS_DIR/.ai/db/shared/published"
+    mkdir -p "$AI_SMARTNESS_DIR/.ai/db/shared/subscriptions"
+    mkdir -p "$AI_SMARTNESS_DIR/.ai/db/shared/cross_bridges"
+    mkdir -p "$AI_SMARTNESS_DIR/.ai/db/shared/proposals/outgoing"
+    mkdir -p "$AI_SMARTNESS_DIR/.ai/db/shared/proposals/incoming"
 fi
 
 # Initialize heartbeat (v4.0)
@@ -487,7 +499,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "5.2.0",
+    "version": "6.0.1",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
@@ -505,6 +517,12 @@ config = {
             "weight_decay_enabled": False,
             "weight_decay_rate": 0.02,
             "weight_decay_min": 0.1
+        },
+        "shared_cognition": {
+            "enabled": True,
+            "auto_notify_mcp_smartness": True,
+            "bridge_proposal_ttl_hours": 24,
+            "default_visibility": "network"
         }
     },
     "llm": {
@@ -882,6 +900,7 @@ echo "   • Heartbeat temporal awareness (v4.1)"
 echo "   • V5 Hybrid: Focus boost, relevance scoring, proactive suggestions"
 echo "   • V5.1 Full Context Continuity: Session state, user profile, layered injection"
 echo "   • V5.2 Auto-Optimization: Batch operations, proactive compression"
+echo "   • V6.0 Shared Cognition: Inter-agent memory sharing with isolation"
 echo ""
 echo "🖥️  CLI Commands:"
 echo "   ai status      - Show memory status"
@@ -924,6 +943,22 @@ echo "   ai_rename_batch(ops) - Rename multiple threads at once"
 echo "   ai_cleanup(mode)     - Fix threads with bad titles"
 echo "   ai_rename(id,title)  - Rename a single thread"
 echo "   Proactive Compression - Auto-compact when pressure > 0.80"
+echo ""
+echo "🌐 V6.0 Shared Cognition (Inter-Agent Memory):"
+echo "   ai_share(thread_id)  - Share a thread to the network"
+echo "   ai_unshare(shared_id) - Remove shared thread"
+echo "   ai_publish(shared_id) - Publish update to subscribers"
+echo "   ai_discover(topics)  - Find shared threads by topics"
+echo "   ai_subscribe(id)     - Subscribe to a shared thread"
+echo "   ai_unsubscribe(id)   - Unsubscribe from shared thread"
+echo "   ai_sync()            - Sync all stale subscriptions"
+echo "   ai_shared_status()   - Show shared cognition status"
+echo ""
+echo "🔗 V6.0 Inter-Agent Bridges (requires bilateral consent):"
+echo "   ai_propose_bridge()  - Propose a cross-agent bridge"
+echo "   ai_accept_bridge()   - Accept incoming proposal"
+echo "   ai_reject_bridge()   - Reject incoming proposal"
+echo "   Proposals expire after 24 hours if not accepted"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""
