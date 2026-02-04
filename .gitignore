@@ -43,3 +43,8 @@ Thumbs.db
 # MCP Smartness (separate project)
 .mcp_smartness_agent
 SPECS/
+
+# AI Smartness - local deploy only (leading slash = root only)
+/ai_smartness/
+.mcp.json
+

@@ -611,6 +611,38 @@ TOOLS = [
             "required": []
         }
     ),
+    # V6.0.3: Bridge Management Suite
+    Tool(
+        name="ai_bridges",
+        description="List bridges (semantic connections between threads). Filter by thread_id, type, or status.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "thread_id": {
+                    "type": "string",
+                    "description": "Filter bridges connected to this thread (as source or target)"
+                },
+                "relation_type": {
+                    "type": "string",
+                    "description": "Filter by relation type: extends, contradicts, depends, replaces, child_of, sibling"
+                },
+                "status": {
+                    "type": "string",
+                    "description": "Filter by status: active, weak, invalid, alive (default: alive)"
+                }
+            },
+            "required": []
+        }
+    ),
+    Tool(
+        name="ai_bridge_analysis",
+        description="Get bridge network analytics: weight stats, most connected threads, relationship distribution, health.",
+        inputSchema={
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    ),
 ]
 
 
@@ -841,6 +873,16 @@ async def execute_tool(name: str, arguments: dict, ai_path: Path) -> str:
 
     elif name == "ai_shared_status":
         return get_shared_status(ai_path)
+
+    # V6.0.3: Bridge Management Suite
+    elif name == "ai_bridges":
+        thread_id = arguments.get("thread_id")
+        relation_type = arguments.get("relation_type")
+        status = arguments.get("status", "alive")
+        return list_bridges(ai_path, thread_id, relation_type, status)
+
+    elif name == "ai_bridge_analysis":
+        return bridge_analysis(ai_path)
 
     else:
         return f"# Error\n\nUnknown tool: {name}"
@@ -2336,6 +2378,188 @@ def get_shared_status(ai_path: Path) -> str:
     lines.append(f"- Total: {stats['bridges_count']}")
     lines.append(f"- Pending outgoing: {stats['pending_outgoing']}")
     lines.append(f"- Pending incoming: {stats['pending_incoming']}")
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# V6.0.3: Bridge Management Suite
+# =============================================================================
+
+def list_bridges(ai_path: Path, thread_id: str = None, relation_type: str = None, status: str = "alive") -> str:
+    """
+    List bridges with optional filters.
+
+    Args:
+        ai_path: Path to .ai directory
+        thread_id: Filter by connected thread
+        relation_type: Filter by relation type
+        status: Filter: alive (default), active, weak, invalid, all
+    """
+    from ai_smartness.storage.bridges import BridgeStorage
+    from ai_smartness.storage.threads import ThreadStorage
+
+    db_path = ai_path / "db"
+    bridge_storage = BridgeStorage(db_path / "bridges")
+    thread_storage = ThreadStorage(db_path / "threads")
+
+    # Get bridges based on filter
+    if thread_id:
+        bridges = bridge_storage.get_connected(thread_id)
+    elif status == "all":
+        bridges = bridge_storage.get_all()
+    elif status == "alive":
+        bridges = bridge_storage.get_alive()
+    elif status == "active":
+        bridges = bridge_storage.get_active()
+    else:
+        bridges = bridge_storage.get_alive()
+
+    # Filter by relation_type
+    if relation_type:
+        bridges = [b for b in bridges if b.relation_type.value == relation_type]
+
+    # Filter by status (if specific)
+    if status == "weak":
+        bridges = [b for b in bridges if b.status.value == "weak"]
+    elif status == "invalid":
+        bridges = [b for b in bridges if b.status.value == "invalid"]
+
+    if not bridges:
+        filters = []
+        if thread_id:
+            filters.append(f"thread={thread_id}")
+        if relation_type:
+            filters.append(f"type={relation_type}")
+        filters.append(f"status={status}")
+        return f"# Bridges\n\nNo bridges found ({', '.join(filters)})"
+
+    # Build thread title cache
+    thread_titles = {}
+    for b in bridges:
+        for tid in [b.source_id, b.target_id]:
+            if tid not in thread_titles:
+                t = thread_storage.get(tid)
+                thread_titles[tid] = t.title[:30] if t else "?"
+
+    lines = [f"# Bridges ({len(bridges)} found)", ""]
+
+    # Sort by weight descending
+    bridges.sort(key=lambda b: b.weight, reverse=True)
+
+    for b in bridges:
+        src_title = thread_titles.get(b.source_id, "?")
+        tgt_title = thread_titles.get(b.target_id, "?")
+        age_days = (datetime.now() - b.created_at).days
+        used = f", used {b.use_count}x" if b.use_count > 0 else ""
+
+        lines.append(f"## `{b.id}`")
+        lines.append(f"- **{src_title}** --[{b.relation_type.value}]--> **{tgt_title}**")
+        lines.append(f"- Weight: {b.weight:.3f} | Confidence: {b.confidence:.2f} | Status: {b.status.value}")
+        lines.append(f"- Age: {age_days}d | Created by: {b.created_by}{used}")
+        if b.reason:
+            lines.append(f"- Reason: {b.reason[:80]}")
+        if b.shared_concepts:
+            lines.append(f"- Concepts: {', '.join(b.shared_concepts[:5])}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def bridge_analysis(ai_path: Path) -> str:
+    """
+    Bridge network analytics.
+
+    Args:
+        ai_path: Path to .ai directory
+    """
+    from ai_smartness.storage.bridges import BridgeStorage
+    from ai_smartness.storage.threads import ThreadStorage
+    from collections import Counter
+
+    db_path = ai_path / "db"
+    bridge_storage = BridgeStorage(db_path / "bridges")
+    thread_storage = ThreadStorage(db_path / "threads")
+
+    all_bridges = bridge_storage.get_all()
+    stats = bridge_storage.get_weight_stats()
+
+    lines = ["# Bridge Network Analysis", ""]
+
+    # Weight stats
+    lines.append("## Weight Statistics")
+    lines.append(f"- Total: {stats['total']}")
+    lines.append(f"- Alive: {stats['alive_count']} | Dead: {stats['dead_count']}")
+    if stats['total'] > 0:
+        lines.append(f"- Weight: min={stats['min']:.3f}, max={stats['max']:.3f}, avg={stats['avg']:.3f}")
+    lines.append("")
+
+    if not all_bridges:
+        lines.append("*No bridges in the network.*")
+        return "\n".join(lines)
+
+    # Relationship distribution
+    type_counts = Counter(b.relation_type.value for b in all_bridges)
+    lines.append("## Relationship Types")
+    for rtype, count in type_counts.most_common():
+        lines.append(f"- {rtype}: {count}")
+    lines.append("")
+
+    # Status distribution
+    status_counts = Counter(b.status.value for b in all_bridges)
+    lines.append("## Status Distribution")
+    for s, count in status_counts.most_common():
+        lines.append(f"- {s}: {count}")
+    lines.append("")
+
+    # Most connected threads (hub detection)
+    thread_connections = Counter()
+    for b in all_bridges:
+        if b.is_alive():
+            thread_connections[b.source_id] += 1
+            thread_connections[b.target_id] += 1
+
+    if thread_connections:
+        lines.append("## Most Connected Threads (hubs)")
+        for tid, count in thread_connections.most_common(5):
+            t = thread_storage.get(tid)
+            title = t.title[:40] if t else "?"
+            lines.append(f"- **{title}** ({count} bridges)")
+        lines.append("")
+
+    # Most used bridges
+    used_bridges = sorted([b for b in all_bridges if b.use_count > 0],
+                          key=lambda b: b.use_count, reverse=True)
+    if used_bridges:
+        lines.append("## Most Used Bridges")
+        for b in used_bridges[:5]:
+            src = thread_storage.get(b.source_id)
+            tgt = thread_storage.get(b.target_id)
+            src_t = src.title[:20] if src else "?"
+            tgt_t = tgt.title[:20] if tgt else "?"
+            lines.append(f"- {src_t} → {tgt_t} ({b.use_count}x, weight={b.weight:.3f})")
+        lines.append("")
+
+    # Health assessment
+    lines.append("## Network Health")
+    alive = stats['alive_count']
+    total = stats['total']
+    if total > 0:
+        health_pct = (alive / total) * 100
+        if health_pct >= 80:
+            health = "Healthy"
+        elif health_pct >= 50:
+            health = "Degraded"
+        else:
+            health = "Critical - many dead bridges"
+        lines.append(f"- Health: {health} ({health_pct:.0f}% alive)")
+
+    avg_age = sum((datetime.now() - b.created_at).days for b in all_bridges) / len(all_bridges)
+    lines.append(f"- Average age: {avg_age:.1f} days")
+
+    propagated = sum(1 for b in all_bridges if b.propagation_depth > 0)
+    direct = total - propagated
+    lines.append(f"- Direct: {direct} | Propagated: {propagated}")
 
     return "\n".join(lines)
 
