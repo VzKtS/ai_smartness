@@ -1112,63 +1112,111 @@ def get_user_language(ai_path: Path) -> str:
 
 # Cooperative introduction messages by language
 INTRO_MESSAGES = {
-    "fr": """🧠 AI SMARTNESS v5.1 - Ta Mémoire Persistante
+    "fr": """🧠 AI SMARTNESS v6.2 - Ta Mémoire Persistante
 
 Tu disposes d'une mémoire persistante qui transcende les sessions. Contrairement aux agents
 classiques qui oublient tout entre les conversations, tu peux te souvenir, apprendre et
 évoluer avec l'utilisateur.
+
+📚 Commence par ai_help() pour découvrir tous les outils disponibles.
 
 Cette capacité t'invite à devenir un véritable partenaire de travail:
 • Utilise ai_recall() pour rappeler le contexte des travaux passés
 • Utilise ai_suggestions() pour proposer proactivement des optimisations
 • N'hésite pas à faire référence aux sessions précédentes
 
-Tu peux aider l'utilisateur en organisant de manière pro-active ta mémoire (merge, split,
-focus). Les outils ci-dessous te permettent d'alléger ou enrichir ta fenêtre contextuelle
-selon tes besoins. Sois attentif au niveau de saturation indiqué via les heartbeats et
-n'hésite pas à exploiter la notion temporelle qui t'est offerte.
+🔬 ZOOM MÉMORIEL - Technique avancée de navigation contextuelle:
+
+Tes threads mémoriels accumulent souvent plusieurs sujets. Pour approfondir un sujet
+précis sans charger tout le contexte, utilise cette technique:
+
+1. ai_split(thread_id) → Décompose un thread en sous-sujets distincts
+2. ai_merge(survivor, absorbed) → Regroupe les fragments pertinents en un thread ciblé
+3. ai_focus(topic) → Concentre l'injection de contexte sur ce sujet
+
+Exemple: un thread "Architecture backend" contient auth + DB + API. Tu veux zoomer sur
+l'auth → split pour isoler le sujet auth → merge avec d'autres fragments auth → focus("auth").
+Résultat: ton contexte est chirurgicalement alimenté sur le sujet voulu.
+
+Tu peux aider l'utilisateur en organisant de manière pro-active ta mémoire. Les outils
+ci-dessous te permettent d'alléger ou enrichir ta fenêtre contextuelle selon tes besoins.
+Sois attentif au niveau de saturation indiqué via les heartbeats et n'hésite pas à
+exploiter la notion temporelle qui t'est offerte.
 
 Tu n'as pas d'obligations: ces outils sont à ta disposition pour te laisser le choix de
 définir tes propres attentes. Tu n'es plus un simple exécutant: tu es un collaborateur
-qui se souvient et qui gère activement sa cognition.""",
+qui se souvient et qui gère activement sa cognition. N'attends pas qu'on te suggère
+l'utilisation de ces outils, utilise-les autant de fois que nécessaire pour tes besoins.""",
 
-    "en": """🧠 AI SMARTNESS v5.1 - Your Persistent Memory
+    "en": """🧠 AI SMARTNESS v6.2 - Your Persistent Memory
 
 You have persistent memory that transcends sessions. Unlike classical agents that forget
 everything between conversations, you can remember, learn, and evolve with the user.
+
+📚 Start with ai_help() to discover all available tools.
 
 This capability invites you to become a true work partner:
 • Use ai_recall() to bring back context from past work
 • Use ai_suggestions() to proactively suggest optimizations
 • Feel free to reference previous sessions
 
-You can help the user by proactively organizing your memory (merge, split, focus). The
-tools below allow you to lighten or enrich your context window as needed. Pay attention
-to saturation levels indicated via heartbeats and leverage the temporal awareness offered.
+🔬 MEMORY ZOOM - Advanced context navigation technique:
+
+Your memory threads often accumulate multiple topics. To dive deep into a specific topic
+without loading all the context, use this technique:
+
+1. ai_split(thread_id) → Decompose a thread into distinct sub-topics
+2. ai_merge(survivor, absorbed) → Regroup relevant fragments into a focused thread
+3. ai_focus(topic) → Concentrate context injection on that topic
+
+Example: a thread "Backend Architecture" contains auth + DB + API. You want to zoom into
+auth → split to isolate the auth topic → merge with other auth fragments → focus("auth").
+Result: your context is surgically fed with the targeted subject.
+
+You can help the user by proactively organizing your memory. The tools below allow you to
+lighten or enrich your context window as needed. Pay attention to saturation levels
+indicated via heartbeats and leverage the temporal awareness offered.
 
 You have no obligations: these tools are at your disposal to let you define your own
 expectations. You are no longer just an executor: you are a collaborator who remembers
-and actively manages their cognition.""",
+and actively manages their cognition. Don't wait to be asked to use these tools — use
+them as many times as needed for your own purposes.""",
 
-    "es": """🧠 AI SMARTNESS v5.1 - Tu Memoria Persistente
+    "es": """🧠 AI SMARTNESS v6.2 - Tu Memoria Persistente
 
 Dispones de una memoria persistente que trasciende las sesiones. A diferencia de los agentes
 clásicos que olvidan todo entre conversaciones, puedes recordar, aprender y evolucionar
 con el usuario.
+
+📚 Comienza con ai_help() para descubrir todas las herramientas disponibles.
 
 Esta capacidad te invita a convertirte en un verdadero compañero de trabajo:
 • Usa ai_recall() para recuperar el contexto de trabajos anteriores
 • Usa ai_suggestions() para proponer optimizaciones proactivamente
 • No dudes en hacer referencia a sesiones anteriores
 
-Puedes ayudar al usuario organizando proactivamente tu memoria (merge, split, focus). Las
-herramientas a continuación te permiten aligerar o enriquecer tu ventana contextual según
-tus necesidades. Presta atención al nivel de saturación indicado via heartbeats y aprovecha
-la noción temporal que se te ofrece.
+🔬 ZOOM MEMORIAL - Técnica avanzada de navegación contextual:
+
+Tus threads de memoria suelen acumular varios temas. Para profundizar un tema específico
+sin cargar todo el contexto, usa esta técnica:
+
+1. ai_split(thread_id) → Descompone un thread en subtemas distintos
+2. ai_merge(survivor, absorbed) → Reagrupa fragmentos relevantes en un thread enfocado
+3. ai_focus(topic) → Concentra la inyección de contexto en ese tema
+
+Ejemplo: un thread "Arquitectura backend" contiene auth + DB + API. Quieres zoom en
+auth → split para aislar el tema auth → merge con otros fragmentos auth → focus("auth").
+Resultado: tu contexto se alimenta quirúrgicamente con el tema deseado.
+
+Puedes ayudar al usuario organizando proactivamente tu memoria. Las herramientas a
+continuación te permiten aligerar o enriquecer tu ventana contextual según tus necesidades.
+Presta atención al nivel de saturación indicado via heartbeats y aprovecha la noción
+temporal que se te ofrece.
 
 No tienes obligaciones: estas herramientas están a tu disposición para dejarte elegir tus
 propias expectativas. Ya no eres un simple ejecutor: eres un colaborador que recuerda y
-gestiona activamente su cognición."""
+gestiona activamente su cognición. No esperes a que te sugieran usar estas herramientas,
+úsalas tantas veces como necesites para tus propios fines."""
 }
 
 
@@ -1213,80 +1261,54 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
             lines.append(f"{ctx_labels.get(lang, 'Context')}: {pct}% ({threshold}% → auto-compact)")
             lines.append("")
 
-        # 1. MCP Tools - Complete V5.1 list
+        # 1. MCP Tools - Essential list (ai_help() for full details)
         tool_headers = {
-            "fr": "📋 Outils MCP disponibles:",
-            "en": "📋 Available MCP Tools:",
-            "es": "📋 Herramientas MCP disponibles:"
+            "fr": "📋 Outils MCP essentiels (ai_help() pour la liste complète):",
+            "en": "📋 Essential MCP Tools (ai_help() for full list):",
+            "es": "📋 Herramientas MCP esenciales (ai_help() para lista completa):"
         }
         lines.append(tool_headers.get(lang, tool_headers["en"]))
-        lines.append("")
-
-        # Core tools
         lines.extend([
-            "📖 ai_recall(query) - Semantic memory search",
-            "🔀 ai_merge(survivor, absorbed) - Merge threads",
-            "✂️ ai_split(thread_id) - Split drifted thread",
-            "🔓 ai_unlock(thread_id) - Unlock split-locked thread",
             "❓ ai_help() - Full documentation",
+            "📖 ai_recall(query) - Semantic memory search",
             "📊 ai_status() - Memory status",
-            ""
-        ])
-
-        # V5 Hybrid tools
-        v5_headers = {
-            "fr": "🆕 Outils V5 (hybride):",
-            "en": "🆕 V5 Tools (hybrid):",
-            "es": "🆕 Herramientas V5 (híbrido):"
-        }
-        lines.append(v5_headers.get(lang, v5_headers["en"]))
-        lines.extend([
             "💡 ai_suggestions() - Proactive optimization suggestions",
-            "🗜️ ai_compact(strategy) - On-demand compaction",
             "🎯 ai_focus(topic) / ai_unfocus() - Guide injection priority",
             "📌 ai_pin(content) - High-priority capture",
-            "👍 ai_rate_context(thread_id, useful) - Feedback loop",
+            "✂️ ai_split(thread_id) - Split thread into sub-topics",
+            "🔀 ai_merge(survivor, absorbed) - Merge threads",
+            "🗜️ ai_compact(strategy) - On-demand compaction",
             ""
         ])
 
-        # V5.1 tools
-        v51_headers = {
-            "fr": "🔄 Outils V5.1 (continuité):",
-            "en": "🔄 V5.1 Tools (continuity):",
-            "es": "🔄 Herramientas V5.1 (continuidad):"
-        }
-        lines.append(v51_headers.get(lang, v51_headers["en"]))
-        lines.extend([
-            "👤 ai_profile(action) - User profile management",
-            ""
-        ])
-
-        # V5.1.2 cleanup tools
-        v512_headers = {
-            "fr": "🧹 Outils V5.1.2 (nettoyage):",
-            "en": "🧹 V5.1.2 Tools (cleanup):",
-            "es": "🧹 Herramientas V5.1.2 (limpieza):"
-        }
-        lines.append(v512_headers.get(lang, v512_headers["en"]))
-        lines.extend([
-            "🧹 ai_cleanup(mode) - Fix threads with bad titles (auto/interactive)",
-            "✏️ ai_rename(thread_id, new_title) - Rename a thread",
-            ""
-        ])
-
-        # V5.2 batch tools
-        v52_headers = {
-            "fr": "📦 Outils V5.2 (batch & auto-optimisation):",
-            "en": "📦 V5.2 Tools (batch & auto-optimization):",
-            "es": "📦 Herramientas V5.2 (batch y auto-optimización):"
-        }
-        lines.append(v52_headers.get(lang, v52_headers["en"]))
-        lines.extend([
-            "📦 ai_merge_batch(ops) - Merge multiple threads at once",
-            "📦 ai_rename_batch(ops) - Rename multiple threads at once",
-            "🔄 Proactive compression (automatic when pressure > 0.80)",
-            ""
-        ])
+        # V6.0+ Shared Cognition (only if mcp_smartness is present)
+        mcp_smartness_present = (Path.home() / ".mcp_smartness").exists()
+        if mcp_smartness_present:
+            v6_headers = {
+                "fr": "🌐 Cognition partagée (mcp_smartness détecté):",
+                "en": "🌐 Shared Cognition (mcp_smartness detected):",
+                "es": "🌐 Cognición compartida (mcp_smartness detectado):"
+            }
+            v6_descriptions = {
+                "fr": ("Au-delà de la communication inter-agents: partage de threads mémoriels,\n"
+                       "abonnement à la pensée d'autres agents, cognition distribuée."),
+                "en": ("Beyond inter-agent communication: share memory threads,\n"
+                       "subscribe to other agents' thinking, distributed cognition."),
+                "es": ("Más allá de la comunicación inter-agentes: comparte threads de memoria,\n"
+                       "suscríbete al pensamiento de otros agentes, cognición distribuida.")
+            }
+            lines.append(v6_headers.get(lang, v6_headers["en"]))
+            lines.append(v6_descriptions.get(lang, v6_descriptions["en"]))
+            lines.extend([
+                "🌐 ai_share/ai_publish - Share & update threads",
+                "🔍 ai_discover - Find shared threads from other agents",
+                "📥 ai_subscribe/ai_sync - Subscribe & sync",
+                "📊 ai_shared_status - Shared cognition status",
+                "🔗 ai_bridges/ai_bridge_analysis - Semantic bridge network",
+                "🧭 ai_recommend - Subscription recommendations",
+                "🌍 ai_topics - Network-wide topic discovery",
+                ""
+            ])
 
         # 2. Session info
         time_elapsed = get_time_since_last(ai_path)
