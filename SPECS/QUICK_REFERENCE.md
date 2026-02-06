@@ -1,4 +1,4 @@
-# AI Smartness v6.2.1 - Quick Reference
+# AI Smartness v6.3.0 - Quick Reference
 
 ## Recall Actif (v4.0)
 
@@ -49,7 +49,7 @@ sim = 0.7×embedding + 0.3×topic_overlap + 0.15 (si topic match)
 
 **Poids thread (decay exponentiel):**
 ```
-decay_factor = 0.5^(days_since_use / 7.0)  # Half-life 7 jours
+decay_factor = 0.5^(days_since_use / 1.5)  # Half-life 1.5 jours
 weight = weight * decay_factor
 ```
 
@@ -108,6 +108,19 @@ Claude: [Shows memory status from CLI]
 
 **Pattern:** `^ai\s+(status|threads?|bridges?|search|health|daemon|mode|help)`
 
+## V6.3 Memory Management
+
+```
+ai_sysinfo()                 # System resource monitoring
+```
+
+**Automatic features:**
+- **Hard Cap** — Thread limits enforced BEFORE creation
+- **LLM Archives** — Suspended >72h -> archived with synthesis
+- **Faster Decay** — Threads: 1.5d, Bridges: 1.0d half-life
+- **Cognitive GuardCode** — Memory pressure reminders (>80% usage)
+- **Shared Hygiene** — Orphaned SharedThreads/Subscriptions/Bridges auto-cleaned
+
 ## Fichiers Clés (base)
 
 ```
@@ -127,12 +140,14 @@ Claude: [Shows memory status from CLI]
 
 ## Modes
 
-| Mode | Threads max | Modèle |
-|------|-------------|--------|
-| light | 15 | haiku |
-| normal | 50 | sonnet |
-| heavy | 100 | opus |
-| max | 200 | opus |
+| Mode | Threads max |
+|------|-------------|
+| light | 15 |
+| normal | 50 |
+| heavy | 100 |
+| max | 200 |
+
+**LLM:** All modes use generic `haiku` (version-agnostic).
 
 ## Tool → SourceType → OriginType
 
@@ -161,7 +176,7 @@ os.environ["AI_SMARTNESS_HOOK_RUNNING"] = "1"
 ## Bridge Weight Decay (Pruning Synaptique)
 
 ```python
-HALF_LIFE_DAYS = 3.0    # Weight halves every 3 days
+HALF_LIFE_DAYS = 1.0    # Weight halves every day
 DEATH_THRESHOLD = 0.05  # Bridge dies below this
 USE_BOOST = 0.1         # Weight boost per use
 ```
@@ -180,7 +195,7 @@ ai bridges --prune        # Apply decay and remove dead bridges
 ## Thread Decay (Neuronal Dormancy)
 
 ```python
-HALF_LIFE_DAYS = 7.0      # Weight halves every 7 days
+HALF_LIFE_DAYS = 1.5      # Weight halves every 1.5 days
 SUSPEND_THRESHOLD = 0.1   # Auto-suspend below this
 USE_BOOST = 0.1           # Weight boost per activation
 ```
@@ -330,6 +345,7 @@ ai_topics(agent_id?)         # Network-wide topic discovery
     ├── threads/*.json
     ├── bridges/*.json
     ├── synthesis/*.json
+    ├── archives/*.json       # V6.3 LLM archives
     └── shared/              # V6.0 Shared Cognition
         ├── published/
         ├── subscriptions/

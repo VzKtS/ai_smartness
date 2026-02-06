@@ -11,13 +11,9 @@ from typing import Optional, Literal
 from datetime import datetime
 
 
-# LLM model mapping by mode
-GUARDIAN_MODELS = {
-    "light": "claude-haiku-3-5-20250620",
-    "normal": "claude-sonnet-4-20250514",
-    "heavy": "claude-opus-4-5-20250514",
-    "max": "claude-opus-4-5-20250514"  # MAX mode uses Opus for quality
-}
+# All internal LLM calls use generic "haiku" (fast, cheap, version-agnostic).
+# Modes only control thread limits, not model selection.
+EXTRACTION_MODEL = "haiku"
 
 # Thread limits by mode
 THREAD_LIMITS = {
@@ -44,11 +40,11 @@ class Config:
     version: str = "6.3.0"
     initialized_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    # Mode (determines Guardian LLM and thread limits)
+    # Mode (determines thread limits only)
     mode: Literal["light", "normal", "heavy", "max"] = "normal"
 
-    # LLM settings
-    extraction_model: Optional[str] = None  # None = use session default model
+    # LLM settings - always "haiku" (generic, version-agnostic)
+    extraction_model: str = EXTRACTION_MODEL
     embedding_model: str = DEFAULT_EMBEDDING_MODEL
 
     # Capture settings
@@ -97,7 +93,7 @@ class Config:
             version=data.get("version", "6.3.0"),
             initialized_at=data.get("initialized_at", datetime.now().isoformat()),
             mode=mode,
-            extraction_model=llm.get("extraction_model", GUARDIAN_MODELS.get(mode, GUARDIAN_MODELS["normal"])),
+            extraction_model=llm.get("extraction_model", EXTRACTION_MODEL),
             embedding_model=llm.get("embedding_model", DEFAULT_EMBEDDING_MODEL),
             auto_capture=settings.get("auto_capture", True),
             active_threads_limit=settings.get("active_threads_limit", 30),
@@ -121,7 +117,7 @@ class Config:
             "llm": {
                 "extraction_model": self.extraction_model,
                 "embedding_model": self.embedding_model,
-                "guardian_model": GUARDIAN_MODELS.get(self.mode, GUARDIAN_MODELS["normal"])
+                "guardian_model": EXTRACTION_MODEL
             },
             "guardcode": {
                 "enforce_plan_mode": self.enforce_plan_mode,
@@ -153,8 +149,8 @@ class Config:
 
     @property
     def guardian_model(self) -> str:
-        """Get the Guardian LLM model for the current mode."""
-        return GUARDIAN_MODELS.get(self.mode, GUARDIAN_MODELS["normal"])
+        """Get the Guardian LLM model (always haiku, generic)."""
+        return EXTRACTION_MODEL
 
 
 def get_project_root() -> Optional[Path]:
