@@ -245,7 +245,7 @@ class ThreadManager:
             if absorbed.weight > survivor.weight:
                 survivor, absorbed = absorbed, survivor
 
-            self.storage.threads.merge(survivor.id, absorbed.id)
+            self.storage.threads.merge(survivor.id, absorbed.id, bridge_storage=self.storage.bridges)
             logger.info(f"HARD_CAP: Auto-merged '{absorbed.title[:25]}' into '{survivor.title[:25]}' (sim={best_sim:.2f})")
             return True
 

@@ -100,7 +100,7 @@ class Compactor:
                 sim = float(np.dot(e1, e2) / (np.linalg.norm(e1) * np.linalg.norm(e2) + 1e-8))
                 if sim >= params["merge_threshold"]:
                     if not dry_run:
-                        self.storage.threads.merge(t1.id, t2.id)
+                        self.storage.threads.merge(t1.id, t2.id, bridge_storage=self.storage.bridges)
                     merged_ids.add(t2.id)
                     report["actions"].append({
                         "action": "merge",

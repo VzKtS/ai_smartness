@@ -8,7 +8,8 @@ Read(".ai/recall/<query>")  # Search memory
 Read(".ai/recall/thread_xxx")  # Direct thread access
 ```
 
-**Limits:** 5 threads, 100 char summary, 8000 char max context
+**Limits:** 5 threads, 100 char summary, 5000 char max context (recall + injection)
+**Bridges:** 5 max per search result
 
 **Reactivation:** Suspended threads with sim > 0.5 auto-reactivate
 

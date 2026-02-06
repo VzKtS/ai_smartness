@@ -393,7 +393,7 @@ class ThreadStorage:
     # MERGE & SPLIT (v4.3)
     # =========================================================================
 
-    def merge(self, survivor_id: str, absorbed_id: str) -> Optional[Thread]:
+    def merge(self, survivor_id: str, absorbed_id: str, bridge_storage=None) -> Optional[Thread]:
         """
         Merge two threads into one.
 
@@ -402,10 +402,12 @@ class ThreadStorage:
         - Topics/tags are merged (union)
         - Weight = max(both) + 0.1 boost
         - Absorbed thread is archived with tag 'merged_into:<survivor_id>'
+        - Bridges pointing to absorbed are redirected to survivor
 
         Args:
             survivor_id: Thread that will remain active
             absorbed_id: Thread to be absorbed and archived
+            bridge_storage: Optional BridgeStorage for bridge redirection
 
         Returns:
             The merged survivor thread, or None if failed
@@ -447,11 +449,53 @@ class ThreadStorage:
         absorbed.archive()
         absorbed.tags.append(f"merged_into:{survivor_id}")
 
-        # 7. Save both
+        # 7. Redirect bridges from absorbed to survivor
+        if bridge_storage is not None:
+            self._redirect_bridges(absorbed_id, survivor_id, bridge_storage)
+
+        # 8. Save both
         self.save(survivor)
         self.save(absorbed)
 
         return survivor
+
+    def _redirect_bridges(self, from_id: str, to_id: str, bridge_storage):
+        """
+        Redirect bridges from absorbed thread to survivor after merge.
+
+        For each bridge connected to from_id:
+        - Delete the old bridge
+        - Redirect source/target to to_id
+        - Save redirected bridge (dedup in save() handles duplicates)
+        - Skip self-loops (bridge pointing to_id -> to_id)
+
+        Args:
+            from_id: Thread being absorbed
+            to_id: Survivor thread
+            bridge_storage: BridgeStorage instance
+        """
+        import uuid as _uuid
+
+        connected = bridge_storage.get_connected(from_id)
+        for bridge in connected:
+            # Delete old bridge
+            bridge_storage.delete(bridge.id)
+
+            # Redirect endpoints
+            if bridge.source_id == from_id:
+                bridge.source_id = to_id
+            if bridge.target_id == from_id:
+                bridge.target_id = to_id
+
+            # Skip self-loops (merged thread pointing to itself)
+            if bridge.source_id == bridge.target_id:
+                continue
+
+            # New ID since old file was deleted
+            bridge.id = f"bridge_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{_uuid.uuid4().hex[:6]}"
+
+            # Save — dedup in save() boosts existing if duplicate
+            bridge_storage.save(bridge)
 
     def split(
         self,

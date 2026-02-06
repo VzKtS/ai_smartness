@@ -99,7 +99,7 @@ class MemoryRetriever:
     def get_relevant_context(
         self,
         user_message: str,
-        max_chars: int = 2000,
+        max_chars: int = 5000,
         focus_data: Optional[Dict[str, Any]] = None
     ) -> str:
         """
@@ -290,7 +290,7 @@ class MemoryRetriever:
             except Exception:
                 continue
 
-        return bridges[:10]  # Limit bridges
+        return bridges[:5]  # Limit bridges
 
     def _find_similar_threads(
         self,

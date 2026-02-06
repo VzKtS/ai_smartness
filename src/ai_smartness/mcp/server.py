@@ -1308,6 +1308,7 @@ def get_suggestions(ai_path: Path, context: str = "") -> str:
 def do_compact(ai_path: Path, strategy: str = "normal", dry_run: bool = False) -> str:
     """Execute memory compaction."""
     from ai_smartness.storage.threads import ThreadStorage
+    from ai_smartness.storage.bridges import BridgeStorage
     from datetime import timedelta
     import numpy as np
 
@@ -1317,6 +1318,7 @@ def do_compact(ai_path: Path, strategy: str = "normal", dry_run: bool = False) -
     params = COMPACTION_STRATEGIES[strategy]
     db_path = ai_path / "db"
     storage = ThreadStorage(db_path / "threads")
+    bridge_storage = BridgeStorage(db_path / "bridges")
 
     # Rebuild indexes from disk to ensure consistency
     storage.rebuild_indexes()
@@ -1350,7 +1352,7 @@ def do_compact(ai_path: Path, strategy: str = "normal", dry_run: bool = False) -
             sim = float(np.dot(e1, e2) / (np.linalg.norm(e1) * np.linalg.norm(e2) + 1e-8))
             if sim >= params["merge_threshold"]:
                 if not dry_run:
-                    storage.merge(t1.id, t2.id)
+                    storage.merge(t1.id, t2.id, bridge_storage=bridge_storage)
                 merged_ids.add(t2.id)
                 report["actions"].append({
                     "action": "merge",

@@ -71,14 +71,33 @@ class BridgeStorage:
         """
         Save a bridge to storage.
 
+        Dedup: If a bridge already exists between the same two threads
+        (in either direction), boost the existing one instead of creating
+        a duplicate. Only applies to NEW bridges (not updates).
+
         Args:
             bridge: ThinkBridge to save
 
         Returns:
-            The saved bridge
+            The saved bridge (may be the existing one if dedup triggered)
         """
+        bridge_path = self._bridge_path(bridge.id)
+
+        # If this bridge ID already exists on disk, it's an update — save directly
+        if not bridge_path.exists():
+            # New bridge — check for bidirectional duplicates
+            existing = self.get_between(bridge.source_id, bridge.target_id)
+            if existing is None:
+                existing = self.get_between(bridge.target_id, bridge.source_id)
+
+            if existing is not None:
+                # Duplicate found — boost existing instead of creating new
+                existing.record_use()
+                self._write_json(self._bridge_path(existing.id), existing.to_dict())
+                return existing
+
         # Write bridge file
-        self._write_json(self._bridge_path(bridge.id), bridge.to_dict())
+        self._write_json(bridge_path, bridge.to_dict())
 
         # Update index
         self._update_index(bridge)

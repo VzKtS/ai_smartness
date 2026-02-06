@@ -791,7 +791,7 @@ def get_memory_context(message: str, db_path: Path) -> str:
         # Get base context
         context = retriever.get_relevant_context(
             message,
-            max_chars=2000,
+            max_chars=5000,
             focus_data=focus_data if has_focus else None
         )
 

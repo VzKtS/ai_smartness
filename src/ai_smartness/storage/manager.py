@@ -50,7 +50,7 @@ class StorageManager:
         meta_path = self.db_path / "_meta.json"
         if not meta_path.exists():
             meta = {
-                "version": "6.3.0",
+                "version": "6.3.1",
                 "created_at": datetime.now().isoformat(),
                 "last_updated": datetime.now().isoformat()
             }

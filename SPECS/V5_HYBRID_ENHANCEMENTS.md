@@ -425,19 +425,19 @@ async def ai_compact(
 COMPACTION_STRATEGIES = {
     "gentle": {
         "merge_threshold": 0.95,
-        "archive_age_days": 30,
+        "archive_age_days": 7,       # v6.3: aligned with fast decay (half-life 1.5j)
         "max_active_threads": 50,
         "weight_decay": 0.95
     },
     "normal": {
         "merge_threshold": 0.85,
-        "archive_age_days": 14,
+        "archive_age_days": 3,       # v6.3: thread weight ~0.25 at 3 days
         "max_active_threads": 30,
         "weight_decay": 0.90
     },
     "aggressive": {
         "merge_threshold": 0.75,
-        "archive_age_days": 7,
+        "archive_age_days": 1,       # v6.3: aggressive cleanup
         "max_active_threads": 15,
         "weight_decay": 0.80
     }

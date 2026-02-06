@@ -188,11 +188,13 @@ def handle_merge(survivor_id: str, absorbed_id: str, ai_path: Path) -> str:
     """
     try:
         from ai_smartness.storage.threads import ThreadStorage
+        from ai_smartness.storage.bridges import BridgeStorage
 
         db_path = ai_path / "db"
         storage = ThreadStorage(db_path / "threads")
+        bridge_storage = BridgeStorage(db_path / "bridges")
 
-        merged = storage.merge(survivor_id, absorbed_id)
+        merged = storage.merge(survivor_id, absorbed_id, bridge_storage=bridge_storage)
 
         if merged:
             return f"""# Merge Complete
