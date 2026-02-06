@@ -185,6 +185,35 @@ def cleanup_zombie_daemons(ai_path: Path) -> None:
     time.sleep(0.2)
 
 
+def _detect_agent_id(ai_path: Path) -> Optional[str]:
+    """
+    v7: Detect agent_id from .mcp_smartness_agent file.
+
+    Args:
+        ai_path: Path to .ai directory
+
+    Returns:
+        agent_id if in multi mode, None otherwise
+    """
+    project_root = ai_path.parent
+    agent_file = project_root / ".mcp_smartness_agent"
+    if not agent_file.exists():
+        return None
+
+    try:
+        data = json.loads(agent_file.read_text(encoding='utf-8'))
+        if data.get("project_mode") == "multi" and len(data.get("agents", [])) >= 2:
+            env_id = os.environ.get("AI_SMARTNESS_AGENT_ID")
+            if env_id:
+                return env_id
+            agents = data.get("agents", [])
+            if len(agents) == 1:
+                return agents[0].get("id")
+        return None
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
 def ensure_daemon_running(ai_path: Path, max_wait: float = 5.0) -> bool:
     """
     Ensure the daemon is running, starting it if necessary.
@@ -206,6 +235,9 @@ def ensure_daemon_running(ai_path: Path, max_wait: float = 5.0) -> bool:
     # Clean up ALL zombie daemons for this project
     cleanup_zombie_daemons(ai_path)
 
+    # v7: Detect agent_id for multi-mode
+    agent_id = _detect_agent_id(ai_path)
+
     # Start the daemon
     try:
         # Find the processor script path
@@ -223,14 +255,20 @@ def ensure_daemon_running(ai_path: Path, max_wait: float = 5.0) -> bool:
             log_file.write(f"\n[{time.strftime('%Y-%m-%d %H:%M:%S')}] Starting daemon...\n")
             log_file.write(f"  processor_path: {processor_path}\n")
             log_file.write(f"  db_path: {db_path}\n")
+            if agent_id:
+                log_file.write(f"  agent_id: {agent_id}\n")
             log_file.write(f"  PYTHONPATH: {env.get('PYTHONPATH', '')}\n")
+
+        cmd = [
+            "python3", str(processor_path),
+            "--db-path", str(db_path)
+        ]
+        if agent_id:
+            cmd.extend(["--agent-id", agent_id])
 
         stderr_log = open(ai_path / "daemon_stderr.log", "a")
         subprocess.Popen(
-            [
-                "python3", str(processor_path),
-                "--db-path", str(db_path)
-            ],
+            cmd,
             env=env,
             start_new_session=True,
             stdout=subprocess.DEVNULL,

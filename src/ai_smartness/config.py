@@ -37,11 +37,15 @@ class Config:
     # Project info
     project_name: str = "unnamed"
     language: Literal["en", "fr", "es"] = "en"
-    version: str = "6.3.0"
+    version: str = "7.0.0"
     initialized_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     # Mode (determines thread limits only)
     mode: Literal["light", "normal", "heavy", "max"] = "normal"
+
+    # v7: Multi-agent mode
+    project_mode: Literal["simple", "multi"] = "simple"
+    agents: list = field(default_factory=list)
 
     # LLM settings - always "haiku" (generic, version-agnostic)
     extraction_model: str = EXTRACTION_MODEL
@@ -87,12 +91,17 @@ class Config:
 
         mode = settings.get("thread_mode", "normal")
 
+        # v7: multi-agent fields
+        multi = data.get("multi_agent", {})
+
         return cls(
             project_name=data.get("project_name", "unnamed"),
             language=data.get("language", "en"),
-            version=data.get("version", "6.3.0"),
+            version=data.get("version", "7.0.0"),
             initialized_at=data.get("initialized_at", datetime.now().isoformat()),
             mode=mode,
+            project_mode=multi.get("project_mode", "simple"),
+            agents=multi.get("agents", []),
             extraction_model=llm.get("extraction_model", EXTRACTION_MODEL),
             embedding_model=llm.get("embedding_model", DEFAULT_EMBEDDING_MODEL),
             auto_capture=settings.get("auto_capture", True),
@@ -123,6 +132,10 @@ class Config:
                 "enforce_plan_mode": self.enforce_plan_mode,
                 "warn_quick_solutions": self.warn_quick_solutions,
                 "require_all_choices": self.require_all_choices
+            },
+            "multi_agent": {
+                "project_mode": self.project_mode,
+                "agents": self.agents
             }
         }
 

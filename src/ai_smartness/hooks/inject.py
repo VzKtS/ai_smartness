@@ -95,14 +95,65 @@ def get_project_root() -> Optional[Path]:
     return None
 
 
+def get_agent_id_from_project(project_root: Path) -> Optional[str]:
+    """
+    v7: Detect agent_id from .mcp_smartness_agent file.
+
+    Returns:
+        agent_id if in multi mode, None for simple mode
+    """
+    if not project_root:
+        return None
+
+    agent_file = project_root / ".mcp_smartness_agent"
+    if not agent_file.exists():
+        return None
+
+    try:
+        data = json.loads(agent_file.read_text(encoding='utf-8'))
+        project_mode = data.get("project_mode", "simple")
+        agents = data.get("agents", [])
+
+        if project_mode == "multi" and len(agents) >= 2:
+            # Check env var override first
+            env_id = os.environ.get("AI_SMARTNESS_AGENT_ID")
+            if env_id:
+                return env_id
+
+            # Single agent in list: use it
+            if len(agents) == 1:
+                return agents[0].get("id")
+
+            return None
+
+        return None
+    except (json.JSONDecodeError, IOError):
+        return None
+
+
 def get_db_path() -> Path:
-    """Get the database path."""
+    """Get the database path, agent-aware in multi mode."""
     project_root = get_project_root()
     if project_root:
+        agent_id = get_agent_id_from_project(project_root)
+        if agent_id:
+            # Multi-agent: partitioned path
+            agent_path = project_root / ".ai" / "db" / "agents" / agent_id
+            if agent_path.exists():
+                return agent_path
+
         return project_root / ".ai" / "db"
 
     # Fallback to package-local .ai
     return get_package_root() / ".ai" / "db"
+
+
+def get_ai_path() -> Path:
+    """Get the .ai directory path (always the shared root, never agent-partitioned)."""
+    project_root = get_project_root()
+    if project_root:
+        return project_root / ".ai"
+    return get_package_root() / ".ai"
 
 
 # =============================================================================
@@ -263,7 +314,7 @@ def record_heartbeat_interaction(ai_path: Path, session_id: Optional[str] = None
 # CONTEXT BUILDING (Lightweight version)
 # =============================================================================
 
-def build_lightweight_context(message: str, db_path: Path) -> dict:
+def build_lightweight_context(message: str, db_path: Path, ai_path: Optional[Path] = None) -> dict:
     """
     Build context without importing heavy modules.
 
@@ -273,11 +324,13 @@ def build_lightweight_context(message: str, db_path: Path) -> dict:
     Args:
         message: User message
         db_path: Path to database
+        ai_path: Path to .ai directory (auto-detected if None)
 
     Returns:
         Context dictionary
     """
-    ai_path = db_path.parent
+    if ai_path is None:
+        ai_path = get_ai_path()
 
     # Get heartbeat context (v4.1)
     heartbeat = get_heartbeat_context(ai_path)
@@ -781,7 +834,7 @@ def get_memory_context(message: str, db_path: Path) -> str:
 
         from ai_smartness.intelligence.memory_retriever import MemoryRetriever
 
-        ai_path = db_path.parent
+        ai_path = get_ai_path()
         retriever = MemoryRetriever(db_path)
 
         # Get focus data for V5 focus boost
@@ -1048,12 +1101,13 @@ def get_minutes_since_last_activity(ai_path: Path) -> float:
 # NEW SESSION CONTEXT (v4.2)
 # =============================================================================
 
-def get_hot_thread(ai_path: Path) -> Optional[dict]:
+def get_hot_thread(ai_path: Path, db_path: Optional[Path] = None) -> Optional[dict]:
     """
     Get last active thread (hot thread) from heartbeat.
 
     Args:
         ai_path: Path to .ai directory
+        db_path: Path to database (agent-aware, used for thread lookup)
 
     Returns:
         Thread data dict if found, None otherwise
@@ -1069,7 +1123,9 @@ def get_hot_thread(ai_path: Path) -> Optional[dict]:
         if not last_thread_id:
             return None
 
-        thread_path = ai_path / "db" / "threads" / f"{last_thread_id}.json"
+        # v7: Use db_path for agent-aware thread lookup
+        threads_dir = db_path / "threads" if db_path else ai_path / "db" / "threads"
+        thread_path = threads_dir / f"{last_thread_id}.json"
         if thread_path.exists():
             return json.loads(thread_path.read_text(encoding='utf-8'))
 
@@ -1079,20 +1135,22 @@ def get_hot_thread(ai_path: Path) -> Optional[dict]:
     return None
 
 
-def suggest_recall(user_message: str, ai_path: Path) -> Optional[str]:
+def suggest_recall(user_message: str, ai_path: Path, db_path: Optional[Path] = None) -> Optional[str]:
     """
     Suggest recall if user message matches known topics.
 
     Args:
         user_message: User's message
         ai_path: Path to .ai directory
+        db_path: Path to database (agent-aware)
 
     Returns:
         Topic string to suggest, or None
     """
     try:
         words = set(user_message.lower().split())
-        threads_dir = ai_path / "db" / "threads"
+        # v7: Use db_path for agent-aware thread lookup
+        threads_dir = db_path / "threads" if db_path else ai_path / "db" / "threads"
 
         if not threads_dir.exists():
             return None
@@ -1265,7 +1323,7 @@ gestiona activamente su cognición. No esperes a que te sugieran usar estas herr
 }
 
 
-def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -> Optional[str]:
+def get_new_session_context(session_id: str, user_message: str, ai_path: Path, db_path: Optional[Path] = None) -> Optional[str]:
     """
     Get unified new session context for injection.
 
@@ -1276,6 +1334,7 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
         session_id: Current session ID from Claude Code
         user_message: User's first message
         ai_path: Path to .ai directory
+        db_path: Path to database (agent-aware)
 
     Returns:
         New session context string, or None if same session
@@ -1370,7 +1429,7 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
             lines.append(labels[2])
 
         # 3. Hot thread (if exists)
-        hot_thread = get_hot_thread(ai_path)
+        hot_thread = get_hot_thread(ai_path, db_path=db_path)
         if hot_thread:
             title = hot_thread.get("title", "")[:50]
             topics = ", ".join(hot_thread.get("topics", [])[:4])
@@ -1387,7 +1446,7 @@ def get_new_session_context(session_id: str, user_message: str, ai_path: Path) -
 
         # 4. Recall suggestion (if message matches known topic)
         if user_message:
-            topic = suggest_recall(user_message, ai_path)
+            topic = suggest_recall(user_message, ai_path, db_path=db_path)
             if topic:
                 hint_labels = {
                     "fr": f"💡 Ton message mentionne \"{topic}\" - mémoire disponible:",
@@ -1439,9 +1498,9 @@ def main():
             print("Empty prompt blocked - please type a message.", file=sys.stderr)
             sys.exit(2)
 
-        # Get database path
+        # Get paths (v7: ai_path is always .ai/, db_path may be agent-partitioned)
         db_path = get_db_path()
-        ai_path = db_path.parent
+        ai_path = get_ai_path()
 
         # =================================================================
         # CLI COMMAND INTERCEPTION (v3.0.0)
@@ -1488,7 +1547,7 @@ def main():
                 log(f"[UserPrompt] Failed to send to daemon")
 
         # Build lightweight context (GuardCode reminders)
-        lightweight_context = build_lightweight_context(message, db_path)
+        lightweight_context = build_lightweight_context(message, db_path, ai_path)
         lightweight_injection = format_injection(lightweight_context)
 
         # V5.1: Calculate timing for layered injection
@@ -1499,7 +1558,7 @@ def main():
 
         # NEW SESSION CONTEXT (v4.2) - Inject first if new session
         if session_id:
-            new_session_ctx = get_new_session_context(session_id, message, ai_path)
+            new_session_ctx = get_new_session_context(session_id, message, ai_path, db_path=db_path)
             if new_session_ctx:
                 injections.append(f"<system-reminder>\n{new_session_ctx}\n</system-reminder>")
 

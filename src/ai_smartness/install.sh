@@ -1,8 +1,15 @@
 #!/bin/bash
 #
-# AI Smartness Installation Script (v6.2.1)
+# AI Smartness Installation Script (v7.0.0)
 # Simplified architecture with absolute paths
 # Includes migration from ai_smartness_v2 to ai_smartness
+#
+# v7.0: Multi-Agent Memory Isolation
+# - Per-agent partitioned storage (up to 5 agents per project)
+# - Default: simple mode (single shared memory, retrocompatible)
+# - Multi mode: triggered by mcp_smartness installation
+# - Agent-aware routing in inject.py, daemon, MCP server
+# - Shared cognition (ai_share/ai_subscribe) remains standard exchange
 #
 # v6.2: Phase 3 - Advanced Shared Cognition
 # - ai_recommend: Subscription recommendations based on topic similarity
@@ -97,9 +104,9 @@ export AI_SMARTNESS_LANG="$LANG"
 
 # Localized messages
 declare -A MSG_BANNER_TITLE=(
-    ["en"]="AI Smartness v6.2.1"
-    ["fr"]="AI Smartness v6.2.1"
-    ["es"]="AI Smartness v6.2.1"
+    ["en"]="AI Smartness v7.0.0"
+    ["fr"]="AI Smartness v7.0.0"
+    ["es"]="AI Smartness v7.0.0"
 )
 declare -A MSG_BANNER_SUB=(
     ["en"]="Persistent Memory for Claude Agents"
@@ -305,26 +312,29 @@ if [ -d "$LEGACY_DIR" ]; then
     fi
 fi
 
-# Check for current installation
-if [ -d "$AI_SMARTNESS_DIR" ]; then
+# Check for flat installation (installed directly at TARGET_DIR root - legacy or error)
+if [ -d "$TARGET_DIR/.ai" ] && [ -d "$TARGET_DIR/hooks" ] && [ -d "$TARGET_DIR/storage" ]; then
     echo ""
-    echo "⚠️  ${MSG_ALREADY_INSTALLED[$LANG]}"
+    echo "⚠️  Installation plate détectée (ancienne structure)"
+    echo "   L'installation sera déplacée dans un sous-dossier ai_smartness/"
 
-    # Check for existing data (if not already from legacy)
+    # Check for existing data
     if [ "$KEEP_DATA" != "yes" ]; then
-        DB_DIR="$AI_SMARTNESS_DIR/.ai/db"
-        if [ -d "$DB_DIR" ]; then
-            THREAD_COUNT=$(find "$DB_DIR/threads" -name "*.json" 2>/dev/null | wc -l)
-            BRIDGE_COUNT=$(find "$DB_DIR/bridges" -name "*.json" 2>/dev/null | wc -l)
+        AI_DIR="$TARGET_DIR/.ai"
+        if [ -d "$AI_DIR/db" ]; then
+            THREAD_COUNT=$(find "$AI_DIR/db/threads" -name "*.json" 2>/dev/null | wc -l)
+            BRIDGE_COUNT=$(find "$AI_DIR/db/bridges" -name "*.json" 2>/dev/null | wc -l)
 
-            if [ "$THREAD_COUNT" -gt 0 ] || [ "$BRIDGE_COUNT" -gt 0 ]; then
-                echo "   📊 Threads: $THREAD_COUNT, Bridges: $BRIDGE_COUNT"
-                read -p "   ${MSG_KEEP_DB[$LANG]}" -n 1 -r
-                echo
-                if [[ $REPLY =~ ^[KkCcGg]$ ]]; then
-                    KEEP_DATA="yes"
-                    echo "   ✓ Data will be preserved"
-                fi
+            echo "   📊 Threads: $THREAD_COUNT, Bridges: $BRIDGE_COUNT"
+            read -p "   ${MSG_KEEP_DB[$LANG]}" -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[KkCcGg]$ ]]; then
+                KEEP_DATA="yes"
+                BACKUP_DIR="/tmp/ai_smartness_backup_$$"
+                cp -r "$AI_DIR" "$BACKUP_DIR"
+                echo "   ✓ Data backed up for migration"
+            else
+                echo "   ✓ Data will be reset"
             fi
         fi
     fi
@@ -334,6 +344,58 @@ if [ -d "$AI_SMARTNESS_DIR" ]; then
     if [[ ! $REPLY =~ ^[YyOoSs]$ ]]; then
         echo "Cancelled."
         exit 0
+    fi
+
+    # Clean flat installation files (but keep .ai if KEEP_DATA=yes)
+    for dir in bin cli daemon guardcode hooks intelligence mcp models processing storage docs; do
+        rm -rf "$TARGET_DIR/$dir" 2>/dev/null || true
+    done
+    # Remove .ai only if not keeping data
+    if [ "$KEEP_DATA" != "yes" ]; then
+        rm -rf "$TARGET_DIR/.ai" 2>/dev/null || true
+    fi
+    rm -f "$TARGET_DIR"/*.py "$TARGET_DIR"/*.sh 2>/dev/null || true
+    echo "   ✓ Flat installation cleaned"
+    FLAT_MIGRATED="yes"
+fi
+
+# Check for current installation (subfolder format)
+if [ -d "$AI_SMARTNESS_DIR" ]; then
+    # Skip if we just migrated from flat install
+    if [ "$FLAT_MIGRATED" = "yes" ]; then
+        echo ""
+        echo "   ℹ️  Procédure après migration flat → subfolder"
+    else
+        echo ""
+        echo "⚠️  ${MSG_ALREADY_INSTALLED[$LANG]}"
+
+        # Check for existing data (if not already from legacy)
+        if [ "$KEEP_DATA" != "yes" ]; then
+            AI_DIR="$AI_SMARTNESS_DIR/.ai"
+            if [ -d "$AI_DIR" ]; then
+                # Count threads and bridges if they exist
+                THREAD_COUNT=$(find "$AI_DIR/db/threads" -name "*.json" 2>/dev/null | wc -l)
+                BRIDGE_COUNT=$(find "$AI_DIR/db/bridges" -name "*.json" 2>/dev/null | wc -l)
+
+                # Always ask if .ai/ exists (may contain config, heartbeat, session_state, etc.)
+                echo "   📊 Threads: $THREAD_COUNT, Bridges: $BRIDGE_COUNT"
+                read -p "   ${MSG_KEEP_DB[$LANG]}" -n 1 -r
+                echo
+                if [[ $REPLY =~ ^[KkCcGg]$ ]]; then
+                    KEEP_DATA="yes"
+                    echo "   ✓ Data will be preserved"
+                else
+                    echo "   ✓ Data will be reset"
+                fi
+            fi
+        fi
+
+        read -p "   ${MSG_CONTINUE[$LANG]}" -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[YyOoSs]$ ]]; then
+            echo "Cancelled."
+            exit 0
+        fi
     fi
 
     # Backup if keeping data (and not already backed up from legacy)
@@ -510,10 +572,12 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "6.3.0",
+    "version": "7.0.0",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
+    "project_mode": "simple",
+    "agents": [],
     "settings": {
         "thread_mode": thread_mode,
         "auto_capture": True,
@@ -989,6 +1053,14 @@ echo "   Hard Cap Enforcement   - Thread limits enforced BEFORE creation"
 echo "   Archive System         - LLM-synthesized archives when threads are pruned"
 echo "   Cognitive GuardCode    - Memory pressure reminders in context"
 echo "   Faster Decay           - Threads: 1.5d half-life, Bridges: 1.0d half-life"
+echo ""
+echo "🔧 V7.0 Multi-Agent Memory Isolation:"
+echo "   Default: Simple mode (single shared memory, retrocompatible)"
+echo "   Multi mode: Triggered by mcp_smartness installation (up to 5 agents/project)"
+echo "   Per-agent partitioned storage (.ai/db/agents/{agent_id}/)"
+echo "   Agent-aware routing (inject.py, daemon, MCP server)"
+echo "   Shared cognition (ai_share/ai_subscribe) remains standard exchange"
+echo "   Memory specialization by agent (each carries only their own context)"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""

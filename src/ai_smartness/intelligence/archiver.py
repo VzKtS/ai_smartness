@@ -318,7 +318,8 @@ Content:
 
     def _delete_thread_file(self, thread: Thread):
         """Delete a thread's JSON file from disk."""
-        thread_path = self.storage.ai_path / "db" / "threads" / f"{thread.id}.json"
+        # v7: Use storage.db_path for agent-aware thread path
+        thread_path = self.storage.db_path / "threads" / f"{thread.id}.json"
         if thread_path.exists():
             thread_path.unlink()
             logger.debug(f"Deleted thread file: {thread.id}")

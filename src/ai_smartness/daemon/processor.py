@@ -65,15 +65,17 @@ class ProcessorDaemon:
         "UserPrompt": "prompt",
     }
 
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path, agent_id: Optional[str] = None):
         """
         Initialize the daemon.
 
         Args:
             db_path: Path to the database directory (.ai/db)
+            agent_id: Optional agent ID for multi-agent mode (v7)
         """
         self.db_path = Path(db_path)
         self.ai_path = self.db_path.parent  # .ai directory
+        self.agent_id = agent_id
         self.socket_path = self.ai_path / "processor.sock"
         self.pid_file = self.ai_path / "processor.pid"
         self.log_file = self.ai_path / "processor.log"
@@ -124,8 +126,9 @@ class ProcessorDaemon:
 
             # StorageManager expects root_path (parent of .ai)
             # db_path = /path/.ai/db → root_path = /path
+            # v7: pass agent_id for multi-agent partitioned storage
             root_path = self.ai_path.parent
-            self.storage = StorageManager(root_path)
+            self.storage = StorageManager(root_path, agent_id=self.agent_id)
             self.thread_manager = ThreadManager(self.storage)
             self.gossip = GossipPropagator(self.storage)
 
@@ -563,7 +566,8 @@ class ProcessorDaemon:
             def thread_exists(thread_id: str) -> bool:
                 if not self.storage:
                     return True  # Can't check, assume exists
-                thread_path = self.ai_path / "db" / "threads" / f"{thread_id}.json"
+                # v7: Use storage.db_path for agent-aware thread lookup
+                thread_path = self.storage.db_path / "threads" / f"{thread_id}.json"
                 return thread_path.exists()
 
             result = shared_storage.cleanup_orphans(thread_exists_fn=thread_exists)
@@ -822,6 +826,12 @@ def main():
         help="Path to database directory (.ai/db)"
     )
     parser.add_argument(
+        "--agent-id",
+        required=False,
+        default=None,
+        help="Agent ID for multi-agent mode (v7)"
+    )
+    parser.add_argument(
         "--foreground", "-f",
         action="store_true",
         help="Run in foreground (don't daemonize)"
@@ -833,7 +843,7 @@ def main():
     if not db_path.exists():
         db_path.mkdir(parents=True, exist_ok=True)
 
-    daemon = ProcessorDaemon(db_path)
+    daemon = ProcessorDaemon(db_path, agent_id=args.agent_id)
 
     if args.foreground:
         sys.exit(daemon.run())

@@ -149,6 +149,33 @@ def get_ai_path() -> Path:
     )
 
 
+def get_agent_db_path(ai_path: Path) -> Path:
+    """
+    v7: Get the agent-aware database path.
+
+    In multi-agent mode, returns the agent-partitioned path.
+    In simple mode, returns the standard .ai/db path.
+
+    Args:
+        ai_path: Path to .ai directory
+
+    Returns:
+        Path to the correct db directory
+    """
+    project_root = ai_path.parent
+    from ai_smartness.storage.manager import detect_agent_id, get_project_mode
+
+    project_mode = get_project_mode(project_root)
+    if project_mode == "multi":
+        agent_id = detect_agent_id(project_root)
+        if agent_id:
+            agent_path = ai_path / "db" / "agents" / agent_id
+            if agent_path.exists():
+                return agent_path
+
+    return ai_path / "db"
+
+
 # =============================================================================
 # TOOL DEFINITIONS
 # =============================================================================
@@ -963,7 +990,7 @@ def get_status(ai_path: Path) -> str:
     # Thread stats
     try:
         from ai_smartness.storage.threads import ThreadStorage
-        db_path = ai_path / "db"
+        db_path = get_agent_db_path(ai_path)
         storage = ThreadStorage(db_path / "threads")
         stats = storage.get_weight_stats()
 
@@ -980,7 +1007,7 @@ def get_status(ai_path: Path) -> str:
     # Bridge stats
     try:
         from ai_smartness.storage.bridges import BridgeStorage
-        db_path = ai_path / "db"
+        db_path = get_agent_db_path(ai_path)
         bridge_storage = BridgeStorage(db_path / "bridges")
         bridge_count = len(bridge_storage.get_all())
 
@@ -1036,7 +1063,7 @@ def get_sysinfo(ai_path: Path) -> str:
     from ai_smartness.config import THREAD_LIMITS
 
     lines = ["# AI Smartness System Info", ""]
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
 
     # 1. Thread stats
     try:
@@ -1208,7 +1235,7 @@ def get_suggestions(ai_path: Path, context: str = "") -> str:
     from ai_smartness.processing.embeddings import get_embedding_manager
     import numpy as np
 
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     storage = ThreadStorage(db_path / "threads")
 
     suggestions = {
@@ -1316,7 +1343,7 @@ def do_compact(ai_path: Path, strategy: str = "normal", dry_run: bool = False) -
         strategy = "normal"
 
     params = COMPACTION_STRATEGIES[strategy]
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     storage = ThreadStorage(db_path / "threads")
     bridge_storage = BridgeStorage(db_path / "bridges")
 
@@ -1456,7 +1483,7 @@ def set_focus(ai_path: Path, topic: str, weight: float = 0.8) -> str:
 
     # Count affected threads
     from ai_smartness.storage.threads import ThreadStorage
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     storage = ThreadStorage(db_path / "threads")
     threads = storage.get_active()
 
@@ -1510,7 +1537,7 @@ def pin_content(ai_path: Path, content: str, title: Optional[str], topics: list,
 
     weight_boost = max(0.0, min(0.5, weight_boost))
 
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     storage = ThreadStorage(db_path / "threads")
 
     # Generate title if not provided
@@ -1535,7 +1562,7 @@ def rate_context(ai_path: Path, thread_id: str, useful: bool, reason: Optional[s
     """Rate context usefulness."""
     from ai_smartness.storage.threads import ThreadStorage
 
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     storage = ThreadStorage(db_path / "threads")
 
     thread = storage.get(thread_id)
@@ -1670,7 +1697,7 @@ def cleanup_threads(ai_path: Path, mode: str = "auto", dry_run: bool = False) ->
     BAD_TITLES = ["Unknown", "Unknown topic", "Untitled", ""]
 
     # Find problematic threads
-    threads_dir = ai_path / "db" / "threads"
+    threads_dir = get_agent_db_path(ai_path) / "threads"
     if threads_dir.exists():
         for f in threads_dir.glob("*.json"):
             # Skip index files (_active.json, _suspended.json) - these are system files
@@ -1726,7 +1753,7 @@ def cleanup_threads(ai_path: Path, mode: str = "auto", dry_run: bool = False) ->
                 errors.append(f"thread {f.name}: {e}")
 
     # Fix bridges
-    bridges_dir = ai_path / "db" / "bridges"
+    bridges_dir = get_agent_db_path(ai_path) / "bridges"
     if bridges_dir.exists():
         for f in bridges_dir.glob("*.json"):
             try:
@@ -1862,7 +1889,7 @@ def rename_thread(ai_path: Path, thread_id: str, new_title: str) -> str:
     # Truncate title to 60 chars
     new_title = new_title[:60]
 
-    threads_dir = ai_path / "db" / "threads"
+    threads_dir = get_agent_db_path(ai_path) / "threads"
     if not threads_dir.exists():
         return "# Error\n\nThreads directory not found"
 
@@ -2260,7 +2287,7 @@ def share_thread(
     from ai_smartness.models.shared import SharedThread, SharedVisibility
 
     # Get the thread
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     thread_storage = ThreadStorage(db_path / "threads")
     thread = thread_storage.get(thread_id)
 
@@ -2356,7 +2383,7 @@ def publish_update(ai_path: Path, shared_id: str) -> str:
         return f"# Error\n\nShared thread not found: {shared_id}"
 
     # Get source thread
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     thread_storage = ThreadStorage(db_path / "threads")
     thread = thread_storage.get(shared.source_thread_id)
 
@@ -2625,7 +2652,7 @@ def list_bridges(ai_path: Path, thread_id: str = None, relation_type: str = None
     from ai_smartness.storage.bridges import BridgeStorage
     from ai_smartness.storage.threads import ThreadStorage
 
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     bridge_storage = BridgeStorage(db_path / "bridges")
     thread_storage = ThreadStorage(db_path / "threads")
 
@@ -2703,7 +2730,7 @@ def bridge_analysis(ai_path: Path) -> str:
     from ai_smartness.storage.threads import ThreadStorage
     from collections import Counter
 
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     bridge_storage = BridgeStorage(db_path / "bridges")
     thread_storage = ThreadStorage(db_path / "threads")
 
@@ -2812,7 +2839,7 @@ def recommend_subscriptions(ai_path: Path, limit: int = 5) -> str:
     agent_id = get_agent_id()
 
     # Get local thread topics
-    db_path = ai_path / "db"
+    db_path = get_agent_db_path(ai_path)
     thread_storage = ThreadStorage(db_path / "threads")
     local_threads = thread_storage.get_active()
 

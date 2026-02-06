@@ -1,4 +1,4 @@
-# AI Smartness v6 - Guide Utilisateur
+# AI Smartness v7 - Guide Utilisateur
 
 ## Démarrage Rapide
 
@@ -151,6 +151,30 @@ Un **InterAgentBridge** est une connexion sémantique entre threads de différen
 | `ttl` | Durée de vie (24h par défaut) |
 
 Nécessite un consentement bilatéral - les deux agents doivent accepter la connexion.
+
+### Isolation Mémoire Multi-Agents (v7.0)
+
+AI Smartness v7.0 supporte **l'isolation mémoire** pour plusieurs agents travaillant sur le même projet.
+
+| Mode | Description | Chemin de Stockage |
+|------|-------------|--------------------|
+| **Simple** | Mémoire partagée unique (défaut) | `.ai/db/` |
+| **Multi** | Mémoires isolées par agent | `.ai/db/agents/{agent_id}/` |
+
+**Fonctionnement :**
+1. **Déclencheur** : L'installation de `mcp_smartness` active `project_mode=multi` dans `.mcp_smartness_agent`
+2. **Enregistrement Agent** : Chaque agent reçoit un `agent_id` unique (ex : "Cog", "Com", "Kratos")
+3. **Routage Stockage** : Le système route toutes les opérations vers la partition de l'agent
+4. **Détection ENV** : Variable d'environnement `AI_SMARTNESS_AGENT_ID` ou auto-détection
+5. **Limite** : Maximum 5 agents par projet pour performance
+
+**Pourquoi l'isolation ?**
+- Chaque agent se spécialise (backend, frontend, infra, etc.)
+- Pas de mélange de contextes entre agents
+- Mémoire plus ciblée et efficace
+- Performance optimisée (embeddings, daemon par agent)
+
+**Cognition partagée maintenue** : `ai_share()`/`ai_subscribe()` fonctionnent toujours pour partager des connaissances entre agents, l'isolation concerne uniquement les mémoires privées de chaque agent.
 
 ### Règles Utilisateur
 

@@ -1,6 +1,8 @@
-# AI Smartness v6.0
+# AI Smartness v7.0
 
-**Couche de méta-cognition pour agents Claude Code avec partage de mémoire inter-agents.**
+**Couche de méta-cognition pour agents Claude Code avec isolation mémoire multi-agents.**
+
+[English](README.md) | [Español](README_es.md)
 
 Un système de mémoire persistante qui transforme Claude Code en un agent capable de maintenir le contexte sémantique sur de longues sessions, de détecter les connexions entre concepts, de partager des connaissances avec d'autres agents, et de reprendre le travail après des semaines/mois comme si vous veniez de faire une pause café.
 
@@ -22,10 +24,11 @@ AI Smartness permet un **partenariat** entre vous et votre agent. Il fournit des
 
 ## Vision
 
-AI Smartness v6.0 est une **mémoire de travail inspirée des réseaux neuronaux** avec **cognition partagée** :
+AI Smartness v7.0 est une **mémoire de travail inspirée des réseaux neuronaux** avec **isolation mémoire multi-agents** et **cognition partagée** :
 
 - **Threads** = Neurones (flux de raisonnement actifs)
 - **ThinkBridges** = Synapses (connexions sémantiques entre threads)
+- **Isolation Multi-Agents** = Mémoires partitionnées par agent (jusqu'à 5 agents/projet)
 - **SharedThreads** = Connaissances publiées (partage inter-agents)
 - **Subscriptions** = Connaissances importées d'autres agents
 - **InterAgentBridges** = Connexions sémantiques inter-agents (consentement bilatéral)
@@ -34,7 +37,7 @@ AI Smartness v6.0 est une **mémoire de travail inspirée des réseaux neuronaux
 - **État de Session** = Continuité du travail entre les sessions
 - **Profil Utilisateur** = Personnalisation persistante
 
-Le système maintient un **réseau de pensées** où les concepts restent connectés, accessibles et partageables.
+Le système maintient un **réseau de pensées** où les concepts restent connectés, accessibles et partageables. En mode multi-agents, chaque agent dispose de sa propre mémoire isolée tout en conservant la capacité de partager des connaissances.
 
 ---
 
@@ -59,6 +62,21 @@ Le système maintient un **réseau de pensées** où les concepts restent connec
 | **GuardCode** | Système consultatif pour les bonnes pratiques |
 | **Synthèse 95%** | Préservation automatique du contexte avant compaction |
 | **100% Transparent** | Aucune action utilisateur requise |
+
+---
+
+## Nouveau en v7.0 : Isolation Mémoire Multi-Agents
+
+| Fonctionnalité | Description |
+|----------------|-------------|
+| **Mode Simple** | Par défaut : mémoire partagée unique (rétrocompatible v6.x) |
+| **Mode Multi** | Déclenché par l'installation de mcp_smartness - jusqu'à 5 agents/projet |
+| **Stockage Partitionné** | DB isolée par agent : `.ai/db/agents/{agent_id}/` |
+| **Routage Agent-Aware** | inject.py, daemon, serveur MCP routent vers la bonne DB agent |
+| **Cognition Partagée** | `ai_share`/`ai_subscribe` restent le standard d'échange inter-agents |
+| **Spécialisation Mémoire** | Chaque agent ne porte que son propre contexte - pas de mélange |
+| **Détection ENV** | `AI_SMARTNESS_AGENT_ID` ou auto-détection depuis `.mcp_smartness_agent` |
+| **MAX_AGENTS** | Limite stricte : 5 agents par projet pour performance |
 
 ---
 
