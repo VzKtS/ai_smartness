@@ -47,7 +47,7 @@ class ThinkBridge:
     - bridge dies when weight < DEATH_THRESHOLD
     """
     # Decay constants (class-level, not instance fields)
-    HALF_LIFE_DAYS: ClassVar[float] = 3.0      # Weight halves every 3 days without use
+    HALF_LIFE_DAYS: ClassVar[float] = 1.0      # Weight halves every day without use
     DEATH_THRESHOLD: ClassVar[float] = 0.05    # Bridge dies below this weight
     USE_BOOST: ClassVar[float] = 0.1           # Weight boost per use
 

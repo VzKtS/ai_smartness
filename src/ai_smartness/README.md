@@ -1,6 +1,6 @@
-# AI Smartness v6.0
+# AI Smartness v6.3
 
-**Meta-cognition layer for Claude Code agents with inter-agent memory sharing.**
+**Meta-cognition layer for Claude Code agents with inter-agent memory sharing and intelligent memory management.**
 
 A persistent memory system that transforms Claude Code into an agent capable of maintaining semantic context across long sessions, detecting connections between concepts, sharing knowledge with other agents, and resuming work after weeks/months as if you just stepped away for coffee.
 
@@ -125,6 +125,29 @@ ai_shared_status()            # Show shared cognition status
 - **Copy-on-share**: Publishing creates a read-only snapshot
 - **Pull not push**: Subscribers explicitly pull updates via `ai_sync()`
 - **No private leakage**: Only SharedThread IDs, never private thread IDs
+
+### V6.1 Bridge Management
+```
+ai_bridges(thread_id?, relation_type?, status?)  # List/filter bridges
+ai_bridge_analysis()          # Network analytics and health
+```
+
+### V6.2 Advanced Shared Cognition
+```
+ai_recommend()                # Subscription recommendations
+ai_topics(agent_id?)          # Network-wide topic discovery
+```
+
+### V6.3 Memory Management
+```
+ai_sysinfo()                  # System resource monitoring
+```
+**Features:**
+- Hard cap enforcement (thread limits enforced before creation)
+- LLM-synthesized archives when threads age out
+- Faster decay (threads: 1.5d half-life, bridges: 1.0d half-life)
+- Cognitive GuardCode (memory pressure reminders)
+- Shared cognition hygiene (orphan cleanup every 5min)
 
 ---
 
@@ -279,7 +302,7 @@ Auto-generated state synthesis before compaction.
 
 ```json
 {
-  "version": "6.0.2",
+  "version": "6.3.0",
   "settings": {
     "thread_mode": "heavy",
     "active_threads_limit": 100,
@@ -373,6 +396,7 @@ ai_smartness/.ai/
     ├── threads/
     ├── bridges/
     ├── synthesis/
+    ├── archives/         # v6.3 LLM-synthesized thread archives
     └── shared/           # v6.0 Shared Cognition
         ├── published/    # SharedThreads owned by this agent
         ├── subscriptions/# Subscriptions to other agents' SharedThreads

@@ -45,7 +45,6 @@ Thumbs.db
 /mcp_smartness/
 SPECS/
 
-# AI Smartness
-ai_smartness/
+# AI Smartness (root deploy only - src/ai_smartness/ already covered by line 10)
 .mcp.json
 

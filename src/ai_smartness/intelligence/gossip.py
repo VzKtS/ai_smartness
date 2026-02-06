@@ -68,25 +68,29 @@ class GossipPropagator:
         # 1. Find potential bridges based on similarity
         proposals = self._find_bridge_candidates(thread)
 
-        # 2. Create bridges that don't exist yet
+        # 2. Create bridges that don't exist yet (bidirectional dedup)
         for proposal in proposals:
-            existing = self.storage.bridges.get_between(
+            existing_forward = self.storage.bridges.get_between(
                 proposal.source_id,
                 proposal.target_id
             )
-            if not existing:
+            existing_reverse = self.storage.bridges.get_between(
+                proposal.target_id,
+                proposal.source_id
+            )
+            if not existing_forward and not existing_reverse:
                 self._create_bridge(proposal)
 
         # 3. Propagate through existing bridges
         self._propagate_from_thread(thread)
 
     def _find_bridge_candidates(self, thread: Thread) -> List[BridgeProposal]:
-        """Find threads that should be bridged to this one."""
+        """Find active threads that should be bridged to this one."""
         if not thread.embedding:
             return []
 
         proposals = []
-        all_threads = self.storage.threads.get_all()
+        all_threads = self.storage.threads.get_active()  # Only scan active threads
 
         for other in all_threads:
             if other.id == thread.id:
@@ -202,9 +206,10 @@ class GossipPropagator:
                 if not third:
                     continue
 
-                # Check if bridge already exists
-                existing = self.storage.bridges.get_between(thread.id, third_id)
-                if existing:
+                # Check if bridge already exists (both directions)
+                existing_fwd = self.storage.bridges.get_between(thread.id, third_id)
+                existing_rev = self.storage.bridges.get_between(third_id, thread.id)
+                if existing_fwd or existing_rev:
                     continue
 
                 # Calculate similarity
@@ -351,5 +356,5 @@ class GossipPropagator:
             "weight_stats": stats,
             "by_type": by_type,
             "by_status": by_status,
-            "half_life_days": 3.0  # From ThinkBridge.HALF_LIFE_DAYS
+            "half_life_days": 1.0  # From ThinkBridge.HALF_LIFE_DAYS
         }

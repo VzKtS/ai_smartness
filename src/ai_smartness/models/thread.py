@@ -87,7 +87,7 @@ class Thread:
     - threads are NEVER deleted (unlike bridges)
     """
     # Decay constants (class-level, not instance fields)
-    HALF_LIFE_DAYS: ClassVar[float] = 7.0       # Weight halves every 7 days without use
+    HALF_LIFE_DAYS: ClassVar[float] = 1.5       # Weight halves every 1.5 days without use
     SUSPEND_THRESHOLD: ClassVar[float] = 0.1    # Auto-suspend below this weight
     USE_BOOST: ClassVar[float] = 0.1            # Weight boost per activation
 

@@ -23,6 +23,7 @@ from ..models.thread import Thread, ThreadStatus, OriginType
 from ..storage.manager import StorageManager
 from ..processing.extractor import LLMExtractor, Extraction, extract_title_from_content
 from ..processing.embeddings import get_embedding_manager
+from ..config import THREAD_LIMITS
 
 
 # Map source_type (from extractor) to OriginType (for thread)
@@ -94,19 +95,24 @@ class ThreadManager:
 
     def _load_active_threads_limit(self) -> int:
         """
-        Load active threads limit from config.
+        Load active threads limit from config, linked to MODE_QUOTAS.
+
+        Uses THREAD_LIMITS[mode] as the authoritative source,
+        with active_threads_limit as override if explicitly set.
 
         Returns:
-            Limit (default 30 if not configured)
+            Limit based on current mode
         """
         try:
             config_path = self.storage.ai_path / "config.json"
             if config_path.exists():
                 config = json.loads(config_path.read_text())
-                return config.get("settings", {}).get("active_threads_limit", 30)
+                mode = config.get("settings", {}).get("thread_mode", "normal")
+                # Use THREAD_LIMITS as authoritative source per mode
+                return THREAD_LIMITS.get(mode, 50)
         except Exception:
             pass
-        return 30
+        return 50
 
     def _load_llm_config(self) -> dict:
         """
@@ -160,16 +166,90 @@ class ThreadManager:
         else:
             decision = self._decide_action(extraction, content)
 
-        # 3. Execute action
+        # 3. HARD CAP: Ensure capacity before creating new threads
+        if decision.action in (ThreadAction.NEW_THREAD, ThreadAction.FORK, ThreadAction.REACTIVATE):
+            self._ensure_capacity()
+
+        # 4. Execute action
         thread = self._execute_action(decision, content, extraction, source_type)
 
-        # 4. Update embeddings
+        # 5. Update embeddings
         self._update_thread_embedding(thread)
 
-        # 5. Check thread limits
+        # 6. Final safety check (should be no-op after _ensure_capacity)
         self._enforce_thread_limits()
 
         return thread, extraction
+
+    def _ensure_capacity(self):
+        """
+        HARD CAP: Ensure there is room for a new thread.
+
+        If at limit:
+        1. Try auto-merge of most similar thread pair (>0.85)
+        2. If still full, suspend the lightest thread
+
+        This guarantees space before any thread creation.
+        """
+        max_active = self._load_active_threads_limit()
+        active = self.storage.threads.get_active()
+
+        if len(active) < max_active:
+            return  # Room available
+
+        logger.info(f"HARD_CAP: At limit ({len(active)}/{max_active}), making room...")
+
+        # Strategy 1: Try auto-merge of most similar pair
+        merged = self._try_auto_merge(active)
+        if merged:
+            logger.info(f"HARD_CAP: Auto-merged threads, freed 1 slot")
+            return
+
+        # Strategy 2: Suspend the lightest thread
+        active.sort(key=lambda t: t.weight)
+        lightest = active[0]
+        lightest.suspend("hard_cap")
+        self.storage.threads.save(lightest)
+        logger.info(f"HARD_CAP: Suspended lightest thread '{lightest.title[:30]}' (weight={lightest.weight:.2f})")
+
+    def _try_auto_merge(self, active_threads: List[Thread]) -> bool:
+        """
+        Try to auto-merge the most similar pair of active threads.
+
+        Args:
+            active_threads: List of active threads
+
+        Returns:
+            True if a merge was performed
+        """
+        # Only consider threads with embeddings and not split-locked
+        candidates = [t for t in active_threads if t.embedding and not t.split_locked]
+
+        if len(candidates) < 2:
+            return False
+
+        best_sim = 0.0
+        best_pair = None
+
+        for i, t1 in enumerate(candidates):
+            for t2 in candidates[i + 1:]:
+                sim = self.embeddings.similarity(t1.embedding, t2.embedding)
+                if sim > best_sim:
+                    best_sim = sim
+                    best_pair = (t1, t2)
+
+        # Only merge if similarity > 0.85
+        if best_sim >= 0.85 and best_pair:
+            survivor, absorbed = best_pair
+            # Keep the higher-weight thread as survivor
+            if absorbed.weight > survivor.weight:
+                survivor, absorbed = absorbed, survivor
+
+            self.storage.threads.merge(survivor.id, absorbed.id)
+            logger.info(f"HARD_CAP: Auto-merged '{absorbed.title[:25]}' into '{survivor.title[:25]}' (sim={best_sim:.2f})")
+            return True
+
+        return False
 
     def _decide_action(self, extraction: Extraction, content: str) -> ThreadDecision:
         """

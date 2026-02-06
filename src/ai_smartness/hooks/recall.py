@@ -524,9 +524,9 @@ ai_compact(strategy="aggressive")    # Compaction agressive
 ai_compact(dry_run=True)            # Preview sans exécuter
 ```
 **Stratégies:**
-- `gentle` - Merge >0.95 similarité, archive >30j
-- `normal` (défaut) - Merge >0.85, archive >14j
-- `aggressive` - Merge >0.75, archive >7j
+- `gentle` - Merge >0.95 similarité, archive >7j
+- `normal` (défaut) - Merge >0.85, archive >3j
+- `aggressive` - Merge >0.75, archive >1j
 
 ---
 
@@ -690,6 +690,27 @@ agents. Tracking via `cross_agent_uses` et `cross_agent_agents`.
 
 ---
 
+## V6.3 Memory Management
+
+### 📊 ai_sysinfo() - Monitoring système complet
+```
+ai_sysinfo()
+```
+→ Threads (actifs/suspendus/total), Bridges (alive/dead), Pression mémoire,
+  Usage disque, Daemon status, Shared Cognition stats, Decay settings
+
+---
+
+### 🛡️ Fonctionnalités automatiques (V6.3)
+
+- **Hard Cap** — Limites de threads vérifiées AVANT création (auto-compact si plein)
+- **Archives LLM** — Threads suspendus >72h archivés avec synthèse LLM
+- **Decay rapide** — Threads: demi-vie 1.5j, Bridges: demi-vie 1.0j
+- **GuardCode Cognitif** — Reminders de pression mémoire dans le contexte
+- **Hygiène Shared** — SharedThreads/Subscriptions/Bridges orphelins auto-nettoyés
+
+---
+
 ## Tips
 
 1. **Libérer du contexte:** `ai_compact()` ou merge des threads similaires
@@ -702,7 +723,7 @@ agents. Tracking via `cross_agent_uses` et `cross_agent_agents`.
 8. **Topics réseau:** `ai_topics()` pour voir les sujets cross-agents
 
 ---
-*AI Smartness v6.2.1 - Phase 3 Advanced Features + Shared Cognition for LLM agents*
+*AI Smartness v6.3.0 - Memory Management + Shared Cognition Hygiene for LLM agents*
 """
 
 

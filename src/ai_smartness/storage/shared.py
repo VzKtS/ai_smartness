@@ -357,6 +357,96 @@ class SharedStorage:
         }
 
     # =========================================================================
+    # SHARED COGNITION HYGIENE (v6.3)
+    # =========================================================================
+
+    def cleanup_orphans(self, thread_exists_fn=None) -> dict:
+        """
+        Clean up orphaned shared resources.
+
+        Removes:
+        1. Published SharedThreads whose source thread no longer exists
+        2. Stale subscriptions (stale for > 24h)
+        3. InterAgentBridges referencing dead SharedThreads
+        4. Expired proposals from disk
+
+        Args:
+            thread_exists_fn: Callable(thread_id) -> bool to check if source thread exists.
+                              If None, skips SharedThread orphan check.
+
+        Returns:
+            Report dict with counts of cleaned items
+        """
+        report = {
+            "orphaned_shared_threads": 0,
+            "stale_subscriptions": 0,
+            "orphaned_bridges": 0,
+            "expired_proposals": 0,
+        }
+
+        # 1. Published SharedThreads whose source thread no longer exists
+        if thread_exists_fn:
+            for shared_thread in self.get_all_published():
+                if shared_thread.status == SharedStatus.ARCHIVED:
+                    continue
+                if not thread_exists_fn(shared_thread.source_thread_id):
+                    shared_thread.archive()
+                    self.save_published(shared_thread)
+                    self.unpublish_from_network(shared_thread.id)
+                    report["orphaned_shared_threads"] += 1
+
+        # 2. Stale subscriptions (stale > 24h)
+        now = datetime.now()
+        for sub in self.get_all_subscriptions():
+            if sub.status == "stale":
+                hours_stale = (now - sub.last_sync_at).total_seconds() / 3600
+                if hours_stale > 24:
+                    self.delete_subscription(sub.id)
+                    report["stale_subscriptions"] += 1
+            elif sub.status == "unsubscribed":
+                self.delete_subscription(sub.id)
+                report["stale_subscriptions"] += 1
+
+        # 3. InterAgentBridges referencing dead SharedThreads
+        # Collect all known active shared thread IDs (local + network)
+        active_shared_ids = set()
+        for st in self.get_all_published():
+            if st.status == SharedStatus.ACTIVE:
+                active_shared_ids.add(st.id)
+        # Also check network
+        network_path = Path.home() / ".mcp_smartness" / "shared_threads"
+        if network_path.exists():
+            for path in network_path.glob("shared_*.json"):
+                data = self._read_json(path)
+                if data and data.get("status") == "active":
+                    active_shared_ids.add(data.get("id", ""))
+
+        for bridge in self.get_all_bridges():
+            source_exists = bridge.source_shared_id in active_shared_ids
+            target_exists = bridge.target_shared_id in active_shared_ids
+            if not source_exists or not target_exists:
+                self.delete_bridge(bridge.id)
+                report["orphaned_bridges"] += 1
+
+        # 4. Expired proposals on disk
+        for direction in ["outgoing", "incoming"]:
+            proposals_dir = self.path / "proposals" / direction
+            for path in proposals_dir.glob("ibridge_*.json"):
+                data = self._read_json(path)
+                if not data:
+                    continue
+                bridge = InterAgentBridge.from_dict(data)
+                if bridge.check_expired() or bridge.status in (
+                    BridgeProposalStatus.REJECTED,
+                    BridgeProposalStatus.EXPIRED,
+                    BridgeProposalStatus.INVALIDATED
+                ):
+                    path.unlink()
+                    report["expired_proposals"] += 1
+
+        return report
+
+    # =========================================================================
     # DISCOVERY (for finding shared threads from other agents)
     # =========================================================================
 

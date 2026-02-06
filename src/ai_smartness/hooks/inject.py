@@ -334,24 +334,42 @@ def build_lightweight_context(message: str, db_path: Path) -> dict:
 
         # Get current thread info (lightweight read)
         threads_dir = db_path / "threads"
+        active_count = 0
         if threads_dir.exists():
             thread_files = list(threads_dir.glob("*.json"))
-            context["active_count"] = len(thread_files)
 
-            # Find current/most recent thread
+            # Count active threads properly
             most_recent = None
             most_recent_time = None
+            stale_count = 0
 
-            for tf in thread_files[:10]:  # Limit to 10 for performance
+            for tf in thread_files:
+                if tf.name.startswith("_"):
+                    continue  # Skip index files
                 try:
                     thread_data = json.loads(tf.read_text(encoding='utf-8'))
-                    if thread_data.get("status") == "active":
+                    status = thread_data.get("status", "")
+
+                    if status == "active":
+                        active_count += 1
                         last_active = thread_data.get("last_active", "")
                         if not most_recent_time or last_active > most_recent_time:
                             most_recent = thread_data
                             most_recent_time = last_active
+                    elif status == "suspended":
+                        # Check if stale (>48h)
+                        try:
+                            from datetime import datetime
+                            la = datetime.fromisoformat(thread_data.get("last_active", ""))
+                            hours = (datetime.now() - la).total_seconds() / 3600
+                            if hours > 48:
+                                stale_count += 1
+                        except Exception:
+                            pass
                 except Exception:
                     continue
+
+            context["active_count"] = active_count
 
             if most_recent:
                 context["current_thread"] = {
@@ -359,6 +377,33 @@ def build_lightweight_context(message: str, db_path: Path) -> dict:
                     "title": most_recent.get("title", "")[:50],
                     "topics": most_recent.get("topics", [])[:3]
                 }
+
+            # V6.3: Memory pressure check for cognitive advisor
+            mode = config.get("settings", {}).get("thread_mode", "normal")
+            mode_quotas = {"light": 15, "normal": 50, "heavy": 100, "max": 200}
+            quota = mode_quotas.get(mode, 50)
+
+            if quota > 0 and active_count >= quota * 0.8:
+                lang = config.get("language", "en")
+                pressure_msgs = {
+                    "en": f"Memory pressure: {active_count}/{quota} threads ({active_count*100//quota}%). Use ai_compact or ai_merge.",
+                    "fr": f"Pression mémoire: {active_count}/{quota} threads ({active_count*100//quota}%). Utilisez ai_compact ou ai_merge.",
+                    "es": f"Presión memoria: {active_count}/{quota} threads ({active_count*100//quota}%). Use ai_compact o ai_merge."
+                }
+                context["reminders"].append(pressure_msgs.get(lang, pressure_msgs["en"]))
+
+            # Bridge count check
+            bridges_dir = db_path / "bridges"
+            if bridges_dir.exists():
+                bridge_count = len(list(bridges_dir.glob("bridge_*.json")))
+                if bridge_count > 500:
+                    lang = config.get("language", "en")
+                    bridge_msgs = {
+                        "en": f"High bridge count ({bridge_count}). Consider ai_compact.",
+                        "fr": f"Nombre de bridges élevé ({bridge_count}). Considérez ai_compact.",
+                        "es": f"Número de bridges alto ({bridge_count}). Considere ai_compact."
+                    }
+                    context["reminders"].append(bridge_msgs.get(lang, bridge_msgs["en"]))
 
     except Exception as e:
         log(f"Context building error: {e}")

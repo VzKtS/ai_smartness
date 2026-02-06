@@ -22,6 +22,7 @@ class RuleType(Enum):
     NO_QUICK_SOLUTIONS = "no_quick_solutions"
     PRESENT_CHOICES = "present_choices"
     CONTEXT_AWARENESS = "context_awareness"
+    MEMORY_MANAGEMENT = "memory_management"
 
 
 @dataclass
@@ -208,11 +209,109 @@ class PresentChoicesRule(Rule):
         return None
 
 
+class MemoryPressureRule(Rule):
+    """Warn when memory pressure is high (threads approaching quota)."""
+
+    rule_type = RuleType.MEMORY_MANAGEMENT
+
+    REMINDERS = {
+        "en": "Memory pressure is high ({active}/{quota} threads active). Consider using ai_compact, ai_merge, or ai_sysinfo to manage memory.",
+        "fr": "Pression mémoire élevée ({active}/{quota} threads actifs). Utilisez ai_compact, ai_merge ou ai_sysinfo pour gérer la mémoire.",
+        "es": "Presión de memoria alta ({active}/{quota} threads activos). Use ai_compact, ai_merge o ai_sysinfo para gestionar la memoria."
+    }
+
+    def check(self, context: dict, config: Config) -> Optional[Reminder]:
+        thread_info = context.get("thread", {})
+        active_count = thread_info.get("active_count", 0)
+
+        if active_count == 0:
+            return None
+
+        # Get quota from mode
+        from ..config import THREAD_LIMITS
+        mode = config.mode
+        quota = THREAD_LIMITS.get(mode, 50)
+
+        if quota == 0 or active_count < quota * 0.8:
+            return None
+
+        lang = config.language
+        msg = self.REMINDERS.get(lang, self.REMINDERS["en"]).format(
+            active=active_count, quota=quota
+        )
+
+        return Reminder(
+            rule_type=self.rule_type,
+            message=msg,
+            priority=1,
+            language=lang
+        )
+
+
+class StaleThreadsRule(Rule):
+    """Warn when stale suspended threads exist (>48h)."""
+
+    rule_type = RuleType.MEMORY_MANAGEMENT
+
+    REMINDERS = {
+        "en": "{count} threads inactive for >48h detected. Consider memory cleanup (ai_compact or ai_merge).",
+        "fr": "{count} threads inactifs depuis >48h détectés. Considérez un nettoyage mémoire (ai_compact ou ai_merge).",
+        "es": "{count} threads inactivos desde >48h detectados. Considere limpieza de memoria (ai_compact o ai_merge)."
+    }
+
+    def check(self, context: dict, config: Config) -> Optional[Reminder]:
+        thread_info = context.get("thread", {})
+        stale_count = thread_info.get("stale_count", 0)
+
+        if stale_count < 3:
+            return None
+
+        lang = config.language
+        msg = self.REMINDERS.get(lang, self.REMINDERS["en"]).format(count=stale_count)
+
+        return Reminder(
+            rule_type=self.rule_type,
+            message=msg,
+            priority=2,
+            language=lang
+        )
+
+
+class BridgeOverloadRule(Rule):
+    """Warn when bridge count is excessive."""
+
+    rule_type = RuleType.MEMORY_MANAGEMENT
+
+    REMINDERS = {
+        "en": "High bridge count ({count} bridges). Use ai_bridge_analysis to review and consider ai_compact to clean up.",
+        "fr": "Nombre de bridges élevé ({count} bridges). Utilisez ai_bridge_analysis pour analyser et ai_compact pour nettoyer.",
+        "es": "Número de bridges alto ({count} bridges). Use ai_bridge_analysis para revisar y ai_compact para limpiar."
+    }
+
+    def check(self, context: dict, config: Config) -> Optional[Reminder]:
+        thread_info = context.get("thread", {})
+        bridge_count = thread_info.get("bridge_count", 0)
+
+        if bridge_count < 500:
+            return None
+
+        lang = config.language
+        msg = self.REMINDERS.get(lang, self.REMINDERS["en"]).format(count=bridge_count)
+
+        return Reminder(
+            rule_type=self.rule_type,
+            message=msg,
+            priority=2,
+            language=lang
+        )
+
+
 class GuardCodeEnforcer:
     """
     Main enforcer that checks all rules.
 
     Collects reminders from all enabled rules based on context.
+    Includes cognitive memory management advice.
     """
 
     def __init__(self, config: Optional[Config] = None):
@@ -226,7 +325,11 @@ class GuardCodeEnforcer:
         self.rules: List[Rule] = [
             PlanModeRule(),
             NoQuickSolutionsRule(),
-            PresentChoicesRule()
+            PresentChoicesRule(),
+            # V6.3: Memory management cognitive advisor
+            MemoryPressureRule(),
+            StaleThreadsRule(),
+            BridgeOverloadRule(),
         ]
 
     def check(self, prompt: str, thread_context: Optional[dict] = None) -> List[Reminder]:

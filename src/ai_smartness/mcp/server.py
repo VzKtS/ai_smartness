@@ -680,6 +680,16 @@ TOOLS = [
             "required": []
         }
     ),
+    # V6.3: System monitoring
+    Tool(
+        name="ai_sysinfo",
+        description="Get AI Smartness system info: thread/bridge counts, disk usage, memory pressure, mode quota, daemon status. Use to monitor resource consumption.",
+        inputSchema={
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    ),
 ]
 
 
@@ -930,6 +940,10 @@ async def execute_tool(name: str, arguments: dict, ai_path: Path) -> str:
         agent_id = arguments.get("agent_id")
         return discover_network_topics(ai_path, agent_id)
 
+    # V6.3: System monitoring
+    elif name == "ai_sysinfo":
+        return get_sysinfo(ai_path)
+
     else:
         return f"# Error\n\nUnknown tool: {name}"
 
@@ -1012,6 +1026,156 @@ def get_status(ai_path: Path) -> str:
     return "\n".join(lines)
 
 
+def get_sysinfo(ai_path: Path) -> str:
+    """
+    Get comprehensive system info for AI Smartness.
+
+    Shows thread/bridge counts, disk usage, memory pressure,
+    mode quota, daemon status, and archive stats.
+    """
+    from ai_smartness.config import THREAD_LIMITS
+
+    lines = ["# AI Smartness System Info", ""]
+    db_path = ai_path / "db"
+
+    # 1. Thread stats
+    try:
+        from ai_smartness.storage.threads import ThreadStorage
+        storage = ThreadStorage(db_path / "threads")
+        stats = storage.get_weight_stats()
+        active_count = stats.get("active_count", 0)
+        suspended_count = stats.get("suspended_count", 0)
+        total = stats.get("total", 0)
+
+        lines.append("## Threads")
+        lines.append(f"- Active: **{active_count}**")
+        lines.append(f"- Suspended: {suspended_count}")
+        lines.append(f"- Total on disk: {total}")
+        lines.append(f"- Avg weight: {stats.get('avg', 0):.2f}")
+        lines.append("")
+    except Exception as e:
+        lines.append(f"## Threads\nError: {e}\n")
+        active_count = 0
+
+    # 2. Bridge stats
+    try:
+        from ai_smartness.storage.bridges import BridgeStorage
+        bridge_storage = BridgeStorage(db_path / "bridges")
+        bridge_stats = bridge_storage.get_weight_stats()
+
+        lines.append("## Bridges")
+        lines.append(f"- Alive: **{bridge_stats.get('alive_count', 0)}**")
+        lines.append(f"- Dead/weak: {bridge_stats.get('dead_count', 0)}")
+        lines.append(f"- Total on disk: {bridge_stats.get('total', 0)}")
+        lines.append(f"- Avg weight: {bridge_stats.get('avg', 0):.2f}")
+        lines.append("")
+    except Exception as e:
+        lines.append(f"## Bridges\nError: {e}\n")
+
+    # 3. Mode & Quota
+    try:
+        config_path = ai_path / "config.json"
+        mode = "normal"
+        if config_path.exists():
+            config = json.loads(config_path.read_text())
+            mode = config.get("settings", {}).get("thread_mode", "normal")
+
+        quota = THREAD_LIMITS.get(mode, 50)
+        pressure = (active_count / quota * 100) if quota > 0 else 100
+
+        pressure_indicator = "OK"
+        if pressure > 95:
+            pressure_indicator = "CRITICAL"
+        elif pressure > 80:
+            pressure_indicator = "HIGH"
+        elif pressure > 60:
+            pressure_indicator = "MODERATE"
+
+        lines.append("## Mode & Pressure")
+        lines.append(f"- Mode: **{mode}**")
+        lines.append(f"- Quota: {quota} threads")
+        lines.append(f"- Usage: {active_count}/{quota} ({pressure:.0f}%)")
+        lines.append(f"- Pressure: **{pressure_indicator}**")
+        lines.append("")
+    except Exception as e:
+        lines.append(f"## Mode & Pressure\nError: {e}\n")
+
+    # 4. Disk usage
+    try:
+        thread_files = list((db_path / "threads").glob("thread_*.json"))
+        bridge_files = list((db_path / "bridges").glob("bridge_*.json"))
+        archive_files = list((db_path / "archives").glob("archive_*.json")) if (db_path / "archives").exists() else []
+
+        thread_size = sum(f.stat().st_size for f in thread_files) / 1024  # KB
+        bridge_size = sum(f.stat().st_size for f in bridge_files) / 1024
+        archive_size = sum(f.stat().st_size for f in archive_files) / 1024
+        total_size = thread_size + bridge_size + archive_size
+
+        lines.append("## Disk Usage")
+        lines.append(f"- Thread files: {len(thread_files)} ({thread_size:.0f} KB)")
+        lines.append(f"- Bridge files: {len(bridge_files)} ({bridge_size:.0f} KB)")
+        lines.append(f"- Archive files: {len(archive_files)} ({archive_size:.0f} KB)")
+        lines.append(f"- **Total: {total_size:.0f} KB**")
+        lines.append("")
+    except Exception as e:
+        lines.append(f"## Disk Usage\nError: {e}\n")
+
+    # 5. Daemon status
+    try:
+        pid_path = ai_path / "processor.pid"
+        if pid_path.exists():
+            pid = int(pid_path.read_text().strip())
+            import os
+            try:
+                os.kill(pid, 0)  # Check if process exists
+                lines.append("## Daemon")
+                lines.append(f"- Status: **running** (PID {pid})")
+            except OSError:
+                lines.append("## Daemon")
+                lines.append(f"- Status: **stale PID** ({pid} - not running)")
+        else:
+            lines.append("## Daemon")
+            lines.append("- Status: **not running**")
+
+        # Last prune
+        heartbeat_path = ai_path / "heartbeat.json"
+        if heartbeat_path.exists():
+            hb = json.loads(heartbeat_path.read_text())
+            beat = hb.get("beat", 0)
+            lines.append(f"- Heartbeat: {beat}")
+
+        lines.append("")
+    except Exception as e:
+        lines.append(f"## Daemon\nError: {e}\n")
+
+    # 6. Shared Cognition stats
+    try:
+        shared_path = db_path / "shared"
+        if shared_path.exists():
+            from ai_smartness.storage.shared import SharedStorage
+            shared_storage = SharedStorage(shared_path)
+            shared_stats = shared_storage.get_stats()
+
+            lines.append("## Shared Cognition")
+            lines.append(f"- Published threads: {shared_stats.get('published_count', 0)}")
+            lines.append(f"- Subscriptions: {shared_stats.get('subscriptions_count', 0)} (active: {shared_stats.get('active_subscriptions', 0)})")
+            lines.append(f"- InterAgent bridges: {shared_stats.get('bridges_count', 0)} (active: {shared_stats.get('active_bridges', 0)})")
+            lines.append(f"- Pending proposals: in={shared_stats.get('pending_incoming', 0)} out={shared_stats.get('pending_outgoing', 0)}")
+            lines.append("")
+    except Exception as e:
+        lines.append(f"## Shared Cognition\nError: {e}\n")
+
+    # 7. Decay constants
+    lines.append("## Decay Settings")
+    lines.append(f"- Thread half-life: 1.5 days")
+    lines.append(f"- Bridge half-life: 1.0 day")
+    lines.append(f"- Thread suspend threshold: 0.1")
+    lines.append(f"- Bridge death threshold: 0.05")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
 # =============================================================================
 # V5: HYBRID ENHANCEMENT IMPLEMENTATIONS
 # =============================================================================
@@ -1019,19 +1183,19 @@ def get_status(ai_path: Path) -> str:
 COMPACTION_STRATEGIES = {
     "gentle": {
         "merge_threshold": 0.95,
-        "archive_age_days": 30,
+        "archive_age_days": 7,
         "max_active_threads": 50,
         "weight_decay": 0.95
     },
     "normal": {
         "merge_threshold": 0.85,
-        "archive_age_days": 14,
+        "archive_age_days": 3,
         "max_active_threads": 30,
         "weight_decay": 0.90
     },
     "aggressive": {
         "merge_threshold": 0.75,
-        "archive_age_days": 7,
+        "archive_age_days": 1,
         "max_active_threads": 15,
         "weight_decay": 0.80
     }
@@ -1153,6 +1317,9 @@ def do_compact(ai_path: Path, strategy: str = "normal", dry_run: bool = False) -
     params = COMPACTION_STRATEGIES[strategy]
     db_path = ai_path / "db"
     storage = ThreadStorage(db_path / "threads")
+
+    # Rebuild indexes from disk to ensure consistency
+    storage.rebuild_indexes()
 
     report = {
         "strategy": strategy,

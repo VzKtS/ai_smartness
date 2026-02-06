@@ -41,7 +41,7 @@ class Config:
     # Project info
     project_name: str = "unnamed"
     language: Literal["en", "fr", "es"] = "en"
-    version: str = "2.2.0"
+    version: str = "6.3.0"
     initialized_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
     # Mode (determines Guardian LLM and thread limits)
@@ -94,7 +94,7 @@ class Config:
         return cls(
             project_name=data.get("project_name", "unnamed"),
             language=data.get("language", "en"),
-            version=data.get("version", "2.4.1"),
+            version=data.get("version", "6.3.0"),
             initialized_at=data.get("initialized_at", datetime.now().isoformat()),
             mode=mode,
             extraction_model=llm.get("extraction_model", GUARDIAN_MODELS.get(mode, GUARDIAN_MODELS["normal"])),

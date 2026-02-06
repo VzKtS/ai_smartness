@@ -381,6 +381,7 @@ else
     mkdir -p "$AI_SMARTNESS_DIR/.ai/db/threads"
     mkdir -p "$AI_SMARTNESS_DIR/.ai/db/bridges"
     mkdir -p "$AI_SMARTNESS_DIR/.ai/db/synthesis"
+    mkdir -p "$AI_SMARTNESS_DIR/.ai/db/archives"
     # v6.0 Shared Cognition directories
     mkdir -p "$AI_SMARTNESS_DIR/.ai/db/shared/published"
     mkdir -p "$AI_SMARTNESS_DIR/.ai/db/shared/subscriptions"
@@ -509,7 +510,7 @@ thread_limits = {
 active_threads_limit = thread_limits.get(thread_mode, 50)
 
 config = {
-    "version": "6.2.1",
+    "version": "6.3.0",
     "project_name": project_name,
     "language": lang,
     "initialized_at": datetime.now().isoformat(),
@@ -981,6 +982,13 @@ echo "   ai_recommend(limit?)  - Subscription recommendations based on topic ove
 echo "   ai_topics(agent_id?)  - Network-wide topic discovery & cross-agent overlap"
 echo "   Shared Context Injection - Subscribed threads auto-injected in recall context"
 echo "   Bridge Strength        - Cross-agent usage tracking for dynamic weight"
+echo ""
+echo "🛡️  V6.3 Memory Management:"
+echo "   ai_sysinfo()          - System resource monitoring (threads, bridges, pressure)"
+echo "   Hard Cap Enforcement   - Thread limits enforced BEFORE creation"
+echo "   Archive System         - LLM-synthesized archives when threads are pruned"
+echo "   Cognitive GuardCode    - Memory pressure reminders in context"
+echo "   Faster Decay           - Threads: 1.5d half-life, Bridges: 1.0d half-life"
 echo ""
 echo "✨ Ready to use! Start a new Claude Code session."
 echo ""

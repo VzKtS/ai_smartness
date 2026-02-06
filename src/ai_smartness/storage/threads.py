@@ -40,6 +40,46 @@ class ThreadStorage:
             if not index_path.exists():
                 self._write_json(index_path, {"threads": [], "last_updated": datetime.now().isoformat()})
 
+    def rebuild_indexes(self) -> dict:
+        """
+        Rebuild indexes from disk files (source of truth).
+
+        Scans all thread JSON files and rebuilds _active.json and _suspended.json.
+        Call this when indexes may be out of sync with disk state.
+
+        Returns:
+            Dict with counts: active, suspended, archived, total
+        """
+        active_ids = []
+        suspended_ids = []
+        archived_count = 0
+
+        for thread_file in self.path.glob("thread_*.json"):
+            try:
+                data = json.loads(thread_file.read_text(encoding="utf-8"))
+                tid = data.get("id", thread_file.stem)
+                status = data.get("status", "active")
+
+                if status == "active":
+                    active_ids.append(tid)
+                elif status == "suspended":
+                    suspended_ids.append(tid)
+                elif status == "archived":
+                    archived_count += 1
+            except (json.JSONDecodeError, IOError):
+                continue
+
+        now = datetime.now().isoformat()
+        self._write_json(self._active_index_path, {"threads": active_ids, "last_updated": now})
+        self._write_json(self._suspended_index_path, {"threads": suspended_ids, "last_updated": now})
+
+        return {
+            "active": len(active_ids),
+            "suspended": len(suspended_ids),
+            "archived": archived_count,
+            "total": len(active_ids) + len(suspended_ids) + archived_count
+        }
+
     def _write_json(self, path: Path, data: dict):
         """Write JSON file atomically."""
         temp_path = path.with_suffix(".tmp")
@@ -169,6 +209,9 @@ class ThreadStorage:
             Number of threads suspended
         """
         from ..models.thread import Thread as ThreadModel
+
+        # Rebuild indexes from disk to ensure consistency
+        self.rebuild_indexes()
 
         active_threads = self.get_active()
         suspended_count = 0

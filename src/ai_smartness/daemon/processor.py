@@ -487,12 +487,93 @@ class ProcessorDaemon:
                     if pruned > 0:
                         logger.info(f"Pruned bridges: {pruned} deleted")
 
+                # V6.3: Archive stale suspended threads (>72h)
+                self._archive_stale_threads()
+
+                # V6.3: Cleanup orphaned shared resources
+                self._cleanup_shared_resources()
+
                 self.last_prune_time = datetime.now()
 
             except Exception as e:
                 logger.error(f"Prune error: {e}")
 
         logger.info("Prune timer stopped")
+
+    def _archive_stale_threads(self) -> None:
+        """
+        V6.3: Archive threads that have been suspended for > 72 hours.
+
+        Generates LLM synthesis, saves lightweight archive, and deletes
+        original thread files to free disk space.
+        """
+        try:
+            import importlib.util
+            archiver_path = Path(__file__).parent.parent / "intelligence" / "archiver.py"
+
+            if not archiver_path.exists():
+                return
+
+            spec = importlib.util.spec_from_file_location("archiver", archiver_path)
+            archiver_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(archiver_mod)
+
+            archiver = archiver_mod.Archiver(self.storage)
+            result = archiver.archive_stale_threads()
+
+            if result.get("archived_count", 0) > 0:
+                logger.info(f"Archived {result['archived_count']} stale threads")
+
+        except Exception as e:
+            logger.debug(f"Archive stale threads error: {e}")
+
+    def _cleanup_shared_resources(self) -> None:
+        """
+        V6.3: Cleanup orphaned shared cognition resources.
+
+        Removes:
+        - Published SharedThreads whose source thread was archived/deleted
+        - Stale subscriptions (>24h stale)
+        - InterAgentBridges pointing to dead SharedThreads
+        - Expired proposals from disk
+        """
+        try:
+            import importlib.util
+            shared_mod_path = Path(__file__).parent.parent / "storage" / "shared.py"
+
+            if not shared_mod_path.exists():
+                return
+
+            shared_path = self.ai_path / "db" / "shared"
+            if not shared_path.exists():
+                return
+
+            spec = importlib.util.spec_from_file_location("shared_storage", shared_mod_path)
+            shared_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(shared_mod)
+
+            shared_storage = shared_mod.SharedStorage(shared_path)
+
+            # Thread existence checker using our storage
+            def thread_exists(thread_id: str) -> bool:
+                if not self.storage:
+                    return True  # Can't check, assume exists
+                thread_path = self.ai_path / "db" / "threads" / f"{thread_id}.json"
+                return thread_path.exists()
+
+            result = shared_storage.cleanup_orphans(thread_exists_fn=thread_exists)
+
+            total = sum(result.values())
+            if total > 0:
+                logger.info(
+                    f"Shared cleanup: {result['orphaned_shared_threads']} shared threads, "
+                    f"{result['stale_subscriptions']} subscriptions, "
+                    f"{result['orphaned_bridges']} bridges, "
+                    f"{result['expired_proposals']} proposals"
+                )
+
+        except Exception as e:
+            logger.debug(f"Shared cleanup error: {e}")
 
     def _increment_heartbeat(self) -> Optional[int]:
         """
@@ -583,7 +664,7 @@ class ProcessorDaemon:
         """
         V5.2: Check context pressure and trigger proactive compaction.
 
-        Automatically compacts memory when pressure exceeds threshold:
+        Pressure is calculated as ratio of active threads to mode quota.
         - > 0.80 → normal compaction
         - > 0.95 → aggressive compaction
         """
@@ -595,22 +676,28 @@ class ProcessorDaemon:
                 config = json.loads(config_path.read_text())
 
             auto_opt = config.get("settings", {}).get("auto_optimization", {})
-            enabled = auto_opt.get("proactive_compact_enabled", True)  # Default enabled
+            enabled = auto_opt.get("proactive_compact_enabled", True)
             threshold = auto_opt.get("proactive_compact_threshold", 0.80)
 
             if not enabled:
                 return
 
-            # Calculate context pressure
-            if not self.thread_manager:
+            if not self.storage:
                 return
 
+            # Calculate pressure as active_count / mode_quota
             active = self.storage.threads.get_active()
-            total_weight = sum(t.weight for t in active)
+            mode = config.get("settings", {}).get("thread_mode", "normal")
 
-            # Rough pressure estimate (total_weight / typical_limit)
-            # A typical limit is around 10.0 total weight for good context
-            pressure = min(1.0, total_weight / 10.0)
+            # Import THREAD_LIMITS for mode quota
+            import importlib.util
+            config_mod_path = Path(__file__).parent.parent / "config.py"
+            spec = importlib.util.spec_from_file_location("config", config_mod_path)
+            config_mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(config_mod)
+
+            quota = config_mod.THREAD_LIMITS.get(mode, 50)
+            pressure = min(1.0, len(active) / quota) if quota > 0 else 1.0
 
             if pressure <= threshold:
                 return
@@ -618,27 +705,29 @@ class ProcessorDaemon:
             # Determine strategy based on pressure
             strategy = "aggressive" if pressure > 0.95 else "normal"
 
-            logger.info(f"PROACTIVE-COMPACT: pressure={pressure:.2f}, threshold={threshold}, strategy={strategy}")
+            logger.info(f"PROACTIVE-COMPACT: pressure={pressure:.2f} ({len(active)}/{quota}), strategy={strategy}")
 
             # Import and run compaction
-            package_dir = Path(__file__).parent.parent
-            package_parent = package_dir.parent
-            package_name = package_dir.name
+            import importlib.util as ilu
+            compactor_path = Path(__file__).parent.parent / "intelligence" / "compactor.py"
 
-            if str(package_parent) not in sys.path:
-                sys.path.insert(0, str(package_parent))
-
-            import importlib
-            compactor_mod = importlib.import_module(f"{package_name}.intelligence.compactor")
+            spec = ilu.spec_from_file_location("compactor", compactor_path)
+            compactor_mod = ilu.module_from_spec(spec)
+            spec.loader.exec_module(compactor_mod)
 
             compactor = compactor_mod.Compactor(self.storage)
             result = compactor.compact(strategy=strategy, dry_run=False)
 
-            if result.get("merged", 0) > 0 or result.get("archived", 0) > 0:
-                logger.info(f"PROACTIVE-COMPACT result: merged={result.get('merged', 0)}, archived={result.get('archived', 0)}")
+            merged = len([a for a in result.get("actions", []) if a.get("action") == "merge"])
+            archived = len([a for a in result.get("actions", []) if a.get("action") == "archive"])
+
+            if merged > 0 or archived > 0:
+                logger.info(f"PROACTIVE-COMPACT result: merged={merged}, archived={archived}")
 
         except Exception as e:
-            logger.debug(f"Proactive compact error: {e}")
+            logger.error(f"Proactive compact error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def run(self):
         """Run the daemon main loop."""

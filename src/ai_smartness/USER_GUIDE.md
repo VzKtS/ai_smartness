@@ -1,4 +1,4 @@
-# AI Smartness v6 - User Guide
+# AI Smartness v6.3 - User Guide
 
 ## Quick Start
 
@@ -282,6 +282,29 @@ ai_shared_status()            # Show shared cognition status
 - **Pull not push**: Subscribers explicitly pull updates via `ai_sync()`
 - **No private leakage**: Only SharedThread IDs, never private thread IDs
 
+### V6.1 Bridge Management
+```
+ai_bridges(thread_id?, relation_type?, status?)  # List/filter bridges
+ai_bridge_analysis()          # Network analytics and health
+```
+
+### V6.2 Advanced Shared Cognition
+```
+ai_recommend()                # Subscription recommendations
+ai_topics(agent_id?)          # Network-wide topic discovery
+```
+
+### V6.3 Memory Management
+```
+ai_sysinfo()                  # System resource monitoring
+```
+**Automatic features:**
+- **Hard Cap** -- Thread limits enforced BEFORE creation (auto-compact if full)
+- **LLM Archives** -- Threads suspended >72h archived with LLM synthesis
+- **Faster Decay** -- Threads: 1.5d half-life, Bridges: 1.0d half-life
+- **Cognitive GuardCode** -- Memory pressure reminders in context (>80% usage)
+- **Shared Hygiene** -- Orphaned SharedThreads/Subscriptions/Bridges auto-cleaned
+
 ---
 
 ## CLI in Prompt (v3.0.0+)
@@ -461,7 +484,7 @@ Threads and bridges use a neural-inspired weight system (Hebbian learning):
 | New thread | Starts at 1.0 |
 | Fork thread | Inherits parent's weight |
 | Each use (message) | +0.1 boost (max 1.0) |
-| Time decay | Halves every 7 days |
+| Time decay | Halves every 1.5 days (threads) / 1.0 day (bridges) |
 | Below 0.1 | Thread auto-suspended |
 | Below 0.05 | Bridge auto-deleted |
 
@@ -525,7 +548,7 @@ A mature agent should rarely hit compaction. Encourage this by:
 
 ```json
 {
-  "version": "6.0.2",
+  "version": "6.3.0",
   "settings": {
     "thread_mode": "heavy",
     "active_threads_limit": 100,
@@ -615,7 +638,8 @@ Check `.claude/settings.json`:
 | `.ai/inject.log` | Injection logs |
 | `.ai/db/threads/*.json` | Thread data |
 | `.ai/db/bridges/*.json` | Bridge data |
-| `.ai/db/synthesis/*.json` | Compaction syntheses |
+| `.ai/db/synthesis/
+    |── archives/         # v6.3 LLM-synthesized archives*.json` | Compaction syntheses |
 | `.ai/db/shared/published/*.json` | SharedThreads owned by this agent |
 | `.ai/db/shared/subscriptions/*.json` | Subscriptions to other agents' SharedThreads |
 | `.ai/db/shared/cross_bridges/*.json` | InterAgentBridges (bilateral consent) |
