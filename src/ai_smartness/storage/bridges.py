@@ -222,12 +222,17 @@ class BridgeStorage:
         """Get all alive bridges (weight above death threshold)."""
         return [b for b in self.get_all() if b.is_alive()]
 
-    def prune_dead_bridges(self) -> int:
+    def prune_dead_bridges(self, active_thread_ids: set = None) -> int:
         """
-        Apply decay and remove dead bridges.
+        Apply decay, remove dead bridges, and purge orphans.
 
         This implements synaptic pruning: bridges that haven't been
-        used decay over time and eventually die.
+        used decay over time and eventually die. Also removes bridges
+        whose source or target thread no longer exists as active.
+
+        Args:
+            active_thread_ids: If provided, bridges pointing to threads
+                NOT in this set are deleted (orphan cleanup).
 
         Returns:
             Number of bridges pruned (deleted)
@@ -236,6 +241,13 @@ class BridgeStorage:
         pruned_count = 0
 
         for bridge in all_bridges:
+            # Orphan check: delete if endpoint thread doesn't exist
+            if active_thread_ids is not None:
+                if bridge.source_id not in active_thread_ids or bridge.target_id not in active_thread_ids:
+                    self.delete(bridge.id)
+                    pruned_count += 1
+                    continue
+
             # Apply decay and check if should die
             should_die = bridge.decay()
 

@@ -168,6 +168,7 @@ def run_prune(ai_path: Path) -> int:
 
     try:
         from ai_smartness.storage.bridges import BridgeStorage
+        from ai_smartness.storage.threads import ThreadStorage
 
         bridges_path = ai_path / "db" / "bridges"
         if not bridges_path.exists():
@@ -184,11 +185,20 @@ def run_prune(ai_path: Path) -> int:
             print("No bridges to prune.")
             return 0
 
-        print(f"Pruning {total_before} bridges...")
+        # Collect active thread IDs for orphan detection
+        active_ids = None
+        threads_path = ai_path / "db" / "threads"
+        if threads_path.exists():
+            thread_storage = ThreadStorage(threads_path)
+            active_threads = thread_storage.get_active()
+            active_ids = {t.id for t in active_threads}
+            print(f"Pruning {total_before} bridges ({len(active_ids)} active threads)...")
+        else:
+            print(f"Pruning {total_before} bridges...")
         print()
 
-        # Apply decay and prune
-        pruned = storage.prune_dead_bridges()
+        # Apply decay, prune dead, and purge orphans
+        pruned = storage.prune_dead_bridges(active_thread_ids=active_ids)
 
         # Get stats after
         stats = storage.get_weight_stats()

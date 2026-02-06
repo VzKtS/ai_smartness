@@ -317,18 +317,23 @@ class GossipPropagator:
         # Just call the new decay-based pruning
         self.prune_dead_bridges()
 
-    def prune_dead_bridges(self) -> int:
+    def prune_dead_bridges(self, active_thread_ids: set = None) -> int:
         """
-        Apply decay and prune dead bridges.
+        Apply decay, prune dead bridges, and purge orphans.
 
         Implements synaptic pruning: bridges decay over time
         based on their half-life. Bridges that fall below the
-        death threshold are deleted.
+        death threshold are deleted. Orphan bridges (pointing to
+        non-active threads) are also removed.
+
+        Args:
+            active_thread_ids: If provided, bridges with endpoints
+                NOT in this set are deleted as orphans.
 
         Returns:
             Number of bridges pruned
         """
-        return self.storage.bridges.prune_dead_bridges()
+        return self.storage.bridges.prune_dead_bridges(active_thread_ids=active_thread_ids)
 
     def get_bridge_health(self) -> dict:
         """

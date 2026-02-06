@@ -481,9 +481,14 @@ class ProcessorDaemon:
                     if result.get("suspended_count", 0) > 0:
                         logger.info(f"Pruned threads: {result['suspended_count']} suspended")
 
-                # Prune bridges (delete dead)
+                # Prune bridges (delete dead + orphans)
                 if self.gossip:
-                    pruned = self.gossip.prune_dead_bridges()
+                    # Collect active thread IDs for orphan detection
+                    active_ids = None
+                    if self.thread_manager:
+                        active_threads = self.thread_manager.storage.threads.get_active()
+                        active_ids = {t.id for t in active_threads}
+                    pruned = self.gossip.prune_dead_bridges(active_thread_ids=active_ids)
                     if pruned > 0:
                         logger.info(f"Pruned bridges: {pruned} deleted")
 
